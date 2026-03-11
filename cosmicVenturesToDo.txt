@@ -1,0 +1,14 @@
+Make timers more accurate
+Add random free money & lose money events
+Switch cost & money per cycle
+Remove rainbow mode
+Make game run offline
+Increase prestige difficulty-higher prestige = harder to reset
+Reduce starter money for prestige
+Make upgrades less dramatic
+Add upgrades till centillion
+Reduce lag
+
+
+
+Later: Add other universes
