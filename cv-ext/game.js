@@ -407,6 +407,7 @@ function buyManager(idx, e) {
 
 // ===== CLICK =====
 function handleClick(e) {
+  console.log("[CV] handleClick fired, val:", getClickValue());
   const val = getClickValue();
   state.money += val;
   state.totalEarned += val;
@@ -1092,10 +1093,12 @@ document.addEventListener('keydown', e=>{
 
 // ── Attach all event listeners (no inline onclick= allowed in extensions) ──
 (function bindEvents() {
+  console.log("[CV] bindEvents running, readyState:", document.readyState);
   // Static elements
   function on(id, evt, fn) {
     const el = document.getElementById(id);
     if (el) el.addEventListener(evt, fn);
+    else console.warn('[CV] bindEvents: element not found:', id);
   }
   on('btn-open-cheat',     'click', openCheat);
   on('btn-try-prestige',   'click', tryPrestige);

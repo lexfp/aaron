@@ -1,6 +1,5 @@
 Switch cost & money per cycle
 Remove rainbow mode
-Add upgrades till centillion
 Reduce lag?
 Remove right-click?
 
