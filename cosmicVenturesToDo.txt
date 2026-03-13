@@ -1,10 +1,8 @@
-Make timers more accurate
 Switch cost & money per cycle
 Remove rainbow mode
-Make game run offline
-Reduce starter money for prestige
 Add upgrades till centillion
-Reduce lag
+Reduce lag?
+Remove right-click?
 
 
 

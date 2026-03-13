@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cosmic Ventures 🚀</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="game.css">
+</head>
+<body>
+<div class="stars"></div>
+<div class="app">
+
+<header>
+  <div class="logo">COSMIC<span>VENTURES</span></div>
+  <div class="header-stats">
+    <div class="stat-pill">
+      <div>
+        <div class="label">Credits</div>
+        <div class="value" id="money-display">$0</div>
+      </div>
+    </div>
+    <div class="stat-pill">
+      <div>
+        <div class="label">All Time</div>
+        <div class="value" id="total-display">$0</div>
+      </div>
+    </div>
+    <div class="stat-pill">
+      <div>
+        <div class="label">Per Sec</div>
+        <div class="value" id="cps-header">$0/s</div>
+      </div>
+    </div>
+    <button class="cheat-btn" id="btn-open-cheat">◈ CHEATS</button>
+    <button class="prestige-btn" id="btn-try-prestige">⬡ PRESTIGE <span id="prestige-level-badge" style="display:none;background:rgba(255,255,255,0.2);border-radius:10px;padding:1px 7px;margin-left:4px;font-size:0.75rem"></span></button>
+  </div>
+</header>
+
+<main>
+  <!-- EVENT BANNER -->
+  <div id="event-banner" style="display:none;position:fixed;top:62px;left:50%;transform:translateX(-50%);z-index:150;
+    border:1px solid rgba(0,255,136,0.4);border-radius:12px;padding:10px 20px;
+    align-items:center;gap:12px;min-width:340px;max-width:500px;
+    backdrop-filter:blur(10px);box-shadow:0 4px 30px rgba(0,0,0,0.5);">
+    <div id="event-icon" style="font-size:1.6rem;flex-shrink:0"></div>
+    <div style="flex:1">
+      <div id="event-label" style="font-family:'Orbitron',sans-serif;font-size:0.75rem;font-weight:700;letter-spacing:1px"></div>
+      <div id="event-desc" style="font-size:0.72rem;color:var(--muted);margin-top:2px"></div>
+    </div>
+    <div id="event-timer" style="font-family:'Orbitron',sans-serif;font-size:0.9rem;color:var(--gold);font-weight:700;flex-shrink:0"></div>
+  </div>
+  <!-- LEFT: CLICKER -->
+  <div class="clicker-panel">
+    <div style="text-align:center">
+      <div style="font-family:'Orbitron',sans-serif;font-size:0.65rem;color:var(--muted);letter-spacing:2px;margin-bottom:12px;">TAP TO HARVEST</div>
+      <div class="planet-wrap" id="planet-wrap-btn">
+        <div class="planet"></div>
+        <div class="planet-ring"></div>
+      </div>
+    </div>
+    <div class="cps-display">
+      <div class="big" id="click-power">+$1</div>
+      <div class="sub">per click</div>
+    </div>
+    <div style="width:100%">
+      <div class="section-title" style="margin-bottom:8px;">Buy Quantity</div>
+      <div class="qty-selector">
+        <button class="qty-btn active" data-qty="1">x1</button>
+        <button class="qty-btn" data-qty="10">x10</button>
+        <button class="qty-btn" data-qty="100">x100</button>
+        <button class="qty-btn" data-qty="max">MAX</button>
+      </div>
+    </div>
+    <div class="milestones" style="flex:1">
+      <div class="section-title" style="margin-bottom:8px;">Milestones</div>
+      <div id="milestones-list"></div>
+    </div>
+  </div>
+
+  <!-- CENTER: BUSINESSES -->
+  <div class="businesses-panel">
+    <div class="section-title">Enterprises</div>
+    <div id="businesses-list"></div>
+  </div>
+
+  <!-- RIGHT: UPGRADES -->
+  <div class="upgrades-panel">
+    <div class="section-title">Upgrades</div>
+    <div id="upgrades-list"></div>
+  </div>
+</main>
+</div>
+
+<!-- RESET MODAL -->
+<div class="cheat-overlay hidden" id="reset-overlay" style="z-index:600">
+  <div class="cheat-panel" style="max-width:360px">
+    <div class="cheat-header" style="background:linear-gradient(135deg,#2a0a0a,#1a0505)">
+      <div class="cheat-title" style="color:#ff4455">⚠ RESET SAVE</div>
+      <button class="cheat-close" id="btn-reset-x">✕</button>
+    </div>
+    <div style="padding:24px 20px;text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:12px">💀</div>
+      <div style="font-family:'Orbitron',sans-serif;font-size:0.85rem;color:#ff4455;margin-bottom:8px">WIPE ALL PROGRESS?</div>
+      <div style="font-size:0.82rem;color:var(--muted);line-height:1.6;margin-bottom:20px">
+        This will permanently delete all money, businesses, upgrades, and milestones. <strong style="color:#ff4455">This cannot be undone.</strong>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button id="btn-reset-cancel" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--muted);padding:10px;border-radius:8px;cursor:pointer;font-family:'Orbitron',sans-serif;font-size:0.7rem;letter-spacing:1px">CANCEL</button>
+        <button id="btn-reset-confirm" style="flex:1;background:linear-gradient(135deg,#cc0000,#880000);border:1px solid #ff4455;color:#fff;padding:10px;border-radius:8px;cursor:pointer;font-family:'Orbitron',sans-serif;font-size:0.7rem;letter-spacing:1px">WIPE SAVE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRESTIGE MODAL -->
+<div class="cheat-overlay hidden" id="prestige-overlay">
+  <div class="cheat-panel" style="max-width:380px">
+    <div class="cheat-header" style="background:linear-gradient(135deg,#1a0a30,#0d0520)">
+      <div class="cheat-title" style="color:#bf7fff">⬡ PRESTIGE</div>
+      <button class="cheat-close" id="btn-prestige-x">✕</button>
+    </div>
+    <div style="padding:24px 20px;text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:12px">🌟</div>
+      <div id="prestige-level-text" style="font-family:'Orbitron',sans-serif;font-size:0.9rem;color:#bf7fff;margin-bottom:8px"></div>
+      <div style="font-size:0.85rem;color:var(--muted);line-height:1.6;margin-bottom:20px">
+        Reset all progress and earnings in exchange for a permanent <strong style="color:var(--gold)">+50% income bonus</strong> that stacks every prestige.
+      </div>
+      <div id="prestige-locked-msg" style="font-size:0.8rem;color:#ff4455;margin-bottom:16px;display:none"></div>
+      <div style="display:flex;gap:10px">
+        <button id="btn-prestige-cancel" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--muted);padding:10px;border-radius:8px;cursor:pointer;font-family:'Orbitron',sans-serif;font-size:0.7rem;letter-spacing:1px">CANCEL</button>
+        <button id="prestige-confirm-btn" id="btn-prestige-confirm" style="flex:1;background:linear-gradient(135deg,#7c3aed,#4f1d96);border:1px solid #9f5cff;color:#fff;padding:10px;border-radius:8px;cursor:pointer;font-family:'Orbitron',sans-serif;font-size:0.7rem;letter-spacing:1px">PRESTIGE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CHEAT CONSOLE -->
+<div class="cheat-overlay hidden" id="cheat-overlay">
+  <div class="cheat-panel">
+    <div class="cheat-header">
+      <div class="cheat-title">◈ CHEAT TERMINAL</div>
+      <button class="cheat-close" id="btn-cheat-x">✕</button>
+    </div>
+    <div class="cheat-input-row">
+      <input class="cheat-input" id="cheat-input" placeholder="ENTER CODE..." autocomplete="off" spellcheck="false"/>
+      <button class="cheat-submit" id="btn-cheat-submit">EXECUTE</button>
+    </div>
+    <div class="cheat-log" id="cheat-log">
+      <div class="log-line log-info">// COSMIC VENTURES CHEAT TERMINAL v1.0</div>
+      <div class="log-line log-info">// Type a code or click a chip below <span class="cursor">_</span></div>
+    </div>
+    <div class="cheat-codes-list">
+      <h4>AVAILABLE CODES</h4>
+      <div class="code-grid" id="code-grid"></div>
+    </div>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
