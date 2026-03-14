@@ -626,6 +626,55 @@ const UPGRADES = [
   { id:48, name:'Galactic Overdrive',  icon:'🌀', desc:'All income x5',    cost:1e22,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=5},   req:()=>state.totalEarned>=1e21 },
   { id:49, name:'Cosmic Singularity',  icon:'🕳️', desc:'All income x7',    cost:1e27,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=7},   req:()=>state.totalEarned>=1e26 },
   { id:50, name:'Decillion Dividend',  icon:'💎', desc:'All income x10',   cost:1e32,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=10},  req:()=>state.totalEarned>=1e31 },
+  // ── EXTENDED TIERS ──────────────────────────────────────────────────────────
+  { id:61, name:'Plasma Lemonade',       icon:'🌡️', desc:'Lemonade x15',          cost:1e+30,        effect:()=>{state.bizMult[0]*=15},                            req:()=>state.owned[0]>=250 },
+  { id:62, name:'Void Citrus',           icon:'🌑', desc:'Lemonade x25',          cost:1e+33,        effect:()=>{state.bizMult[0]*=25},                            req:()=>state.owned[0]>=500 },
+  { id:63, name:'Omnilemon',             icon:'🍋', desc:'Lemonade x50',          cost:1e+36,        effect:()=>{state.bizMult[0]*=50},                            req:()=>state.owned[0]>=1000 },
+  { id:64, name:'Neutron Drill',         icon:'⚡', desc:'Mine x15',          cost:1e+31,        effect:()=>{state.bizMult[1]*=15},                            req:()=>state.owned[1]>=250 },
+  { id:65, name:'Black Hole Bore',       icon:'🕳️', desc:'Mine x25',          cost:1e+34,        effect:()=>{state.bizMult[1]*=25},                            req:()=>state.owned[1]>=500 },
+  { id:66, name:'Reality Miner',         icon:'💫', desc:'Mine x50',          cost:1e+37,        effect:()=>{state.bizMult[1]*=50},                            req:()=>state.owned[1]>=1000 },
+  { id:67, name:'Quantum Harvest',       icon:'🧬', desc:'Farm x15',          cost:1e+32,        effect:()=>{state.bizMult[2]*=15},                            req:()=>state.owned[2]>=250 },
+  { id:68, name:'Stellar Seeds',         icon:'🌟', desc:'Farm x25',          cost:1e+35,        effect:()=>{state.bizMult[2]*=25},                            req:()=>state.owned[2]>=500 },
+  { id:69, name:'Universe Farm',         icon:'🌌', desc:'Farm x50',          cost:1e+38,        effect:()=>{state.bizMult[2]*=50},                            req:()=>state.owned[2]>=1000 },
+  { id:70, name:'Void Oven',             icon:'🌑', desc:'Bakery x15',          cost:1e+33,        effect:()=>{state.bizMult[3]*=15},                            req:()=>state.owned[3]>=250 },
+  { id:71, name:'Cosmic Sourdough',      icon:'🌠', desc:'Bakery x25',          cost:1e+36,        effect:()=>{state.bizMult[3]*=25},                            req:()=>state.owned[3]>=500 },
+  { id:72, name:'Omnibake',              icon:'♾️', desc:'Bakery x50',          cost:1e+39,        effect:()=>{state.bizMult[3]*=50},                            req:()=>state.owned[3]>=1000 },
+  { id:73, name:'Singularity Press',     icon:'🕳️', desc:'Factory x15',          cost:1e+34,        effect:()=>{state.bizMult[4]*=15},                            req:()=>state.owned[4]>=250 },
+  { id:74, name:'Galactic Forge',        icon:'⚙️', desc:'Factory x25',          cost:1e+37,        effect:()=>{state.bizMult[4]*=25},                            req:()=>state.owned[4]>=500 },
+  { id:75, name:'Omni Factory',          icon:'🤖', desc:'Factory x50',          cost:1e+40,        effect:()=>{state.bizMult[4]*=50},                            req:()=>state.owned[4]>=1000 },
+  { id:76, name:'Reality Splicer',       icon:'🔭', desc:'Lab x15',          cost:1e+35,        effect:()=>{state.bizMult[5]*=15},                            req:()=>state.owned[5]>=250 },
+  { id:77, name:'Consciousness Core',    icon:'🧠', desc:'Lab x25',          cost:1e+38,        effect:()=>{state.bizMult[5]*=25},                            req:()=>state.owned[5]>=500 },
+  { id:78, name:'Omniscience Lab',       icon:'🔬', desc:'Lab x50',          cost:1e+41,        effect:()=>{state.bizMult[5]*=50},                            req:()=>state.owned[5]>=1000 },
+  { id:79, name:'Fate Engine',           icon:'🎰', desc:'Casino x15',          cost:1e+36,        effect:()=>{state.bizMult[6]*=15},                            req:()=>state.owned[6]>=250 },
+  { id:80, name:'Probability God',       icon:'🎲', desc:'Casino x25',          cost:1e+39,        effect:()=>{state.bizMult[6]*=25},                            req:()=>state.owned[6]>=500 },
+  { id:81, name:'Omniversal House',      icon:'💎', desc:'Casino x50',          cost:1e+42,        effect:()=>{state.bizMult[6]*=50},                            req:()=>state.owned[6]>=1000 },
+  { id:82, name:'Infinite Ledger',       icon:'📈', desc:'Bank x15',          cost:1e+37,        effect:()=>{state.bizMult[7]*=15},                            req:()=>state.owned[7]>=250 },
+  { id:83, name:'Cosmic Fed',            icon:'🏦', desc:'Bank x25',          cost:1e+40,        effect:()=>{state.bizMult[7]*=25},                            req:()=>state.owned[7]>=500 },
+  { id:84, name:'Universal Reserve',     icon:'💰', desc:'Bank x50',          cost:1e+43,        effect:()=>{state.bizMult[7]*=50},                            req:()=>state.owned[7]>=1000 },
+  { id:85, name:'Causality Loop',        icon:'⏳', desc:'Time Corp x15',          cost:1e+38,        effect:()=>{state.bizMult[8]*=15},                            req:()=>state.owned[8]>=250 },
+  { id:86, name:'Timeline God',          icon:'🌀', desc:'Time Corp x25',          cost:1e+41,        effect:()=>{state.bizMult[8]*=25},                            req:()=>state.owned[8]>=500 },
+  { id:87, name:'Omni Epoch',            icon:'♾️', desc:'Time Corp x50',          cost:1e+44,        effect:()=>{state.bizMult[8]*=50},                            req:()=>state.owned[8]>=1000 },
+  { id:88, name:'Multiverse CEO',        icon:'🌌', desc:'Universe x15',          cost:1e+39,        effect:()=>{state.bizMult[9]*=15},                            req:()=>state.owned[9]>=250 },
+  { id:89, name:'Omniversal Inc',        icon:'🔭', desc:'Universe x25',          cost:1e+42,        effect:()=>{state.bizMult[9]*=25},                            req:()=>state.owned[9]>=500 },
+  { id:90, name:'The Everything',        icon:'💥', desc:'Universe x50',          cost:1e+45,        effect:()=>{state.bizMult[9]*=50},                            req:()=>state.owned[9]>=1000 },
+  // CLICK (extended)
+  { id:91, name:'Nova Strike',           icon:'🌟', desc:'Click x15',        cost:1e+26,        effect:()=>{state.clickMult*=15},                                     req:()=>state.totalEarned>=1e+25 },
+  { id:92, name:'Pulsar Punch',          icon:'💫', desc:'Click x25',        cost:1e+36,        effect:()=>{state.clickMult*=25},                                     req:()=>state.totalEarned>=1e+35 },
+  { id:93, name:'Quasar Slam',           icon:'⚡', desc:'Click x50',        cost:1e+51,        effect:()=>{state.clickMult*=50},                                     req:()=>state.totalEarned>=1e+50 },
+  { id:94, name:'Big Bang Click',        icon:'💥', desc:'Click x100',       cost:1e+71,        effect:()=>{state.clickMult*=100},                                     req:()=>state.totalEarned>=1e+70 },
+  { id:95, name:'Reality Tap',           icon:'🔮', desc:'Click x500',       cost:1e+101,        effect:()=>{state.clickMult*=500},                                     req:()=>state.totalEarned>=1e+100 },
+  { id:96, name:'God Click',             icon:'👑', desc:'Click x9999',      cost:1e+151,        effect:()=>{state.clickMult*=9999},                                     req:()=>state.totalEarned>=1e+150 },
+  // GLOBAL (extended)
+  { id:97, name:'Stellar Dominion',      icon:'🌟', desc:'All income x15',    cost:1e+37,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=15},     req:()=>state.totalEarned>=1e+36 },
+  { id:98, name:'Universal Hegemony',    icon:'🌌', desc:'All income x25',    cost:1e+43,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=25},     req:()=>state.totalEarned>=1e+42 },
+  { id:99, name:'Omniversal Apex',       icon:'👑', desc:'All income x50',    cost:1e+51,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=50},     req:()=>state.totalEarned>=1e+50 },
+  { id:100, name:'Centillion Conquest',   icon:'💎', desc:'All income x100',   cost:1e+61,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=100},     req:()=>state.totalEarned>=1e+60 },
+  { id:101, name:'Infinite Dominance',    icon:'♾️', desc:'All income x200',   cost:1e+76,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=200},     req:()=>state.totalEarned>=1e+75 },
+  { id:102, name:'Reality Breach',        icon:'🕳️', desc:'All income x500',   cost:1e+91,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=500},     req:()=>state.totalEarned>=1e+90 },
+  { id:103, name:'The Final Theorem',     icon:'🔮', desc:'All income x1000',  cost:1e+101,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=1000},     req:()=>state.totalEarned>=1e+100 },
+  { id:104, name:'Centillion Crown',      icon:'⭐', desc:'All income x5000',  cost:1e+151,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=5000},     req:()=>state.totalEarned>=1e+150 },
+  { id:105, name:'Beyond Everything',     icon:'🌈', desc:'All income x9999',  cost:1e+201,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=9999},     req:()=>state.totalEarned>=1e+200 },
+  { id:106, name:'The Absolute End',      icon:'💥', desc:'All income x99999', cost:1e+251,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=99999},     req:()=>state.totalEarned>=1e+250 },
 ];
 
 const MILESTONES = [
@@ -712,6 +761,21 @@ const RANDOM_EVENTS = [
   { id:'cosmic_fortune', icon:'🌟',  label:'Cosmic Fortune',      desc:'The universe smiles upon you. Everything x2!',    incomeMult:2,    speedMult:2,    duration:20, good:true  },
 ];
 
+// Instant one-shot money events (fire independently of duration events)
+const MONEY_EVENTS = [
+  { id:'space_treasure', icon:'💰', label:'Space Treasure!',    good:true,  mult:30,  msg:'Found a drifting cargo pod!' },
+  { id:'comet_gold',     icon:'☄️', label:'Golden Comet!',      good:true,  mult:60,  msg:'A golden comet streaks past!' },
+  { id:'alien_trade',    icon:'👽', label:'Alien Traders!',     good:true,  mult:120, msg:'Alien merchants make a deal!' },
+  { id:'nebula_crystal', icon:'💎', label:'Nebula Crystal!',    good:true,  mult:300, msg:'Rare crystal formation discovered!' },
+  { id:'jackpot',        icon:'🎰', label:'Cosmic Jackpot!',    good:true,  mult:600, msg:'The universe deals you a winner!' },
+  { id:'tax_audit',      icon:'📋', label:'Galactic Tax Audit', good:false, mult:20,  msg:'The Galactic IRS strikes!' },
+  { id:'pirate_raid',    icon:'🏴‍☠️', label:'Space Pirates!',    good:false, mult:45,  msg:'Pirates raided your fleet!' },
+  { id:'black_market',   icon:'🌑', label:'Black Market Fine',  good:false, mult:90,  msg:'Caught running unlicensed wormholes!' },
+  { id:'supernova_dmg',  icon:'💣', label:'Supernova Damage',   good:false, mult:180, msg:'Nearby supernova destroys equipment!' },
+];
+
+let nextMoneyEventIn = 60 + Math.random() * 60;
+
 let activeEvent = null;
 let eventTimer = 0;
 let nextEventIn = 90 + Math.random() * 60; // first event 90-150s in
@@ -720,12 +784,19 @@ function tickEvents(dt) {
   nextEventIn -= dt;
   if(nextEventIn <= 0 && !activeEvent) {
     triggerRandomEvent();
-    nextEventIn = 120 + Math.random() * 60; // next event in 2-3 min
+    nextEventIn = 120 + Math.random() * 60;
   }
   if(activeEvent) {
     eventTimer -= dt;
     updateEventBanner();
     if(eventTimer <= 0) endEvent();
+  }
+
+  // Tick money events independently
+  nextMoneyEventIn -= dt;
+  if(nextMoneyEventIn <= 0) {
+    triggerMoneyEvent();
+    nextMoneyEventIn = 60 + Math.random() * 90; // every 1-2.5 mins
   }
 }
 
@@ -735,6 +806,22 @@ function triggerRandomEvent() {
   eventTimer = e.duration;
   showEventBanner(e);
   showNotification(`${e.icon} ${e.label}: ${e.desc}`);
+}
+
+function triggerMoneyEvent() {
+  const cps = getCPS();
+  if(cps <= 0) return;
+  const e = MONEY_EVENTS[Math.floor(Math.random() * MONEY_EVENTS.length)];
+  const amt = Math.floor(cps * e.mult);
+  if(e.good) {
+    state.money += amt;
+    state.totalEarned += amt;
+    showNotification(`${e.icon} ${e.label} — ${e.msg} +${fmt(amt)}`);
+  } else {
+    const loss = Math.min(amt, Math.floor(state.money * 0.25));
+    state.money = Math.max(0, state.money - loss);
+    showNotification(`${e.icon} ${e.label} — ${e.msg} -${fmt(loss)}`);
+  }
 }
 
 function triggerEventById(id) {
@@ -833,15 +920,18 @@ function getBizCost(idx, qty) {
   const b = BUSINESSES[idx];
   const owned = state.owned[idx];
   const r = 1.15;
-  if(qty === 1) return b.baseCost * Math.pow(r, owned);
-  return b.baseCost * Math.pow(r, owned) * (Math.pow(r, qty) - 1) / (r - 1);
+  const logCost = Math.log(b.baseCost) + owned * Math.log(r);
+  const singleCost = Math.exp(logCost);
+  if(!isFinite(singleCost)) return Infinity; // too expensive to display — treated as unaffordable
+  if(qty === 1) return singleCost;
+  return singleCost * (Math.pow(r, qty) - 1) / (r - 1);
 }
 function getMaxBuy(idx) {
   const b = BUSINESSES[idx];
   const r = 1.15;
   const owned = state.owned[idx];
-  const singleCost = b.baseCost * Math.pow(r, owned);
-  if(state.money < singleCost) return 0;
+  const singleCost = Math.exp(Math.log(b.baseCost) + owned * Math.log(r));
+  if(!isFinite(singleCost) || state.money < singleCost) return 0;
   const inner = state.money * (r - 1) / singleCost + 1;
   return Math.max(0, Math.floor(Math.log(inner) / Math.log(r)));
 }
@@ -917,15 +1007,22 @@ function handleClick(e) {
 }
 
 // ===== PRESTIGE =====
+function getPrestigeThreshold(level) {
+  // Level 1: $1T, each level after multiplies by 100
+  // Lv1=$1T, Lv2=$100T, Lv3=$10Q, Lv4=$1Qn, etc.
+  return 1e12 * Math.pow(100, level);
+}
+
 function tryPrestige() {
-  const canPrestige = state.totalEarned >= 1e12;
+  const threshold = getPrestigeThreshold(state.prestigeLevel);
+  const canPrestige = state.totalEarned >= threshold;
   const pl = state.prestigeLevel + 1;
   document.getElementById('prestige-level-text').textContent = `Prestige to Level ${pl} (+${pl*100}% income)`;
   const lockedMsg = document.getElementById('prestige-locked-msg');
   const confirmBtn = document.getElementById('prestige-confirm-btn');
   if(!canPrestige) {
     lockedMsg.style.display = 'block';
-    lockedMsg.textContent = `Need ${fmt(1e12)} lifetime earnings. You have ${fmt(state.totalEarned)}.`;
+    lockedMsg.textContent = `Need ${fmt(threshold)} lifetime earnings. You have ${fmt(state.totalEarned)}.`;
     confirmBtn.style.opacity = '0.4';
     confirmBtn.style.cursor = 'not-allowed';
   } else {
@@ -936,7 +1033,7 @@ function tryPrestige() {
   document.getElementById('prestige-overlay').classList.remove('hidden');
 }
 function confirmPrestige() {
-  if(state.totalEarned < 1e12) return;
+  if(state.totalEarned < getPrestigeThreshold(state.prestigeLevel)) return;
   closePrestige();
   doPrestige();
 }
@@ -1155,12 +1252,18 @@ function renderStats() {
   document.getElementById('click-power').textContent = '+'+fmt(getClickValue());
   const badge = document.getElementById('prestige-level-badge');
   if(badge) {
+    const threshold = getPrestigeThreshold(state.prestigeLevel);
+    const ready = state.totalEarned >= threshold;
     if(state.prestigeLevel > 0) {
       badge.style.display = 'inline';
-      badge.textContent = `Lv${state.prestigeLevel} +${state.prestigeLevel*100}%`;
+      badge.textContent = ready
+        ? `Lv${state.prestigeLevel} ✦ READY`
+        : `Lv${state.prestigeLevel} — ${fmt(state.totalEarned)}/${fmt(threshold)}`;
     } else {
-      badge.style.display = 'none';
+      badge.style.display = 'inline';
+      badge.textContent = ready ? '✦ READY' : `${fmt(state.totalEarned)}/${fmt(threshold)}`;
     }
+    badge.style.color = ready ? '#ffdd00' : '';
   }
 }
 
@@ -1258,16 +1361,17 @@ function renderUpgrades() {
   const sorted = [...UPGRADES].sort((a,b) => a.cost - b.cost);
   list.innerHTML = sorted.map((u)=>{
     const purchased = state.purchasedUpgrades.has(u.id);
+    if(purchased) return '';
     const available = u.req();
     const canAfford = state.money >= u.cost;
-    if(!available && !purchased) return '';
-    return `<div id="upg-${u.id}" class="upgrade-card ${purchased?'purchased':(canAfford?'affordable':'cant-afford')}"
+    if(!available) return '';
+    return `<div id="upg-${u.id}" class="upgrade-card ${canAfford?'affordable':'cant-afford'}"
       onclick="buyUpgrade(${u.id})">
       <div class="upg-icon">${u.icon}</div>
       <div class="upg-info">
-        <div class="upg-name">${u.name} ${purchased?'✓':''}</div>
+        <div class="upg-name">${u.name}</div>
         <div class="upg-desc">${u.desc}</div>
-        ${!purchased?`<div id="upg-cost-${u.id}" class="upg-cost" style="color:${canAfford?'var(--green)':'var(--accent2)'}">${fmt(u.cost)}</div>`:''}
+        <div id="upg-cost-${u.id}" class="upg-cost" style="color:${canAfford?'var(--green)':'var(--accent2)'}">${fmt(u.cost)}</div>
       </div>
     </div>`;
   }).join('');
@@ -1285,9 +1389,15 @@ document.addEventListener('click', e=>{
 
 // ===== SAVE/LOAD =====
 function saveGame() {
-  const save = {...state, purchasedUpgrades:[...state.purchasedUpgrades], completedMilestones:[...state.completedMilestones]};
+  const save = {
+    ...state,
+    purchasedUpgrades: [...state.purchasedUpgrades],
+    completedMilestones: [...state.completedMilestones],
+    savedAt: Date.now()
+  };
   localStorage.setItem('cosmicVentures', JSON.stringify(save));
 }
+
 function loadGame() {
   try {
     const raw = localStorage.getItem('cosmicVentures');
@@ -1307,6 +1417,46 @@ function loadGame() {
       const u = UPGRADES.find(u => u.id === id);
       if(u) u.effect();
     });
+
+    // Calculate offline earnings (manager-run businesses only)
+    // Full rate for first 8 hours, then diminishing returns after that
+    if(s.savedAt) {
+      const offlineSecs = (Date.now() - s.savedAt) / 1000;
+      if(offlineSecs > 60) {
+        cachedMilestoneMults = getMilestoneMults();
+        const { incomeMult } = cachedMilestoneMults;
+        const globalMult = (1 + state.prestigeLevel) * incomeMult;
+        let offlineEarned = 0;
+        const fullRateCap = 8 * 3600; // 8 hours at full rate
+        BUSINESSES.forEach((b, i) => {
+          if(state.owned[i] > 0 && state.managers[i]) {
+            const incomePerSec = b.baseIncome * state.owned[i] * state.bizMult[i] * globalMult / b.time;
+            // Full earnings for first 8 hours
+            const fullSecs = Math.min(offlineSecs, fullRateCap);
+            let earned = incomePerSec * fullSecs;
+            // Diminishing returns beyond 8 hours: each doubling of extra time gives 50% efficiency
+            if(offlineSecs > fullRateCap) {
+              const extraSecs = offlineSecs - fullRateCap;
+              // efficiency = 1 / (1 + log2(extraSecs / 3600)) — drops off but never hits zero
+              const extraHours = extraSecs / 3600;
+              const efficiency = 1 / (1 + Math.log2(1 + extraHours));
+              earned += incomePerSec * extraSecs * efficiency;
+            }
+            offlineEarned += earned;
+          }
+        });
+        if(offlineEarned > 0) {
+          state.money += offlineEarned;
+          state.totalEarned += offlineEarned;
+          const totalMins = Math.floor(offlineSecs / 60);
+          const hrs = Math.floor(totalMins / 60);
+          const mins = totalMins % 60;
+          const timeStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+          const note = offlineSecs > fullRateCap ? ' (reduced rate)' : '';
+          setTimeout(() => showNotification(`⏰ Welcome back! Earned ${fmt(offlineEarned)} in ${timeStr} offline${note}.`), 500);
+        }
+      }
+    }
   } catch(e) {}
 }
 
@@ -1349,7 +1499,7 @@ const CHEAT_CODES = [
   { code:'MAXOUT',     label:'MAXOUT',     desc:'Own 100 of each biz', fn:()=>{ state.owned=state.owned.map(v=>Math.max(v,100)); state.managers=state.managers.map(()=>true); render(); return '🏭 100x all businesses + managers!'; }},
   { code:'ULTRAMANAGER',label:'ULTRAMANAGER',desc:'All managers hired',fn:()=>{ state.managers=state.managers.map(()=>true); render(); return '🤖 All managers hired!'; }},
   { code:'TIMELOCK',   label:'TIMELOCK',   desc:'All cycles instant', fn:()=>{ state.progress=state.progress.map(()=>0.999); render(); return '⏱️ Cycles near-instant!'; }},
-  { code:'PRESTIGEME', label:'PRESTIGEME', desc:'Force prestige',    fn:()=>{ state.totalEarned = 1e12; doPrestige(); return `🌟 Forced prestige! Level ${state.prestigeLevel}`; }},
+  { code:'PRESTIGEME', label:'PRESTIGEME', desc:'Force prestige',    fn:()=>{ state.totalEarned = getPrestigeThreshold(state.prestigeLevel); doPrestige(); return `🌟 Forced prestige! Level ${state.prestigeLevel}`; }},
   { code:'EVENT',      label:'EVENT',      desc:'Trigger random event',   fn:()=>{ triggerEventById(null); return '🎲 Random event triggered!'; }},
   { code:'EVENT:solar_flare',   label:'EVENT:solar_flare',   desc:'☀️ Solar Flare',        fn:()=>{ triggerEventById('solar_flare');   return '☀️ Solar Flare triggered!'; }},
   { code:'EVENT:warp_surge',    label:'EVENT:warp_surge',    desc:'⚡ Warp Surge',          fn:()=>{ triggerEventById('warp_surge');    return '⚡ Warp Surge triggered!'; }},
