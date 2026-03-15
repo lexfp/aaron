@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Shooter</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Homepage -->
+    <div id="homepage">
+        <h1>WARZONE</h1>
+        <div class="subtitle">3D Tactical Shooter</div>
+        <button id="btn-zombie" class="menu-btn">Zombie Apocalypse</button>
+        <button id="btn-pvp" class="menu-btn">PvP Arena</button>
+        <button id="btn-shop" class="menu-btn">Shop</button>
+        <button id="btn-loadout" class="menu-btn">Loadout</button>
+        <button id="btn-cheat" class="menu-btn">Cheat Menu</button>
+        <div class="player-stats">
+            Money: <span id="home-money">$100</span><br>
+            Missions: <span id="home-missions">0</span>
+        </div>
+    </div>
+
+    <div id="cheat-menu">
+        <div class="cheat-panel">
+            <h2>Cheat Menu</h2>
+            <p>Activate cheats directly. Toggle with backtick key in-game.</p>
+            <div class="cheat-buttons" id="cheat-buttons"></div>
+            <button class="menu-btn close-btn" onclick="hideCheatMenu()">Close</button>
+            <button class="menu-btn close-btn" onclick="hideCheatMenu(); showScreen('homepage')">Back to Homepage</button>
+        </div>
+    </div>
+
+    <!-- Map Selection -->
+    <div id="map-screen">
+        <h2>Select Map</h2>
+        <div class="map-grid" id="map-grid"></div>
+        <button class="back-btn" onclick="showScreen('homepage')">Back</button>
+    </div>
+
+    <!-- Shop -->
+    <div id="shop-screen">
+        <h2>SHOP</h2>
+        <div style="text-align:center;font-size:24px;color:#00ff88;margin-bottom:20px">
+            Your Money: <span id="shop-money">$100</span>
+        </div>
+        <h3 style="text-align:center;color:#ffaa00;font-size:28px;margin-bottom:15px">Weapons</h3>
+        <div class="shop-grid" id="weapon-shop"></div>
+        <div class="equip-section">
+            <h3>Equipment</h3>
+            <div class="shop-grid" id="equipment-shop"></div>
+        </div>
+        <div class="equip-section attachment-section">
+            <h3>Attachments</h3>
+            <div class="shop-grid" id="attachment-shop"></div>
+        </div>
+        <button class="back-btn" onclick="showScreen('homepage')">Back</button>
+    </div>
+
+    <!-- Loadout -->
+    <div id="loadout-screen">
+        <h2>LOADOUT</h2>
+        <div class="slots-info" id="slots-info">Equip weapons for your next mission</div>
+        <div class="loadout-grid" id="loadout-grid"></div>
+        <button class="back-btn" onclick="showScreen('homepage')">Back</button>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div id="crosshair"><div class="dot"></div></div>
+        <div id="hp-bar"><div class="fill"></div><div class="label">100 HP</div></div>
+        <div id="armor-bar"><div class="fill"></div><div class="label">0 Armor</div></div>
+        <div id="weapon-hud">
+            <div class="weapon-name">Fists</div>
+            <div class="ammo-display">
+                <span class="current">--</span>
+                <span class="separator"> / </span>
+                <span class="reserve">--</span>
+            </div>
+            <div class="reload-text" style="display:none">RELOADING...</div>
+        </div>
+        <div id="money-hud">$100</div>
+        <div id="wave-hud">Wave 1</div>
+        <div id="weapon-slots"></div>
+        <div id="kill-feed"></div>
+        <div id="interaction-prompt">Press [E] to pick up</div>
+        <div id="scope-overlay">
+            <div class="vignette"></div>
+            <div class="crosshair-h"></div>
+            <div class="crosshair-v"></div>
+        </div>
+        <div id="damage-overlay"></div>
+        <div id="cheat-console"><input id="cheat-input" placeholder="Enter cheat code..." /></div>
+        <div id="cheat-msg"></div>
+    </div>
+
+    <!-- Round overlay -->
+    <div id="round-overlay">
+        <div id="round-text"></div>
+        <div class="sub" id="round-sub"></div>
+        <button class="menu-btn" id="return-home-btn" style="display:none;margin-top:14px;" onclick="returnToMenu()">Return to Homepage</button>
+    </div>
+
+    <!-- Pause -->
+    <div id="pause-menu">
+        <h2>PAUSED</h2>
+        <button class="menu-btn" onclick="resumeGame()">Resume</button>
+        <button class="menu-btn" onclick="quitToMenu()">Quit to Menu</button>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

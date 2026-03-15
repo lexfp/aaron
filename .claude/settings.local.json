@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/micro/OneDrive/Documents/code/aaron -type f -exec ls -lh {})",
+      "Bash(sort -k2)",
+      "Bash(wc:*)",
+      "Bash(head:*)",
+      "Bash(tree:*)"
+    ]
+  }
+}

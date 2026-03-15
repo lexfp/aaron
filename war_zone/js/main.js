@@ -1,0 +1,285 @@
+// Main entry point: game loop, start/quit, collision, initialization
+
+import * as THREE from 'three';
+import { WEAPONS, EQUIPMENT, MAPS } from './data.js';
+import { playerData, playerState, resetPlayerState, savePlayerData, gameState } from './state.js';
+import { playPickup } from './audio.js';
+import {
+    scene, camera, renderer, controls, velocity, direction, keys,
+    canJump, setCanJump, obstacles, moveSpeed, sprintMult, jumpForce, gravity,
+    weaponModel, weaponSwingTime, setWeaponSwingTime
+} from './engine.js';
+import { buildMap } from './map.js';
+import {
+    showScreen, updateHomeStats, showShop, showLoadout,
+    renderMapScreen, updateHUD, renderWeaponSlots,
+    showRoundOverlay, buildCheats, showCheatMenu, hideCheatMenu
+} from './ui.js';
+import { createWeaponModel, getCurrentWeapon, switchWeapon, updateReload, refillAllAmmo } from './weapons.js';
+import { updateZombies, spawnPvPEnemy, updatePvPEnemy, killZombie } from './entities.js';
+import { shoot, updateFireZones, checkPvPEnd } from './combat.js';
+import { setupInput, checkInteractionPrompt, isMouseDown } from './input.js';
+import { register } from './callbacks.js';
+
+// --- Register callbacks to break circular deps ---
+
+register('quitToMenu', () => quitToMenu());
+register('refillAllAmmo', () => refillAllAmmo());
+register('killAllEnemies', () => killAllEnemies());
+
+// --- Cheats ---
+
+const CHEATS = buildCheats();
+
+function killAllEnemies() {
+    for (let i = gameState.zombieEntities.length - 1; i >= 0; i--) {
+        killZombie(gameState.zombieEntities[i], i);
+    }
+    if (gameState.pvpEnemy) {
+        gameState.pvpEnemy.hp = 0;
+        gameState.pvpPlayerScore++;
+        checkPvPEnd();
+    }
+}
+
+// --- Collision ---
+
+function checkCollision(newPos) {
+    if (playerState.noClip) return false;
+    const size = gameState.currentMap ? MAPS[gameState.currentMap].size * 0.95 : 50;
+    if (Math.abs(newPos.x) > size || Math.abs(newPos.z) > size) return true;
+
+    const playerBox = new THREE.Box3().setFromCenterAndSize(newPos, new THREE.Vector3(0.5, 1.7, 0.5));
+    for (const obs of obstacles) {
+        if (obs.box && obs.box.intersectsBox(playerBox)) {
+            if (newPos.y - 1.7 >= obs.box.max.y - 0.3) continue;
+            return true;
+        }
+        if (obs.radius) {
+            const dx = newPos.x - obs.mesh.position.x;
+            const dz = newPos.z - obs.mesh.position.z;
+            if (Math.sqrt(dx * dx + dz * dz) < obs.radius + 0.3) return true;
+        }
+    }
+    return false;
+}
+
+function getFloorHeight(pos) {
+    let floor = 0;
+    for (const obs of obstacles) {
+        if (obs.box) {
+            if (pos.x >= obs.box.min.x - 0.25 && pos.x <= obs.box.max.x + 0.25 &&
+                pos.z >= obs.box.min.z - 0.25 && pos.z <= obs.box.max.z + 0.25) {
+                const obsTop = obs.box.max.y;
+                if (obsTop > floor && pos.y >= obsTop + 1.4) floor = obsTop;
+            }
+        }
+    }
+    return floor;
+}
+
+// --- Start Game ---
+
+function startGame(mode, mapId) {
+    gameState.mode = mode || 'zombie';
+    gameState.currentMap = mapId in MAPS ? mapId : 'warehouse';
+
+    if (!playerData.equippedLoadout?.length) playerData.equippedLoadout = ['fists'];
+    if (!playerData.equippedLoadout.includes('fists')) playerData.equippedLoadout.unshift('fists');
+
+    ['homepage', 'shop-screen', 'loadout-screen', 'map-screen'].forEach(s =>
+        document.getElementById(s).style.display = 'none'
+    );
+    document.getElementById('hud').style.display = 'block';
+
+    buildMap(mapId);
+
+    const maxSlots = mode === 'pvp' ? 3 : 4;
+    resetPlayerState({
+        weapons: playerData.equippedLoadout.slice(0, maxSlots),
+        maxSlots
+    });
+
+    for (const wid of playerState.weapons) {
+        const w = WEAPONS[wid];
+        playerState.weaponStates[wid] = {
+            ammo: w.maxAmmo, reserveAmmo: w.reserveAmmo,
+            lastFired: 0, reloading: false, reloadStart: 0
+        };
+    }
+
+    if (playerData.equippedArmor) {
+        const eq = EQUIPMENT[playerData.equippedArmor];
+        playerState.armor = eq.armor;
+        playerState.maxArmor = eq.armor;
+        playerState.damageReduction = eq.damageReduction;
+    }
+    if (playerData.equippedHelmet) {
+        const eq = EQUIPMENT[playerData.equippedHelmet];
+        playerState.armor += eq.armor;
+        playerState.headshotReduction = eq.headshotReduction;
+    }
+    for (const id of playerData.ownedEquipment) {
+        const eq = EQUIPMENT[id];
+        if (eq.hpRestore) playerState.hp = Math.min(playerState.maxHp, playerState.hp + eq.hpRestore);
+        if (eq.hpBoost) { playerState.maxHp += eq.hpBoost; playerState.hp += eq.hpBoost; }
+    }
+    playerData.ownedEquipment = [];
+
+    camera.position.set(0, 1.7, 0);
+    scene.add(camera);
+    createWeaponModel(playerState.weapons[0]);
+    renderWeaponSlots();
+
+    gameState.zombieEntities = [];
+    gameState.droppedWeapons = [];
+    gameState.fireZones = [];
+
+    if (mode === 'zombie') {
+        gameState.wave = 1;
+        gameState.zombiesAlive = 0;
+        gameState.zombiesToSpawn = 5;
+        gameState.zombieSpawnTimer = 0;
+        document.getElementById('wave-hud').style.display = 'block';
+        document.getElementById('wave-hud').textContent = 'Wave 1';
+    } else if (mode === 'pvp') {
+        gameState.pvpRound = 1;
+        gameState.pvpPlayerScore = 0;
+        gameState.pvpEnemyScore = 0;
+        document.getElementById('wave-hud').style.display = 'block';
+        document.getElementById('wave-hud').textContent = 'Round 1 | 0-0';
+        spawnPvPEnemy();
+    }
+
+    gameState.active = true;
+    gameState.paused = false;
+    updateHUD();
+    controls.lock();
+}
+window.startGame = startGame;
+
+// --- Quit / Resume ---
+
+function quitToMenu() {
+    gameState.active = false;
+    gameState.paused = false;
+    controls.unlock();
+    document.getElementById('hud').style.display = 'none';
+    document.getElementById('pause-menu').style.display = 'none';
+    document.getElementById('round-overlay').style.display = 'none';
+    gameState.zombieEntities = [];
+    gameState.droppedWeapons = [];
+    gameState.fireZones = [];
+    gameState.ammoPickups = [];
+    gameState.pvpEnemy = null;
+    showScreen('homepage');
+}
+window.quitToMenu = quitToMenu;
+
+function resumeGame() {
+    gameState.paused = false;
+    document.getElementById('pause-menu').style.display = 'none';
+    controls.lock();
+}
+window.resumeGame = resumeGame;
+
+window.returnToMenu = function () {
+    document.getElementById('round-overlay').style.display = 'none';
+    quitToMenu();
+};
+
+// --- Game Loop ---
+
+let prevTime = performance.now();
+
+function animate() {
+    requestAnimationFrame(animate);
+    const time = performance.now();
+    const dt = Math.min((time - prevTime) / 1000, 0.1);
+    prevTime = time;
+
+    if (gameState.active && !gameState.paused && controls.isLocked) {
+        direction.z = Number(keys.w) - Number(keys.s);
+        direction.x = Number(keys.d) - Number(keys.a);
+        direction.normalize();
+
+        const speed = moveSpeed * (keys.shift ? sprintMult : 1) * playerState.speedMult;
+        velocity.x -= velocity.x * 10.0 * dt;
+        velocity.z -= velocity.z * 10.0 * dt;
+        velocity.y -= gravity * dt;
+        if (direction.z !== 0) velocity.z -= direction.z * speed * dt * 15;
+        if (direction.x !== 0) velocity.x -= direction.x * speed * dt * 15;
+        if (keys.space && canJump) { velocity.y = jumpForce; setCanJump(false); }
+
+        controls.moveRight(-velocity.x * dt);
+        controls.moveForward(-velocity.z * dt);
+        camera.position.y += velocity.y * dt;
+
+        const floorY = getFloorHeight(camera.position) + 1.7;
+        if (camera.position.y < floorY) {
+            camera.position.y = floorY;
+            velocity.y = 0;
+            setCanJump(true);
+        }
+        if (checkCollision(camera.position)) {
+            controls.moveRight(velocity.x * dt);
+            controls.moveForward(velocity.z * dt);
+        }
+
+        const { def } = getCurrentWeapon();
+        if (isMouseDown() && def.fireRate <= 0.15) shoot();
+
+        updateReload();
+        updateFireZones(dt);
+
+        if (gameState.mode === 'zombie') updateZombies(dt);
+        else if (gameState.mode === 'pvp') updatePvPEnemy(dt);
+
+        for (const pickup of gameState.ammoPickups) {
+            if (pickup.collected) continue;
+            pickup.mesh.rotation.y += dt * 2;
+            if (camera.position.distanceTo(pickup.mesh.position) < 2) {
+                pickup.collected = true;
+                scene.remove(pickup.mesh);
+                const state = playerState.weaponStates[playerState.weapons[playerState.currentWeaponIndex]];
+                if (state) { state.reserveAmmo += 20; playPickup(); updateHUD(); }
+            }
+        }
+
+        for (const dw of gameState.droppedWeapons) dw.mesh.rotation.y += dt * 1.5;
+        checkInteractionPrompt();
+
+        if (weaponModel) {
+            const bobSpeed = keys.shift ? 12 : 8;
+            const bobAmt = keys.shift ? 0.015 : 0.008;
+            if (direction.x !== 0 || direction.z !== 0) {
+                weaponModel.position.y = Math.sin(time * 0.001 * bobSpeed) * bobAmt;
+                weaponModel.position.x = Math.cos(time * 0.001 * bobSpeed * 0.5) * bobAmt * 0.5;
+            }
+            if (weaponSwingTime > 0) {
+                setWeaponSwingTime(weaponSwingTime - dt);
+                weaponModel.rotation.x = -weaponSwingTime * 3;
+            } else {
+                weaponModel.rotation.x = 0;
+            }
+        }
+        updateHUD();
+    }
+    renderer.render(scene, camera);
+}
+
+// --- Initialize ---
+
+renderMapScreen(startGame);
+
+document.getElementById('btn-zombie').addEventListener('click', () => { gameState.pendingMode = 'zombie'; showScreen('map-screen'); });
+document.getElementById('btn-pvp').addEventListener('click', () => { gameState.pendingMode = 'pvp'; showScreen('map-screen'); });
+document.getElementById('btn-shop').addEventListener('click', showShop);
+document.getElementById('btn-loadout').addEventListener('click', showLoadout);
+document.getElementById('btn-cheat').addEventListener('click', () => showCheatMenu(CHEATS));
+
+window.showCheatMenu = () => showCheatMenu(CHEATS);
+
+setupInput(CHEATS, resumeGame);
+updateHomeStats();
+animate();
