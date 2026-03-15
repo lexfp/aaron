@@ -946,7 +946,7 @@
             shield: {
                 name: 'Shield', type: 'melee', range: 'close', damage: 1, fireRate: 0.8,
                 ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
-                cost: 1200, reach: 1.2, damageReduction: 0.5
+                cost: 1200, reach: 1.2, damageReduction: 1.0
             },
             minigun: {
                 name: 'Minigun', type: 'gun', range: 'long', damage: 1, fireRate: 0.03,
@@ -1168,7 +1168,12 @@
 
         function showScreen(id) {
             ['homepage', 'shop-screen', 'loadout-screen', 'map-screen'].forEach(s => {
-                document.getElementById(s).style.display = s === id ? 'flex' : 'none';
+                if (s === id) {
+                    // Shop/loadout use block for vertical scroll; others use flex
+                    document.getElementById(s).style.display = (s === 'shop-screen' || s === 'loadout-screen') ? 'block' : 'flex';
+                } else {
+                    document.getElementById(s).style.display = 'none';
+                }
             });
             if (id === 'homepage') updateHomeStats();
         }
@@ -1337,8 +1342,22 @@
             <div class="ammo-info">${w.type === 'melee' ? 'Melee' : `Ammo: ${w.maxAmmo}`}</div>
             ${attachments ? `<div class="ammo-info" style="color:#ff88ff">${attachments}</div>` : ''}
             ${needsRepair ? '<div style="color:#ff4444;font-size:12px">NEEDS REPAIR</div>' : ''}
+            ${needsRepair ? `<button class="repair-btn" style="width:100%;padding:8px;margin-top:6px;background:#ff8800;color:#000;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer" data-repair-id="${id}">Repair ($50)</button>` : ''}
             <div style="margin-top:6px;font-size:12px;color:#888">${equipped ? 'EQUIPPED' : 'Click to equip'}</div>
         `;
+                // Attach repair button handler
+                const repairBtn = item.querySelector('[data-repair-id]');
+                if (repairBtn) {
+                    repairBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (playerData.money >= 50) {
+                            playerData.money -= 50;
+                            playerData.weaponUsage[id] = 0;
+                            savePlayerData();
+                            showLoadout();
+                        }
+                    };
+                }
                 item.onclick = () => {
                     if (needsRepair) return;
                     if (equipped) {
@@ -1478,16 +1497,29 @@
                     );
                 }
             } else if (mapId === 'city') {
-                // Buildings
+                // Buildings with staircases
+                const stairMat = new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 0.8 });
                 for (let i = 0; i < 15; i++) {
                     const w = 4 + rng() * 8;
                     const h = 4 + rng() * 12;
                     const d = 4 + rng() * 8;
-                    addObstacle(obsMat, w, h, d,
-                        (rng() - 0.5) * size * 1.4,
-                        h / 2,
-                        (rng() - 0.5) * size * 1.4
-                    );
+                    const bx = (rng() - 0.5) * size * 1.4;
+                    const bz = (rng() - 0.5) * size * 1.4;
+                    addObstacle(obsMat, w, h, d, bx, h / 2, bz);
+
+                    // Add staircase on one side of the building to the roof
+                    const stairWidth = 1.2;
+                    const stepH = 0.5;
+                    const stepD = 0.6;
+                    const numSteps = Math.ceil(h / stepH);
+                    const side = rng() > 0.5 ? 1 : -1; // which side of building
+
+                    for (let s = 0; s < numSteps; s++) {
+                        const stepY = s * stepH + stepH / 2;
+                        const stepZ = bz - d / 2 + (s / numSteps) * d;
+                        const stepX = bx + side * (w / 2 + stairWidth / 2 + 0.1);
+                        addObstacle(stairMat, stairWidth, stepH, stepD, stepX, stepY, stepZ);
+                    }
                 }
             } else if (mapId === 'forest') {
                 // Trees (cylinders)
@@ -1595,30 +1627,118 @@
                 mesh.position.set(0.15, -0.12, -0.3);
                 group.add(mesh);
             } else {
-                // Gun
-                const bodyMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+                // Gun - styled per weapon type
+                let bodyColor = 0x333333;
+                let accentColor = 0x4a3520;
+                let metalColor = 0x555555;
                 let bodyLen = 0.3;
                 let bodyH = 0.04;
-                if (weaponId === 'sniper' || weaponId === 'assault_rifle') bodyLen = 0.5;
-                if (weaponId === 'minigun') { bodyLen = 0.55; bodyH = 0.06; }
-                if (weaponId === 'rpg') { bodyLen = 0.5; bodyH = 0.06; }
-                if (weaponId === 'shotgun') bodyLen = 0.45;
+                let bodyW = 0.03;
+                let barrelLen = 0.15;
+                let barrelRadius = 0.008;
 
-                const body = new THREE.Mesh(new THREE.BoxGeometry(0.03, bodyH, bodyLen), bodyMat);
+                if (weaponId === 'glock') {
+                    bodyColor = 0x2a2a2a; accentColor = 0x1a1a1a; bodyLen = 0.2; bodyH = 0.035;
+                } else if (weaponId === 'revolver') {
+                    bodyColor = 0x6B6B6B; accentColor = 0x3a2010; metalColor = 0x888888;
+                    bodyLen = 0.22; bodyH = 0.045; barrelRadius = 0.012;
+                } else if (weaponId === 'shotgun') {
+                    bodyColor = 0x2a2a2a; accentColor = 0x5a3520; bodyLen = 0.45; bodyH = 0.04;
+                    barrelLen = 0.2; barrelRadius = 0.012;
+                } else if (weaponId === 'assault_rifle') {
+                    bodyColor = 0x2d2d2d; accentColor = 0x3a3a3a; bodyLen = 0.5; bodyH = 0.04;
+                    bodyW = 0.035; barrelLen = 0.18;
+                } else if (weaponId === 'sniper') {
+                    bodyColor = 0x1a2a1a; accentColor = 0x2a1a10; bodyLen = 0.55; bodyH = 0.035;
+                    barrelLen = 0.25; barrelRadius = 0.006;
+                } else if (weaponId === 'minigun') {
+                    bodyColor = 0x3a3a3a; accentColor = 0x2a2a2a; metalColor = 0x666666;
+                    bodyLen = 0.55; bodyH = 0.06; bodyW = 0.05; barrelLen = 0.2; barrelRadius = 0.015;
+                } else if (weaponId === 'rpg') {
+                    bodyColor = 0x4a5a3a; accentColor = 0x3a3a2a; bodyLen = 0.5; bodyH = 0.06;
+                    bodyW = 0.05; barrelLen = 0.15; barrelRadius = 0.025;
+                } else if (weaponId === 'crossbow') {
+                    bodyColor = 0x3a2a1a; accentColor = 0x2a1a0a; bodyLen = 0.3; bodyH = 0.03;
+                }
+
+                const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.4, metalness: 0.6 });
+                const accentMat = new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.7 });
+                const metalMat = new THREE.MeshStandardMaterial({ color: metalColor, roughness: 0.2, metalness: 0.8 });
+
+                // Main body/receiver
+                const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, bodyLen), bodyMat);
                 body.position.set(0.15, -0.12, -0.35);
                 group.add(body);
 
-                // Handle
-                const handle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.08, 0.02), new THREE.MeshStandardMaterial({ color: 0x4a3520 }));
+                // Handle/grip
+                const handle = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.08, 0.025), accentMat);
                 handle.position.set(0.15, -0.18, -0.25);
                 handle.rotation.x = -0.3;
                 group.add(handle);
 
                 // Barrel
-                const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.15, 8), bodyMat);
+                const barrel = new THREE.Mesh(new THREE.CylinderGeometry(barrelRadius, barrelRadius, barrelLen, 8), metalMat);
                 barrel.rotation.x = Math.PI / 2;
-                barrel.position.set(0.15, -0.11, -0.58);
+                barrel.position.set(0.15, -0.11, -0.35 - bodyLen / 2 - barrelLen / 2);
                 group.add(barrel);
+
+                // Weapon-specific details
+                if (weaponId === 'shotgun') {
+                    // Pump grip
+                    const pump = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.025, 0.08), accentMat);
+                    pump.position.set(0.15, -0.13, -0.48);
+                    group.add(pump);
+                } else if (weaponId === 'assault_rifle') {
+                    // Magazine
+                    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.07, 0.025), bodyMat);
+                    mag.position.set(0.15, -0.17, -0.35);
+                    mag.rotation.x = -0.1;
+                    group.add(mag);
+                    // Stock
+                    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.04, 0.1), accentMat);
+                    stock.position.set(0.15, -0.12, -0.12);
+                    group.add(stock);
+                } else if (weaponId === 'sniper') {
+                    // Stock
+                    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.045, 0.12), accentMat);
+                    stock.position.set(0.15, -0.12, -0.1);
+                    group.add(stock);
+                    // Magazine
+                    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.05, 0.02), bodyMat);
+                    mag.position.set(0.15, -0.16, -0.35);
+                    group.add(mag);
+                } else if (weaponId === 'minigun') {
+                    // Multiple barrels
+                    for (let b = 0; b < 4; b++) {
+                        const angle = (b / 4) * Math.PI * 2;
+                        const extraBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.2, 6), metalMat);
+                        extraBarrel.rotation.x = Math.PI / 2;
+                        extraBarrel.position.set(0.15 + Math.cos(angle) * 0.015, -0.11 + Math.sin(angle) * 0.015, -0.68);
+                        group.add(extraBarrel);
+                    }
+                } else if (weaponId === 'rpg') {
+                    // Wide tube opening
+                    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.025, 0.08, 8), metalMat);
+                    tube.rotation.x = Math.PI / 2;
+                    tube.position.set(0.15, -0.11, -0.63);
+                    group.add(tube);
+                } else if (weaponId === 'crossbow') {
+                    // Crossbow arms
+                    const armMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.5 });
+                    const leftCBArm = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.008, 0.008), armMat);
+                    leftCBArm.position.set(0.08, -0.11, -0.5);
+                    leftCBArm.rotation.z = 0.2;
+                    group.add(leftCBArm);
+                    const rightCBArm = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.008, 0.008), armMat);
+                    rightCBArm.position.set(0.22, -0.11, -0.5);
+                    rightCBArm.rotation.z = -0.2;
+                    group.add(rightCBArm);
+                } else if (weaponId === 'revolver') {
+                    // Cylinder
+                    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.03, 8), metalMat);
+                    cyl.position.set(0.15, -0.11, -0.32);
+                    group.add(cyl);
+                }
 
                 // Silencer visual
                 if ((playerData.weaponAttachments[weaponId] || []).includes('silencer')) {
@@ -1781,36 +1901,61 @@
 
             // Create mesh
             const group = new THREE.Group();
-            const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor });
+            const skinColor = isBoss ? bodyColor : [0x445533, 0x3a5530, 0x504a38, 0x3d4a33][Math.floor(Math.random() * 4)];
+            const bodyMat = new THREE.MeshStandardMaterial({ color: skinColor });
 
-            // Body
-            const body = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.6, bodySize, bodySize * 0.4), bodyMat);
+            // Random clothing colors
+            const shirtColors = [0x8B0000, 0x2F4F4F, 0x4B3621, 0x556B2F, 0x8B4513, 0x36454F, 0x702963, 0x1C1C1C, 0x3B5998, 0xA0522D];
+            const pantColors = [0x191970, 0x2F2F2F, 0x3B3B3B, 0x4A4A4A, 0x2E2E1F, 0x3D3D1F];
+            const shirtColor = shirtColors[Math.floor(Math.random() * shirtColors.length)];
+            const pantColor = pantColors[Math.floor(Math.random() * pantColors.length)];
+            const shirtMat = new THREE.MeshStandardMaterial({ color: shirtColor });
+            const pantMat = new THREE.MeshStandardMaterial({ color: pantColor });
+
+            // Body (shirt)
+            const body = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.6, bodySize, bodySize * 0.4), shirtMat);
             body.position.y = bodySize * 0.8;
             body.castShadow = true;
             group.add(body);
 
-            // Head
+            // Head (skin)
             const head = new THREE.Mesh(new THREE.SphereGeometry(bodySize * 0.25, 8, 8), bodyMat);
             head.position.y = bodySize * 1.5;
             head.castShadow = true;
             group.add(head);
 
-            // Arms
-            const armMat = new THREE.MeshStandardMaterial({ color: bodyColor });
-            const leftArm = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.15, bodySize * 0.7, bodySize * 0.15), armMat);
+            // Arms (shirt sleeves on upper, skin on lower)
+            const leftArm = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.15, bodySize * 0.7, bodySize * 0.15), shirtMat);
             leftArm.position.set(-bodySize * 0.4, bodySize * 0.7, 0);
             group.add(leftArm);
             const rightArm = leftArm.clone();
             rightArm.position.x = bodySize * 0.4;
             group.add(rightArm);
 
-            // Legs
-            const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.18, bodySize * 0.5, bodySize * 0.18), armMat);
+            // Legs (pants)
+            const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.18, bodySize * 0.5, bodySize * 0.18), pantMat);
             leftLeg.position.set(-bodySize * 0.15, bodySize * 0.25, 0);
             group.add(leftLeg);
             const rightLeg = leftLeg.clone();
             rightLeg.position.x = bodySize * 0.15;
             group.add(rightLeg);
+
+            // Random accessories
+            const rAcc = Math.random();
+            if (rAcc < 0.3) {
+                // Hat
+                const hatColors = [0x1C1C1C, 0x8B4513, 0x2F4F4F, 0x800000];
+                const hatMat = new THREE.MeshStandardMaterial({ color: hatColors[Math.floor(Math.random() * hatColors.length)] });
+                const hat = new THREE.Mesh(new THREE.CylinderGeometry(bodySize * 0.28, bodySize * 0.3, bodySize * 0.12, 8), hatMat);
+                hat.position.y = bodySize * 1.75;
+                group.add(hat);
+            } else if (rAcc < 0.5) {
+                // Tie
+                const tieMat = new THREE.MeshStandardMaterial({ color: 0xaa0000 });
+                const tie = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.06, bodySize * 0.4, bodySize * 0.02), tieMat);
+                tie.position.set(0, bodySize * 0.7, bodySize * 0.21);
+                group.add(tie);
+            }
 
             group.position.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
             scene.add(group);
@@ -1866,15 +2011,48 @@
                 if (dist > 1.5) {
                     const moveX = (dx / dist) * z.speed * dt;
                     const moveZ = (dz / dist) * z.speed * dt;
-                    z.mesh.position.x += moveX;
-                    z.mesh.position.z += moveZ;
+                    const zombieRadius = z.isBoss ? 0.7 : 0.5;
+
+                    // Try X+Z movement first
+                    const newPos = z.mesh.position.clone();
+                    newPos.x += moveX;
+                    newPos.z += moveZ;
+                    if (!checkZombieCollision(newPos, zombieRadius)) {
+                        z.mesh.position.x = newPos.x;
+                        z.mesh.position.z = newPos.z;
+                    } else {
+                        // Try sliding along X only
+                        const posX = z.mesh.position.clone();
+                        posX.x += moveX;
+                        if (!checkZombieCollision(posX, zombieRadius)) {
+                            z.mesh.position.x = posX.x;
+                        }
+                        // Try sliding along Z only
+                        const posZ = z.mesh.position.clone();
+                        posZ.z += moveZ;
+                        if (!checkZombieCollision(posZ, zombieRadius)) {
+                            z.mesh.position.z = posZ.z;
+                        }
+                    }
                     // Face player
                     z.mesh.rotation.y = Math.atan2(dx, dz);
                 }
 
-                // Bob animation
-                z.mesh.children[2].rotation.x = Math.sin(Date.now() * 0.005) * 0.3; // left arm
-                z.mesh.children[3].rotation.x = Math.sin(Date.now() * 0.005 + Math.PI) * 0.3; // right arm
+                // Walking animation
+                const walkPhase = Date.now() * 0.006 + i * 1.7; // offset per zombie
+                // Arms swing forward/back with shambling motion
+                z.mesh.children[2].rotation.x = Math.sin(walkPhase) * 0.6; // left arm
+                z.mesh.children[3].rotation.x = Math.sin(walkPhase + Math.PI) * 0.6; // right arm
+                // Arms reach forward (zombie pose)
+                z.mesh.children[2].rotation.z = 0.15;
+                z.mesh.children[3].rotation.z = -0.15;
+                // Legs walk
+                z.mesh.children[4].rotation.x = Math.sin(walkPhase + Math.PI) * 0.5; // left leg
+                z.mesh.children[5].rotation.x = Math.sin(walkPhase) * 0.5; // right leg
+                // Body sway
+                z.mesh.children[0].rotation.z = Math.sin(walkPhase * 0.5) * 0.05;
+                // Head bob
+                z.mesh.children[1].rotation.z = Math.sin(walkPhase * 0.7) * 0.1;
 
                 // Attack
                 if (dist < 2) {
@@ -2632,6 +2810,7 @@
             // Track mission
             playerData.missions++;
             for (const wid of playerState.weapons) {
+                if (wid === 'fists') continue; // fists never need repairs
                 if (!playerData.weaponUsage[wid]) playerData.weaponUsage[wid] = 0;
                 playerData.weaponUsage[wid]++;
             }
@@ -2874,16 +3053,60 @@
             const size = currentMap ? MAPS[currentMap].size * 0.95 : 50;
             if (Math.abs(newPos.x) > size || Math.abs(newPos.z) > size) return true;
 
-            // Obstacles
+            // Obstacles - check horizontal collision but allow standing on top
             const playerBox = new THREE.Box3().setFromCenterAndSize(
                 newPos, new THREE.Vector3(0.5, 1.7, 0.5)
             );
             for (const obs of obstacles) {
-                if (obs.box && obs.box.intersectsBox(playerBox)) return true;
+                if (obs.box) {
+                    if (obs.box.intersectsBox(playerBox)) {
+                        // Allow if player feet are above the obstacle top
+                        const obsTop = obs.box.max.y;
+                        const playerFeet = newPos.y - 1.7;
+                        if (playerFeet >= obsTop - 0.3) continue; // on top, allow
+                        return true;
+                    }
+                }
                 if (obs.radius) {
                     const dx = newPos.x - obs.mesh.position.x;
                     const dz = newPos.z - obs.mesh.position.z;
                     if (Math.sqrt(dx * dx + dz * dz) < obs.radius + 0.3) return true;
+                }
+            }
+            return false;
+        }
+
+        // Get the floor height at a position (top of any obstacle below)
+        function getFloorHeight(pos) {
+            let floor = 0; // ground level
+            for (const obs of obstacles) {
+                if (obs.box) {
+                    // Check if pos is within XZ bounds of obstacle
+                    if (pos.x >= obs.box.min.x - 0.25 && pos.x <= obs.box.max.x + 0.25 &&
+                        pos.z >= obs.box.min.z - 0.25 && pos.z <= obs.box.max.z + 0.25) {
+                        const obsTop = obs.box.max.y;
+                        if (obsTop > floor && pos.y >= obsTop + 1.4) {
+                            floor = obsTop;
+                        }
+                    }
+                }
+            }
+            return floor;
+        }
+
+        // Check if a zombie position collides with any obstacle
+        function checkZombieCollision(pos, radius) {
+            for (const obs of obstacles) {
+                if (obs.box) {
+                    const expanded = obs.box.clone().expandByScalar(radius);
+                    if (expanded.containsPoint(new THREE.Vector3(pos.x, obs.box.min.y + 0.5, pos.z))) {
+                        return true;
+                    }
+                }
+                if (obs.radius) {
+                    const dx = pos.x - obs.mesh.position.x;
+                    const dz = pos.z - obs.mesh.position.z;
+                    if (Math.sqrt(dx * dx + dz * dz) < obs.radius + radius) return true;
                 }
             }
             return false;
@@ -2930,8 +3153,9 @@
 
                 // Y movement
                 camera.position.y += velocity.y * dt;
-                if (camera.position.y < 1.7) {
-                    camera.position.y = 1.7;
+                const floorY = getFloorHeight(camera.position) + 1.7;
+                if (camera.position.y < floorY) {
+                    camera.position.y = floorY;
                     velocity.y = 0;
                     canJump = true;
                 }
