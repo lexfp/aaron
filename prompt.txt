@@ -1,0 +1,2 @@
+can you make me a 3d zombie shooter game with wasd to move, space to jump, shift to sprint, a homepage, 
+different guns, and different equipment?

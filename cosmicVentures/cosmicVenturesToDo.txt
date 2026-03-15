@@ -1,8 +1,8 @@
 Switch cost & money per cycle
 Remove rainbow mode
-Make credits, all time, & per sec money use abbreviations
 Reduce lag?
 Remove right-click?
+buy all upgrades button to buy all that can be afforded
 
 
 
