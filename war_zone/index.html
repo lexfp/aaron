@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Shooter</title>
+    <title>Warzone</title>
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <!-- Homepage -->
     <div id="homepage">
@@ -28,7 +30,8 @@
             <p>Activate cheats directly. Toggle with backtick key in-game.</p>
             <div class="cheat-buttons" id="cheat-buttons"></div>
             <button class="menu-btn close-btn" onclick="hideCheatMenu()">Close</button>
-            <button class="menu-btn close-btn" onclick="hideCheatMenu(); showScreen('homepage')">Back to Homepage</button>
+            <button class="menu-btn close-btn" onclick="hideCheatMenu(); showScreen('homepage')">Back to
+                Homepage</button>
         </div>
     </div>
 
@@ -68,9 +71,17 @@
 
     <!-- HUD -->
     <div id="hud">
-        <div id="crosshair"><div class="dot"></div></div>
-        <div id="hp-bar"><div class="fill"></div><div class="label">100 HP</div></div>
-        <div id="armor-bar"><div class="fill"></div><div class="label">0 Armor</div></div>
+        <div id="crosshair">
+            <div class="dot"></div>
+        </div>
+        <div id="hp-bar">
+            <div class="fill"></div>
+            <div class="label">100 HP</div>
+        </div>
+        <div id="armor-bar">
+            <div class="fill"></div>
+            <div class="label">0 Armor</div>
+        </div>
         <div id="weapon-hud">
             <div class="weapon-name">Fists</div>
             <div class="ammo-display">
@@ -99,7 +110,8 @@
     <div id="round-overlay">
         <div id="round-text"></div>
         <div class="sub" id="round-sub"></div>
-        <button class="menu-btn" id="return-home-btn" style="display:none;margin-top:14px;" onclick="returnToMenu()">Return to Homepage</button>
+        <button class="menu-btn" id="return-home-btn" style="display:none;margin-top:14px;"
+            onclick="returnToMenu()">Return to Homepage</button>
     </div>
 
     <!-- Pause -->
@@ -119,4 +131,5 @@
     </script>
     <script type="module" src="js/main.js"></script>
 </body>
+
 </html>

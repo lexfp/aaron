@@ -1,0 +1,20 @@
+the entire game appears to speed up when minigun is used. Fix that
+add armor equip slots to the loadout tab
+make me able to deselect fists in the loadout tab
+give the zombies proper facial expressions(drooling, bloodthirsty, etc.)
+make me not fall through roofs of buildings
+hollow out buildings and add doorways
+add knife weapon
+add air strike that costs lots of $ but kills all zombies in reigon
+add mountain map
+add fall damage
+make me go up staircases easier
+add exit game button
+add pictures to choose map thing
+
+Rescue Mode: You start at a custom map where you must go through many enemies at choke points 
+like a valley surrounded my mountains with enemies with guns' checkpoints with towers/sandbags 
+with enemies taking cover behind. After traveling thought these choke points there will be a 
+central enemy point like a town or militant base covered with enemies. While you fight them 
+you need to find a hostage or smth. Then you need to go back where you came from or another area 
+like a helipad or beach to escape to get lots of money.
