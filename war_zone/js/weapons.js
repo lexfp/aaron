@@ -28,27 +28,46 @@ export function createWeaponModel(weaponId) {
 }
 
 function buildMeleeModel(group, weaponId, w) {
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 });
     if (weaponId === 'fists') {
-        const mat = new THREE.MeshStandardMaterial({ color: 0xd4a574 });
-        const fist = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), mat);
+        const fist = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), skinMat);
         fist.position.set(0.15, -0.12, -0.3);
         group.add(fist);
         const fist2 = fist.clone();
-        fist2.position.x = -0.08;
+        fist2.position.x = -0.15;
         group.add(fist2);
     } else if (weaponId === 'shield') {
-        const shield = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.35, 0.03), new THREE.MeshStandardMaterial({ color: 0x4444aa }));
-        shield.position.set(0.0, -0.1, -0.35);
+        const shield = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.05), new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5 }));
+        shield.position.set(0.0, -0.1, -0.4);
         group.add(shield);
-    } else {
-        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.15, 8), new THREE.MeshStandardMaterial({ color: 0x4a3520 }));
-        handle.position.set(0.15, -0.18, -0.35);
-        handle.rotation.x = Math.PI * 0.1;
+        const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), skinMat);
+        hand.position.set(0.1, -0.1, -0.35);
+        group.add(hand);
+    } else if (weaponId === 'knife') {
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.1), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+        handle.position.set(0.15, -0.15, -0.3);
+        handle.rotation.x = -Math.PI / 4;
         group.add(handle);
-        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.3, 0.05), new THREE.MeshStandardMaterial({ color: 0xaaaaaa }));
-        blade.position.set(0.15, -0.02, -0.38);
-        blade.rotation.x = Math.PI * 0.1;
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.2, 0.04), new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 0.8 }));
+        blade.position.set(0.15, -0.05, -0.38);
+        blade.rotation.x = -Math.PI / 4;
         group.add(blade);
+        const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), skinMat);
+        hand.position.set(0.15, -0.15, -0.3);
+        hand.rotation.x = -Math.PI / 4;
+        group.add(hand);
+    } else {
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 8), new THREE.MeshStandardMaterial({ color: 0x4a3520 }));
+        handle.position.set(0.15, -0.2, -0.35);
+        handle.rotation.x = -Math.PI / 4;
+        group.add(handle);
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.5, 0.08), new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.7 }));
+        blade.position.set(0.15, 0.05, -0.55);
+        blade.rotation.x = -Math.PI / 4;
+        group.add(blade);
+        const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), skinMat);
+        hand.position.set(0.15, -0.15, -0.32);
+        group.add(hand);
     }
 }
 
@@ -95,6 +114,12 @@ function buildGunModel(group, weaponId, w) {
     barrel.rotation.x = Math.PI / 2;
     barrel.position.set(0.15, -0.11, -0.35 - bodyLen / 2 - barrelLen / 2);
     group.add(barrel);
+
+    // Hand
+    const handMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 });
+    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), handMat);
+    hand.position.set(0.15, -0.16, -0.22);
+    group.add(hand);
 
     // Weapon-specific details
     buildGunDetails(group, weaponId, bodyMat, accentMat, metalMat);

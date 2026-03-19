@@ -41,6 +41,11 @@ export const WEAPONS = {
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
         cost: 800, reach: 1.5
     },
+    knife: {
+        name: 'Knife', type: 'melee', range: 'close', damage: 5, fireRate: 0.1, headshot: 60,
+        ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
+        cost: 1000, reach: 1.2
+    },
     katana: {
         name: 'Katana', type: 'melee', range: 'close', damage: 8, fireRate: 0.4,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
@@ -88,7 +93,8 @@ export const EQUIPMENT = {
     heavy_armor: { name: 'Heavy Armor', type: 'armor', armor: 75, cost: 800, damageReduction: 0.25 },
     helmet: { name: 'Helmet', type: 'head', armor: 20, cost: 200, headshotReduction: 0.5 },
     med_kit: { name: 'Med Kit', type: 'consumable', hpRestore: 50, cost: 100 },
-    adrenaline: { name: 'Adrenaline', type: 'consumable', hpBoost: 25, cost: 250, tempHP: true }
+    adrenaline: { name: 'Adrenaline', type: 'consumable', hpBoost: 25, cost: 250, tempHP: true },
+    airstrike: { name: 'Airstrike Targeter', type: 'consumable', airstrikes: 1, cost: 200 }
 };
 
 export const ATTACHMENTS = {
@@ -111,6 +117,10 @@ export const MAPS = {
     },
     forest: {
         name: 'Dark Forest', description: 'Dense forest with limited visibility',
-        size: 90, color: 0x2d5a1e, wallColor: 0x3d6a2e, ambientLight: 0.2
+        size: 110, color: 0x2d5a1e, wallColor: 0x3d6a2e, ambientLight: 0.2
+    },
+    mountain: {
+        name: 'Rocky Mountains', description: 'Uneven terrain with valleys and peaks',
+        size: 150, color: 0x555555, wallColor: 0x444444, ambientLight: 0.5
     }
 };

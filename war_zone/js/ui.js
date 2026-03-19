@@ -22,6 +22,9 @@ window.showScreen = showScreen;
 export function updateHomeStats() {
     document.getElementById('home-money').textContent = '$' + playerData.money;
     document.getElementById('home-missions').textContent = playerData.missions;
+    if (playerData.airstrikes > 0) {
+        document.getElementById('home-missions').innerHTML += `<br>Airstrikes: <span style="color:#ff4444">${playerData.airstrikes}</span>`;
+    }
 }
 
 // --- Shop ---
@@ -71,6 +74,7 @@ function renderEquipmentShop() {
         if (e.headshotReduction) desc += `Headshot Reduction: ${e.headshotReduction * 100}%<br>`;
         if (e.hpRestore) desc += `Restores ${e.hpRestore} HP<br>`;
         if (e.hpBoost) desc += `+${e.hpBoost} Temp HP<br>`;
+        if (e.airstrikes) desc += `Press F to kill all zombies (+${e.airstrikes} use)<br>`;
         const item = document.createElement('div');
         item.className = 'shop-item';
         item.innerHTML = `
@@ -123,6 +127,7 @@ window.buyEquipment = function (id) {
         playerData.money -= e.cost;
         if (e.type === 'armor') playerData.equippedArmor = id;
         else if (e.type === 'head') playerData.equippedHelmet = id;
+        else if (e.airstrikes) playerData.airstrikes = (playerData.airstrikes || 0) + e.airstrikes;
         else playerData.ownedEquipment.push(id);
         savePlayerData();
         showShop();
@@ -190,7 +195,7 @@ export function showLoadout() {
         item.onclick = () => {
             if (needsRepair) return;
             if (equipped) {
-                if (id === 'fists') return;
+                if (playerData.equippedLoadout.length <= 1) return; // Prevent unequipping last weapon
                 playerData.equippedLoadout = playerData.equippedLoadout.filter(x => x !== id);
             } else {
                 if (playerData.equippedLoadout.length >= maxSlots) return;
@@ -212,7 +217,22 @@ export function renderMapScreen(startGameFn) {
     for (const [id, m] of Object.entries(MAPS)) {
         const card = document.createElement('div');
         card.className = 'map-card';
-        card.innerHTML = `<h3>${m.name}</h3><p>${m.description}</p>`;
+        
+        let bgUrl = '';
+        if (id === 'warehouse') bgUrl = 'linear-gradient(135deg, #222, #444)';
+        else if (id === 'desert') bgUrl = 'linear-gradient(135deg, #c2a645, #dcb95e)';
+        else if (id === 'city') bgUrl = 'linear-gradient(135deg, #555, #888)';
+        else if (id === 'forest') bgUrl = 'linear-gradient(135deg, #1d3a1e, #2d5a2e)';
+        else if (id === 'mountain') bgUrl = 'linear-gradient(135deg, #444, #777)';
+        
+        card.style.background = bgUrl;
+        
+        card.innerHTML = `
+            <div style="background:rgba(0,0,0,0.6); padding: 15px; border-radius: 8px; height: 100%;">
+                <h3 style="color:#fff; text-shadow: 1px 1px 2px #000;">${m.name}</h3>
+                <p style="color:#ddd;">${m.description}</p>
+            </div>
+        `;
         card.onclick = () => startGameFn(gameState.pendingMode, id);
         grid.appendChild(card);
     }
@@ -237,6 +257,11 @@ export function updateHUD() {
         document.getElementById('armor-bar').style.display = 'block';
     } else {
         document.getElementById('armor-bar').style.display = 'none';
+    }
+
+    if (playerState.maxStamina > 0) {
+        document.querySelector('#stamina-bar .fill').style.width = (playerState.stamina / playerState.maxStamina) * 100 + '%';
+        document.querySelector('#stamina-bar .label').textContent = Math.floor(playerState.stamina) + ' Stamina';
     }
 
     document.querySelector('#weapon-hud .weapon-name').textContent = def.name;

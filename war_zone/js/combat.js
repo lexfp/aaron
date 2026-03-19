@@ -3,10 +3,10 @@
 import * as THREE from 'three';
 import { WEAPONS } from './data.js';
 import { playerData, playerState, savePlayerData, gameState } from './state.js';
-import { scene, camera, controls, raycaster, setWeaponSwingTime } from './engine.js';
+import { scene, camera, controls, raycaster, setWeaponSwingTime, obstacles } from './engine.js';
 import { playSound, playGunshot, playHit, playExplosion } from './audio.js';
 import { updateHUD, addKillFeed, showRoundOverlay } from './ui.js';
-import { getCurrentWeapon, hasSilencer, hasScope, reload } from './weapons.js';
+import { getCurrentWeapon, hasSilencer, hasScope, reload, toggleZoom } from './weapons.js';
 import { killZombie, attractZombies, spawnPvPEnemy } from './entities.js';
 import { cb } from './callbacks.js';
 
@@ -55,10 +55,24 @@ export function shoot() {
             def.radius || 5, def.damage
         );
     } else {
-        const hits = raycaster.intersectObjects(getEnemyMeshes(), true);
-        if (hits.length > 0) applyDamageToEnemy(hits[0], calculateDamage(def, hits[0]));
+        const colliders = [...getEnemyMeshes(), ...obstacles.filter(o => o.mesh).map(o => o.mesh)];
+        const hits = raycaster.intersectObjects(colliders, true);
+        const startPoint = camera.position.clone().add(new THREE.Vector3(0.1, -0.2, -0.5).applyQuaternion(camera.quaternion));
+        
+        if (hits.length > 0) {
+            const hitEnemy = findEntityFromHit(hits[0]);
+            if (hitEnemy) applyDamageToEnemy(hits[0], calculateDamage(def, hits[0]));
+            createTracer(startPoint, hits[0].point);
+        } else {
+            createTracer(startPoint, camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(100)));
+        }
         createMuzzleFlash();
     }
+    
+    if ((id === 'sniper' || id === 'crossbow') && playerState.isZoomed) {
+        setTimeout(toggleZoom, 200);
+    }
+    
     updateHUD();
 }
 
@@ -155,6 +169,8 @@ export function damagePlayer(amount) {
 function throwProjectile(def) {
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
+    // Add upward arc so it lands center
+    dir.y += 0.2; dir.normalize();
     const start = camera.position.clone();
     if (def.explosive) createExplosion(start.clone().add(dir.clone().multiplyScalar(20)), def.radius, def.damage);
     if (def.fire) createFireZone(start.clone().add(dir.clone().multiplyScalar(15)), def.radius, def.damage, def.duration);
@@ -216,6 +232,15 @@ function createMuzzleFlash() {
     setTimeout(() => camera.remove(flash), 50);
 }
 
+function createTracer(start, end) {
+    const material = new THREE.LineBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.8 });
+    const points = [start, end];
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const line = new THREE.Line(geometry, material);
+    scene.add(line);
+    setTimeout(() => scene.remove(line), 50);
+}
+
 function showDamageNumber(pos, dmg) {
     const div = document.createElement('div');
     div.style.color = '#ffaa00';
@@ -261,4 +286,35 @@ function gameOver() {
     }
     savePlayerData();
     showRoundOverlay('GAME OVER', `Wave ${gameState.wave} | $${playerData.money}`, 0, true);
+}
+
+export function callAirstrike() {
+    const pos = camera.position.clone();
+    playSound(40, 2.0, 'sawtooth', 0.5);
+    showRoundOverlay('AIRSTRIKE INBOUND', 'Take cover!', 1500);
+
+    setTimeout(() => {
+        playExplosion();
+        const flash = document.createElement('div');
+        flash.style.position = 'fixed'; flash.style.inset = '0';
+        flash.style.backgroundColor = '#ffffff'; flash.style.zIndex = '999';
+        flash.style.opacity = '1'; flash.style.pointerEvents = 'none';
+        flash.style.transition = 'opacity 1s';
+        document.body.appendChild(flash);
+        setTimeout(() => flash.style.opacity = '0', 50);
+        setTimeout(() => flash.remove(), 1050);
+
+        const radius = 100;
+        for (let i = gameState.zombieEntities.length - 1; i >= 0; i--) {
+            const z = gameState.zombieEntities[i];
+            if (z.mesh.position.distanceTo(pos) < radius) {
+                z.hp -= 10000;
+                if (z.hp <= 0) killZombie(z, i);
+            }
+        }
+        if (gameState.pvpEnemy?.hp > 0 && gameState.pvpEnemy.mesh.position.distanceTo(pos) < radius) {
+            gameState.pvpEnemy.hp -= 10000;
+            applyDamageToEnemy({ object: gameState.pvpEnemy.mesh }, 10000);
+        }
+    }, 1500);
 }

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dog Game Settings</title>
+<!-- Tailwind CSS v3 with plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style data-purpose="custom-typography">
+    @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@500;700&display=swap');
+    
+    body {
+      font-family: 'Quicksand', sans-serif;
+    }
+    
+    h1, h2, h3 {
+      font-family: 'Fredoka One', cursive;
+    }
+  </style>
+<style data-purpose="ui-effects">
+    /* Playful bouncy effect for buttons */
+    .btn-bounce:active {
+      transform: scale(0.95);
+    }
+    
+    /* Cartoon-style shadows with dog-friendly brown tone */
+    .cartoon-shadow {
+      box-shadow: 0 4px 0 0 rgba(111, 78, 55, 0.3);
+    }
+    
+    .cartoon-border {
+      border: 3px solid #5d4037;
+    }
+
+    /* Custom paw print toggle */
+    .peer:checked ~ .toggle-bg {
+      background-color: #fbbf24; /* Amber-400 */
+    }
+    
+    .peer:checked ~ .toggle-dot {
+      transform: translateX(100%);
+    }
+  </style>
+</head>
+<body class="bg-orange-100 min-h-screen flex items-center justify-center p-4">
+<!-- BEGIN: SettingsContainer -->
+<main class="w-full max-w-md bg-[#fffdfa] cartoon-border rounded-3xl p-6 relative overflow-hidden shadow-2xl" data-purpose="settings-panel">
+<!-- Top Header Section -->
+<header class="text-center mb-8 relative">
+<div class="flex items-center justify-center gap-2 relative w-full mb-2">
+<button onclick="window.location.href='main_game.html'" class="absolute left-0 text-orange-600 font-bold bg-orange-100 hover:bg-orange-200 px-3 py-1 rounded-full shadow-sm text-sm">&lt; Back</button>
+<span class="text-3xl text-orange-600">🐾</span>
+<h1 class="text-4xl text-orange-800 tracking-wider uppercase drop-shadow-sm">Settings</h1>
+<span class="text-3xl text-orange-600">🐾</span>
+</div>
+<div class="h-1.5 w-24 bg-orange-200 mx-auto rounded-full mt-2"></div>
+</header>
+<!-- BEGIN: AudioControls -->
+<section class="space-y-6 mb-10" data-purpose="audio-settings">
+<!-- Music Toggle -->
+<div class="flex items-center justify-between bg-orange-50 p-4 rounded-2xl border-2 border-orange-100">
+<div class="flex items-center gap-3">
+<span class="text-2xl">🦴</span>
+<span class="text-xl font-bold text-orange-900">Music</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="toggle-bg w-14 h-7 bg-orange-200 peer-focus:outline-none rounded-full transition-colors"></div>
+<div class="toggle-dot absolute left-[2px] top-[2px] bg-white border-orange-300 border rounded-full h-6 w-6 transition-all flex items-center justify-center">
+<span class="text-[10px]">🐾</span>
+</div>
+</label>
+</div>
+<!-- Sound Effects Toggle -->
+<div class="flex items-center justify-between bg-orange-50 p-4 rounded-2xl border-2 border-orange-100">
+<div class="flex items-center gap-3">
+<span class="text-2xl">🐶</span>
+<span class="text-xl font-bold text-orange-900">Bark Sounds</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="toggle-bg w-14 h-7 bg-orange-200 peer-focus:outline-none rounded-full transition-colors"></div>
+<div class="toggle-dot absolute left-[2px] top-[2px] bg-white border-orange-300 border rounded-full h-6 w-6 transition-all flex items-center justify-center">
+<span class="text-[10px]">🐾</span>
+</div>
+</label>
+</div>
+</section>
+<!-- END: AudioControls -->
+<!-- BEGIN: InformationLinks -->
+<section class="grid grid-cols-2 gap-4 mb-10" data-purpose="navigation-links">
+<a class="btn-bounce cartoon-shadow bg-amber-500 text-white text-center py-4 rounded-2xl font-bold border-2 border-amber-600 block" href="#">
+        Fetch Guide
+      </a>
+<a class="btn-bounce cartoon-shadow bg-orange-400 text-white text-center py-4 rounded-2xl font-bold border-2 border-orange-500 block" href="#">
+        About Pack
+      </a>
+</section>
+<!-- END: InformationLinks -->
+<!-- BEGIN: DangerZone -->
+<footer class="pt-6 border-t-2 border-orange-50">
+<button class="btn-bounce w-full bg-stone-100 hover:bg-stone-200 text-stone-600 font-bold py-3 rounded-xl transition-colors border-2 border-transparent" data-purpose="trigger-reset-modal" id="reset-btn">
+        Clear All Treats (Reset)
+      </button>
+</footer>
+<!-- END: DangerZone -->
+<!-- BEGIN: ResetConfirmationPopup -->
+<div class="hidden absolute inset-0 z-50 flex items-center justify-center p-6 bg-orange-900/40 backdrop-blur-sm" data-purpose="confirmation-overlay" id="reset-modal">
+<div class="bg-white w-full rounded-3xl p-6 cartoon-border shadow-2xl animate-in zoom-in duration-200">
+<div class="text-center">
+<div class="text-5xl mb-4">🐕💤</div>
+<h2 class="text-2xl text-orange-900 mb-2">Wait, paws!</h2>
+<p class="text-stone-500 mb-8">This will bury all your hard-earned bones and levels forever!</p>
+<div class="flex flex-col gap-3">
+<button class="btn-bounce cartoon-shadow w-full bg-orange-600 text-white font-bold py-4 rounded-2xl border-2 border-orange-700" id="confirm-reset">
+              DIG IT ALL UP (RESET)
+            </button>
+<button class="btn-bounce w-full bg-stone-100 text-stone-600 font-bold py-4 rounded-2xl" id="cancel-reset">
+              Keep My Bones!
+            </button>
+</div>
+</div>
+</div>
+</div>
+<!-- END: ResetConfirmationPopup -->
+</main>
+<!-- END: SettingsContainer -->
+<script data-purpose="modal-handlers">
+    const resetBtn = document.getElementById('reset-btn');
+    const modal = document.getElementById('reset-modal');
+    const cancelBtn = document.getElementById('cancel-reset');
+    const confirmBtn = document.getElementById('confirm-reset');
+
+    // Show modal
+    resetBtn.addEventListener('click', () => {
+      modal.classList.remove('hidden');
+    });
+
+    // Hide modal
+    cancelBtn.addEventListener('click', () => {
+      modal.classList.add('hidden');
+    });
+
+    // Handle reset (logic placeholder)
+    confirmBtn.addEventListener('click', () => {
+      console.log('Progress Resetting...');
+      localStorage.removeItem('dogScore');
+      localStorage.removeItem('wagMultiplier');
+      modal.classList.add('hidden');
+      alert('Your progress has been buried!');
+      window.location.href = 'main_game.html';
+    });
+
+    // Close on overlay click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.classList.add('hidden');
+      }
+    });
+  </script>
+</body></html>

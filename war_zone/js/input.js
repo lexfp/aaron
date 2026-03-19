@@ -1,9 +1,9 @@
 // Keyboard, mouse, and pointer lock input handling
 
 import { keys, controls } from './engine.js';
-import { gameState, playerState } from './state.js';
+import { gameState, playerState, playerData, savePlayerData } from './state.js';
 import { switchWeapon, reload, dropCurrentWeapon, toggleZoom, pickupWeapon } from './weapons.js';
-import { shoot } from './combat.js';
+import { shoot, callAirstrike } from './combat.js';
 import { camera } from './engine.js';
 import { WEAPONS } from './data.js';
 
@@ -43,7 +43,15 @@ export function setupInput(CHEATS, resumeGameFn) {
             }
         }
         if (key === 'q') switchWeapon(playerState.currentWeaponIndex - 1);
-        if (key === 'f') switchWeapon(playerState.currentWeaponIndex + 1);
+        if (key === 'f') {
+            if (playerData.airstrikes > 0) {
+                playerData.airstrikes--;
+                savePlayerData();
+                callAirstrike();
+            } else {
+                switchWeapon(playerState.currentWeaponIndex + 1);
+            }
+        }
         if (key === 'z') toggleZoom();
     });
 

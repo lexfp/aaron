@@ -46,6 +46,16 @@ export function spawnZombie(isBoss) {
     const head = new THREE.Mesh(new THREE.SphereGeometry(bodySize * 0.25, 8, 8), bodyMat);
     head.position.y = bodySize * 1.5; head.castShadow = true; group.add(head);
 
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const eye1 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.05), eyeMat);
+    eye1.position.set(0.1, 0.05, bodySize*0.22); head.add(eye1);
+    const eye2 = eye1.clone(); eye2.position.x = -0.1; head.add(eye2);
+    const mouthMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.02, 0.05), mouthMat);
+    mouth.position.set(0, -0.1, bodySize*0.24);
+    mouth.rotation.z = (Math.random() - 0.5) * 0.4;
+    head.add(mouth);
+
     const leftArm = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.15, bodySize * 0.7, bodySize * 0.15), shirtMat);
     leftArm.position.set(-bodySize * 0.4, bodySize * 0.7, 0); group.add(leftArm);
     const rightArm = leftArm.clone(); rightArm.position.x = bodySize * 0.4; group.add(rightArm);
@@ -71,15 +81,71 @@ export function spawnZombie(isBoss) {
         tie.position.set(0, bodySize * 0.7, bodySize * 0.21); group.add(tie);
     }
 
-    group.position.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+    let spawnX = Math.cos(angle) * dist;
+    let spawnZ = Math.sin(angle) * dist;
+    
+    // Ensure we don't spawn inside a bounding box
+    for (let attempts = 0; attempts < 10; attempts++) {
+        if (!checkZombieCollision(new THREE.Vector3(spawnX, 1, spawnZ), isBoss ? 0.7 : 0.5)) break;
+        dist += 2;
+        spawnX = Math.cos(angle) * dist;
+        spawnZ = Math.sin(angle) * dist;
+    }
+    
+    group.position.set(spawnX, 0, spawnZ);
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = 64; canvas.height = 16;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ff0000'; ctx.fillRect(0,0,64,16);
+    const tex = new THREE.CanvasTexture(canvas);
+    const hpSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
+    hpSprite.scale.set(1, 0.25, 1);
+    hpSprite.position.y = bodySize * 2.2;
+    group.add(hpSprite);
+
     scene.add(group);
 
     gameState.zombieEntities.push({
         mesh: group, hp, maxHp: hp, damage, dropMoney, isBoss,
         weaponId, speed: isBoss ? 2.5 : 3.5, attackCooldown: 0,
-        lastNoiseCheck: 0, attracted: false
+        lastNoiseCheck: 0, attracted: false, dead: false,
+        hpCtx: ctx, hpTex: tex
     });
     gameState.zombiesAlive++;
+}
+
+export function spawnHostage(mapSize) {
+    const group = new THREE.Group();
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3366cc });
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xd4a574 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 0.4), bodyMat);
+    body.position.y = 0.8; group.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), headMat);
+    head.position.y = 1.5; group.add(head);
+
+    let spawnX = (Math.random() - 0.5) * mapSize * 0.8;
+    let spawnZ = (Math.random() - 0.5) * mapSize * 0.8;
+    
+    // Ensure we don't spawn inside a bounding box
+    for (let attempts = 0; attempts < 10; attempts++) {
+        if (!checkZombieCollision(new THREE.Vector3(spawnX, 1, spawnZ), 0.5)) break;
+        spawnX = (Math.random() - 0.5) * mapSize * 0.8;
+        spawnZ = (Math.random() - 0.5) * mapSize * 0.8;
+    }
+    group.position.set(spawnX, 0, spawnZ);
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = 128; canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#00aaff'; ctx.font = '20px Arial'; ctx.textAlign="center"; ctx.fillText('HOSTAGE (E)', 64, 24);
+    const tex = new THREE.CanvasTexture(canvas);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
+    sprite.position.y = 2.2; sprite.scale.set(1.5, 0.35, 1);
+    group.add(sprite);
+
+    scene.add(group);
+    gameState.hostage = { mesh: group, rescued: false };
 }
 
 function pickRandomWeapon(range) {
@@ -89,11 +155,21 @@ function pickRandomWeapon(range) {
 }
 
 export function killZombie(z, idx) {
-    scene.remove(z.mesh);
+    if (z.dead) return;
+    z.dead = true; z.hp = 0;
     playerData.money += z.dropMoney;
+    if (z.hpSprite) { z.mesh.remove(z.hpSprite); z.hpSprite = null; }
     if (z.weaponId) dropWeapon(z.weaponId, z.mesh.position.clone());
-    gameState.zombieEntities.splice(idx, 1);
-    gameState.zombiesAlive--;
+    
+    if (Math.random() < 0.03) {
+        const mat = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), mat);
+        mesh.position.copy(z.mesh.position);
+        mesh.position.y = 0.25;
+        scene.add(mesh);
+        gameState.ammoPickups.push({ mesh, collected: false, isMedkit: true });
+    }
+
     addKillFeed(z.isBoss ? 'Boss Zombie' : 'Zombie');
     savePlayerData();
 }
@@ -136,14 +212,35 @@ export function updateZombies(dt) {
 
     for (let i = gameState.zombieEntities.length - 1; i >= 0; i--) {
         const z = gameState.zombieEntities[i];
-        if (z.hp <= 0) continue;
+        if (z.dead) {
+            z.mesh.rotation.x -= dt * 3;
+            if (z.mesh.rotation.x <= -Math.PI/2) {
+                z.mesh.position.y -= dt * 2;
+                if (z.mesh.position.y < -1) {
+                    scene.remove(z.mesh);
+                    gameState.zombieEntities.splice(i, 1);
+                    gameState.zombiesAlive--;
+                }
+            }
+            continue;
+        }
 
         const dx = playerPos.x - z.mesh.position.x;
         const dz = playerPos.z - z.mesh.position.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
 
+        let stopDist = 1.5;
+        if (playerState.weapons[playerState.currentWeaponIndex] === 'shield') stopDist = 2.5;
+
+        // Stair climbing via Raycaster
+        const zRay = new THREE.Raycaster(new THREE.Vector3(z.mesh.position.x, z.mesh.position.y + 2, z.mesh.position.z), new THREE.Vector3(0, -1, 0), 0, 4);
+        const zHits = zRay.intersectObjects(obstacles.filter(o => o.mesh).map(o => o.mesh));
+        if (zHits.length > 0) {
+            z.mesh.position.y += (zHits[0].point.y - z.mesh.position.y) * dt * 10;
+        }
+
         // Movement with collision sliding
-        if (dist > 1.5) {
+        if (dist > stopDist) {
             const moveX = (dx / dist) * z.speed * dt;
             const moveZ = (dz / dist) * z.speed * dt;
             const zombieRadius = z.isBoss ? 0.7 : 0.5;
@@ -161,16 +258,31 @@ export function updateZombies(dt) {
             z.mesh.rotation.y = Math.atan2(dx, dz);
         }
 
-        // Walk animation
+        // Anim
         const walkPhase = Date.now() * 0.006 + i * 1.7;
-        z.mesh.children[2].rotation.x = Math.sin(walkPhase) * 0.6;
-        z.mesh.children[3].rotation.x = Math.sin(walkPhase + Math.PI) * 0.6;
+        let isAttacking = dist < stopDist + 0.5 && z.attackCooldown <= 0;
+        
+        if (isAttacking) {
+            z.mesh.children[2].rotation.x = -Math.PI/2 + Math.sin(Date.now() * 0.02) * 0.5;
+            z.mesh.children[3].rotation.x = -Math.PI/2 + Math.sin(Date.now() * 0.02 + Math.PI) * 0.5;
+        } else {
+            z.mesh.children[2].rotation.x = Math.sin(walkPhase) * 0.6;
+            z.mesh.children[3].rotation.x = Math.sin(walkPhase + Math.PI) * 0.6;
+        }
+        
         z.mesh.children[2].rotation.z = 0.15;
         z.mesh.children[3].rotation.z = -0.15;
         z.mesh.children[4].rotation.x = Math.sin(walkPhase + Math.PI) * 0.5;
         z.mesh.children[5].rotation.x = Math.sin(walkPhase) * 0.5;
         z.mesh.children[0].rotation.z = Math.sin(walkPhase * 0.5) * 0.05;
         z.mesh.children[1].rotation.z = Math.sin(walkPhase * 0.7) * 0.1;
+
+        if (z.hpCtx) {
+            z.hpCtx.clearRect(0,0,64,16);
+            z.hpCtx.fillStyle = '#ff0000';
+            z.hpCtx.fillRect(0,0,64 * (z.hp / z.maxHp),16);
+            z.hpTex.needsUpdate = true;
+        }
 
         // Attack
         if (dist < 2) {
@@ -194,8 +306,10 @@ export function updateZombies(dt) {
 export function attractZombies(pos, radius) {
     for (const z of gameState.zombieEntities) {
         if (z.hp > 0 && z.mesh.position.distanceTo(pos) < radius) {
-            z.attracted = true;
-            z.speed *= 1.1;
+            if (!z.attracted) {
+                z.attracted = true;
+                z.speed *= 1.5;
+            }
         }
     }
 }

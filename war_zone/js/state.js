@@ -11,7 +11,8 @@ function defaultPlayerData() {
         equippedLoadout: ['fists', 'glock'],
         equippedArmor: null,
         equippedHelmet: null,
-        reserveAmmo: {}
+        reserveAmmo: {},
+        airstrikes: 0
     };
 }
 
@@ -46,7 +47,8 @@ export const playerState = {
     weapons: [], currentWeaponIndex: 0,
     weaponStates: {},
     isZoomed: false, godMode: false, noClip: false, speedMult: 1,
-    maxSlots: 4
+    maxSlots: 4,
+    stamina: 100, maxStamina: 100
 };
 
 export function resetPlayerState(overrides = {}) {
@@ -54,7 +56,7 @@ export function resetPlayerState(overrides = {}) {
         hp: 100, maxHp: 100, armor: 0, maxArmor: 0, damageReduction: 0,
         headshotReduction: 0, weapons: [], currentWeaponIndex: 0,
         weaponStates: {}, isZoomed: false, godMode: false, noClip: false,
-        speedMult: 1, maxSlots: 4, ...overrides
+        speedMult: 1, maxSlots: 4, stamina: 100, maxStamina: 100, ...overrides
     });
 }
 

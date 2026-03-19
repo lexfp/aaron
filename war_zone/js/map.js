@@ -94,55 +94,136 @@ export function buildMap(mapId) {
                 (rng() - 0.5) * size * 1.6, s * 0.3, (rng() - 0.5) * size * 1.6);
         }
     } else if (mapId === 'city') {
-        const stairMat = new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 0.8 });
-        for (let i = 0; i < 15; i++) {
-            const w = 4 + rng() * 8, h = 4 + rng() * 12, d = 4 + rng() * 8;
-            const bx = (rng() - 0.5) * size * 1.4;
-            const bz = (rng() - 0.5) * size * 1.4;
-            addObstacle(obs, obsMat, w, h, d, bx, h / 2, bz);
+        const buildingColors = [0xaaaaaa, 0x884444, 0x445588, 0x888855, 0x55aa66];
+        for (let i = 0; i < 20; i++) {
+            const w = 12 + rng() * 8, h = 8 + rng() * 6, d = 12 + rng() * 8;
+            const bx = (rng() - 0.5) * size * 1.5;
+            const bz = (rng() - 0.5) * size * 1.5;
+            const bMat = new THREE.MeshStandardMaterial({ color: buildingColors[Math.floor(rng() * buildingColors.length)], roughness: 0.8 });
+            
+            const thickness = 0.5;
+            const doorW = 2.5, doorH = 3.5;
+            
+            // Front wall
+            addObstacle(obs, bMat, (w - doorW)/2, h, thickness, bx - w/2 + (w - doorW)/4, h/2, bz + d/2);
+            addObstacle(obs, bMat, (w - doorW)/2, h, thickness, bx + w/2 - (w - doorW)/4, h/2, bz + d/2);
+            addObstacle(obs, bMat, doorW, h - doorH, thickness, bx, h - (h - doorH)/2, bz + d/2);
+            
+            // Back wall (50% chance for backdoor)
+            if (rng() > 0.5) {
+                addObstacle(obs, bMat, (w - doorW)/2, h, thickness, bx - w/2 + (w - doorW)/4, h/2, bz - d/2);
+                addObstacle(obs, bMat, (w - doorW)/2, h, thickness, bx + w/2 - (w - doorW)/4, h/2, bz - d/2);
+                addObstacle(obs, bMat, doorW, h - doorH, thickness, bx, h - (h - doorH)/2, bz - d/2);
+            } else {
+                addObstacle(obs, bMat, w, h, thickness, bx, h/2, bz - d/2);
+            }
 
-            const stairWidth = 1.2, stepH = 0.5, stepD = 0.6;
-            const numSteps = Math.ceil(h / stepH);
-            const side = rng() > 0.5 ? 1 : -1;
-            for (let s = 0; s < numSteps; s++) {
-                addObstacle(obs, stairMat, stairWidth, stepH, stepD,
-                    bx + side * (w / 2 + stairWidth / 2 + 0.1),
-                    s * stepH + stepH / 2,
-                    bz - d / 2 + (s / numSteps) * d);
+            // Side walls
+            addObstacle(obs, bMat, thickness, h, d, bx - w/2, h/2, bz); // left
+            addObstacle(obs, bMat, thickness, h, d, bx + w/2, h/2, bz); // right
+            
+            // Roof
+            addObstacle(obs, new THREE.MeshStandardMaterial({ color: 0x333333 }), w, thickness, d, bx, h + thickness/2, bz);
+
+            // Second floor & stairs
+            if (rng() > 0.3) {
+                const floorH = h * 0.45;
+                // Add second floor covering the back half of the building
+                addObstacle(obs, bMat, w - thickness * 2, thickness, d/2 - thickness, bx, floorH, bz - d/4);
+                
+                // Add stairs going up the left wall
+                const steps = 8;
+                const stepW = 2.5;
+                const stepD = (d/2 - 1) / steps;
+                const stepH = floorH / steps;
+                for (let s = 0; s < steps; s++) {
+                    const curH = stepH * (s + 1);
+                    addObstacle(obs, bMat, stepW, curH, stepD, 
+                                bx - w/2 + thickness + stepW/2, 
+                                curH / 2, 
+                                bz + d/2 - thickness - 0.5 - stepD * s - stepD/2);
+                }
+            }
+            
+            // Windows
+            const winMat = new THREE.MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.4 });
+            const windowMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), winMat);
+            windowMesh.position.set(bx, h/2 + 1, bz - d/2 + thickness + 0.02);
+            scene.add(windowMesh);
+            
+            // Graffiti/boxes
+            if (rng() < 0.6) {
+                const crateMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b });
+                addObstacle(obs, crateMat, 1.2, 1.2, 1.2, bx + 2, 0.6, bz + 2);
             }
         }
+    } else if (mapId === 'mountain') {
+        const rockMat = new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.95 });
+        for (let i = 0; i < 60; i++) {
+            const w = 10 + rng() * 20, h = 10 + rng() * 25, d = 10 + rng() * 20;
+            const bx = (rng() - 0.5) * size * 1.8;
+            const bz = (rng() - 0.5) * size * 1.8;
+            addObstacle(obs, rockMat, w, h, d, bx, h/2, bz);
+            const slope = new THREE.Mesh(new THREE.BoxGeometry(w*1.5, h*0.5, d*1.5), rockMat);
+            slope.rotation.x = (rng() - 0.5); slope.rotation.z = (rng() - 0.5);
+            slope.position.set(bx, h/4, bz);
+            scene.add(slope);
+        }
     } else if (mapId === 'forest') {
-        const treeMat = new THREE.MeshStandardMaterial({ color: 0x4a3520 });
-        const leafMat = new THREE.MeshStandardMaterial({ color: 0x1a5a0a });
-        for (let i = 0; i < 50; i++) {
-            const x = (rng() - 0.5) * size * 1.6;
-            const z = (rng() - 0.5) * size * 1.6;
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 6, 8), treeMat);
-            trunk.position.set(x, 3, z);
+        const treeMat = new THREE.MeshStandardMaterial({ color: 0x3d2b1f });
+        const leafMat = new THREE.MeshStandardMaterial({ color: 0x113a11 });
+        
+        scene.fog = new THREE.Fog(0x051105, size * 0.1, size * 0.5);
+        scene.background = new THREE.Color(0x020802);
+        
+        for (let i = 0; i < 200; i++) {
+            const x = (rng() - 0.5) * size * 1.9;
+            const z = (rng() - 0.5) * size * 1.9;
+            const scale = 0.5 + rng() * 2.0;
+            
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3*scale, 0.6*scale, 8*scale, 6), treeMat);
+            trunk.position.set(x, 4*scale, z);
             trunk.castShadow = true;
             scene.add(trunk);
-            obs.push({ mesh: trunk, radius: 0.4 });
-            const canopy = new THREE.Mesh(new THREE.SphereGeometry(2.5, 8, 6), leafMat);
-            canopy.position.set(x, 7, z);
+            obs.push({ mesh: trunk, radius: 0.6*scale });
+            
+            const canopy = new THREE.Mesh(new THREE.SphereGeometry(3.5*scale, 7, 5), leafMat);
+            canopy.position.set(x, 8*scale, z);
             canopy.castShadow = true;
             scene.add(canopy);
+            
+            for(let j=0; j<3; j++) {
+                const root = new THREE.Mesh(new THREE.CylinderGeometry(0.15*scale, 0.4*scale, 2.5*scale, 4), treeMat);
+                root.rotation.x = Math.PI/2 + rng();
+                root.rotation.y = j * (Math.PI*2/3) + rng();
+                root.position.set(x + Math.cos(root.rotation.y)*scale*0.8, 0, z + Math.sin(root.rotation.y)*scale*0.8);
+                scene.add(root);
+            }
         }
     }
 
     setObstacles(obs);
-    spawnAmmoPickups(size);
+    gameState.ammoPickups = [];
+    for (let i = 0; i < 3; i++) spawnSinglePickup(size);
 }
 
-function spawnAmmoPickups(mapSize) {
-    gameState.ammoPickups = [];
-    const mat = new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0x888800 });
-    for (let i = 0; i < 15; i++) {
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), mat);
-        mesh.position.set(
-            (Math.random() - 0.5) * mapSize * 1.4, 0.4,
-            (Math.random() - 0.5) * mapSize * 1.4
-        );
-        scene.add(mesh);
-        gameState.ammoPickups.push({ mesh, collected: false });
-    }
+export function spawnSinglePickup(mapSize) {
+    const isMedkit = Math.random() < 0.2;
+    const mat = new THREE.MeshStandardMaterial({ color: isMedkit ? 0x00ff00 : 0xffff00, emissive: isMedkit ? 0x004400 : 0x888800 });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), mat);
+    mesh.position.set(
+        (Math.random() - 0.5) * mapSize * 1.5, 0.4,
+        (Math.random() - 0.5) * mapSize * 1.5
+    );
+    gameState.ammoPickups.push({ mesh, collected: false, isMedkit });
+}
+
+export function spawnExtractionZone(mapSize) {
+    const mat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 20, 16), mat);
+    const x = (Math.random() - 0.5) * mapSize * 0.8;
+    const z = (Math.random() - 0.5) * mapSize * 0.8;
+    mesh.position.set(x, 10, z);
+    scene.add(mesh);
+    gameState.extractionZone = { mesh, x, z };
 }

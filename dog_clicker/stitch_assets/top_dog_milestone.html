@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Goodest Boy - Level Up</title>
+<!-- Tailwind CSS CDN with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Material Symbols for Dog/Paw icons -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind Config for Custom Animations -->
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'dog-brown': '#78350f',
+            'dog-tan': '#fef3c7',
+            'dog-gold': '#d97706',
+          },
+          animation: {
+            'spin-slow': 'spin 12s linear infinite',
+            'bounce-slow': 'bounce 3s infinite',
+            'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'float': 'float 3s ease-in-out infinite',
+            'wag': 'wag 0.5s ease-in-out infinite',
+          },
+          keyframes: {
+            float: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-15px)' },
+            },
+            wag: {
+              '0%, 100%': { transform: 'rotate(-5deg)' },
+              '50%': { transform: 'rotate(5deg)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="layout-styles">
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #451a03; /* Deep brown */
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    .prestige-gradient {
+      background: radial-gradient(circle, #92400e 0%, #451a03 100%);
+    }
+    .golden-text {
+      background: linear-gradient(to bottom, #fbbf24 0%, #d97706 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .paw-print {
+      font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 48;
+    }
+  </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center prestige-gradient text-white select-none">
+<!-- BEGIN: Celebration Background -->
+<div class="fixed inset-0 pointer-events-none flex items-center justify-center overflow-hidden" data-purpose="background-vfx">
+<!-- Rotating Rays -->
+<div class="absolute w-[200%] h-[200%] opacity-10 animate-spin-slow bg-[conic-gradient(from_0deg,transparent_0deg,#fde68a_15deg,transparent_30deg)]"></div>
+<div class="absolute w-[150%] h-[150%] opacity-5 animate-spin-slow bg-[conic-gradient(from_45deg,transparent_0deg,#fbbf24_15deg,transparent_30deg)]" style="animation-direction: reverse;"></div>
+<!-- Floating Bone Particles Canvas -->
+<canvas class="absolute inset-0 w-full h-full opacity-40" data-purpose="particle-system" id="particleCanvas"></canvas>
+</div>
+<!-- END: Celebration Background -->
+<!-- BEGIN: Main Content Container -->
+<main class="relative z-10 w-full max-w-md px-6 flex flex-col items-center text-center space-y-8" data-purpose="ui-container">
+<!-- Level Up Header -->
+<header class="animate-float flex flex-col items-center" data-purpose="header-section">
+<span class="material-symbols-outlined text-6xl text-amber-400 mb-2 paw-print">pets</span>
+<h1 class="text-5xl font-black uppercase italic tracking-tighter golden-text drop-shadow-[0_5px_15px_rgba(217,119,6,0.5)]">
+        GOODEST BOY!
+      </h1>
+<p class="text-amber-100 text-lg font-bold tracking-widest uppercase mt-2">Top Dog Milestone Reached</p>
+</header>
+<!-- Stat Display -->
+<section class="bg-amber-950/40 backdrop-blur-md border border-amber-500/20 rounded-[2.5rem] p-8 w-full shadow-2xl" data-purpose="stats-card">
+<div class="flex flex-col items-center">
+<span class="text-amber-200/60 text-xs uppercase font-bold tracking-widest mb-1">Lifetime Boops</span>
+<span class="text-5xl font-mono font-bold text-white tracking-tight" id="clickCount">1,245,892</span>
+</div>
+<div class="mt-6 pt-6 border-t border-white/10 grid grid-cols-2 gap-4">
+<div class="flex flex-col">
+<span class="text-amber-200/60 text-[10px] uppercase font-bold">Bark Power</span>
+<span class="text-xl font-bold flex items-center justify-center gap-1">
+          x1.5 <span class="material-symbols-outlined text-sm">trending_up</span>
+</span>
+</div>
+<div class="flex flex-col">
+<span class="text-amber-200/60 text-[10px] uppercase font-bold">Breed Rank</span>
+<span class="text-xl font-bold">Golden Alpha</span>
+</div>
+</div>
+</section>
+<!-- Action Buttons -->
+<div class="flex flex-col w-full gap-4" data-purpose="action-buttons">
+<!-- Prestige Button -->
+<button class="group relative overflow-hidden bg-gradient-to-r from-amber-600 to-orange-700 p-[2px] rounded-3xl transition-transform active:scale-95 shadow-lg shadow-amber-900/40" data-purpose="prestige-action" onclick="triggerPrestige()">
+<div class="bg-amber-950 rounded-[22px] px-8 py-5 flex items-center justify-between group-hover:bg-transparent transition-colors">
+<div class="text-left">
+<h2 class="text-xl font-bold text-white leading-none">LEARN NEW TRICK</h2>
+<p class="text-xs text-amber-200/70 mt-1">Reset for +50% Treat Bonus</p>
+</div>
+<div class="bg-white/20 p-2 rounded-full animate-wag">
+<span class="material-symbols-outlined text-white">psychology_alt</span>
+</div>
+</div>
+</button>
+<!-- Continue Button -->
+<button class="bg-white/5 hover:bg-white/10 border border-white/10 text-amber-50 font-bold py-4 px-8 rounded-3xl transition-all active:scale-95 flex items-center justify-center gap-2" data-purpose="continue-action" onclick="continueGame()">
+        Keep Digging <span class="material-symbols-outlined text-sm">potted_plant</span>
+</button>
+</div>
+</main>
+<!-- END: Main Content Container -->
+<script data-purpose="particle-logic">
+    // Simple particle system for the background (now "bones" or circles)
+    const canvas = document.getElementById('particleCanvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    class Particle {
+      constructor() {
+        this.init();
+      }
+      init() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 4 + 2;
+        this.speedY = Math.random() * -0.8 - 0.2;
+        this.speedX = (Math.random() - 0.5) * 0.5;
+        this.opacity = Math.random() * 0.4 + 0.1;
+        this.rotation = Math.random() * Math.PI * 2;
+        this.rotationSpeed = (Math.random() - 0.5) * 0.02;
+      }
+      update() {
+        this.y += this.speedY;
+        this.x += this.speedX;
+        this.rotation += this.rotationSpeed;
+        if (this.y < -20) {
+          this.y = canvas.height + 20;
+          this.x = Math.random() * canvas.width;
+        }
+      }
+      draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        ctx.fillStyle = `rgba(254, 243, 199, ${this.opacity})`; // Dog tan color
+        
+        // Draw a tiny bone-like shape (two circles and a rect)
+        const w = this.size * 2;
+        const h = this.size * 0.6;
+        ctx.fillRect(-w/2, -h/2, w, h);
+        ctx.beginPath();
+        ctx.arc(-w/2, -h/2, h, 0, Math.PI * 2);
+        ctx.arc(-w/2, h/2, h, 0, Math.PI * 2);
+        ctx.arc(w/2, -h/2, h, 0, Math.PI * 2);
+        ctx.arc(w/2, h/2, h, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+      }
+    }
+
+    function initParticles() {
+      particles = [];
+      for (let i = 0; i < 30; i++) {
+        particles.push(new Particle());
+      }
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => {
+        p.update();
+        p.draw();
+      });
+      requestAnimationFrame(animate);
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+    initParticles();
+    animate();
+  </script>
+<script data-purpose="ui-interactions">
+    function triggerPrestige() {
+      const currentScore = parseInt(localStorage.getItem('dogScore') || '0');
+      const requiredScore = 100000;
+      
+      if (currentScore < requiredScore) {
+        alert(`You need at least ${requiredScore.toLocaleString()} bones to prestige! You currently have ${currentScore.toLocaleString()} bones. Keep digging!`);
+        return;
+      }
+
+      if(confirm("Are you sure? Learning a new trick resets your progress but gives a permanent +50% treat multiplier! Woof!")) {
+        localStorage.setItem('dogScore', '0');
+        localStorage.setItem('wagMultiplier', (parseFloat(localStorage.getItem('wagMultiplier') || '1') + 0.5).toString());
+        alert("Who's a good boy? You are! Starting fresh with new skills...");
+        window.location.href = 'main_game.html';
+      }
+    }
+
+    function continueGame() {
+      document.body.style.transition = 'opacity 0.2s ease-out';
+      document.body.style.opacity = '0';
+      setTimeout(() => {
+        window.location.href = 'main_game.html';
+      }, 200);
+    }
+  </script>
+</body></html>

@@ -1,4 +1,3 @@
-the entire game appears to speed up when minigun is used. Fix that
 add armor equip slots to the loadout tab
 make me able to deselect fists in the loadout tab
 give the zombies proper facial expressions(drooling, bloodthirsty, etc.)
@@ -11,7 +10,10 @@ add fall damage
 make me go up staircases easier
 add exit game button
 add pictures to choose map thing
+zombie death animations
+show zombie health bars
 
+New Mode:
 Rescue Mode: You start at a custom map where you must go through many enemies at choke points 
 like a valley surrounded my mountains with enemies with guns' checkpoints with towers/sandbags 
 with enemies taking cover behind. After traveling thought these choke points there will be a 

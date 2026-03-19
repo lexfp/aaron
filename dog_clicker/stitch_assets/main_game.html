@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport" />
+  <title>Paws &amp; Barks</title>
+  <!-- Tailwind CSS v3 with plugins -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <!-- Material Symbols for Bone/Paw Icons -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+    rel="stylesheet" />
+  <!-- Tailwind Configuration for Custom Colors/Animations -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'dog-brown': '#8B4513',
+            'dog-tan': '#D2B48C',
+            'dog-blue': '#1E90FF',
+            'dog-green': '#4CAF50',
+          },
+          animation: {
+            'bounce-short': 'bounce-short 0.1s ease-in-out',
+            'float': 'float 3s ease-in-out infinite',
+            'spin-slow': 'spin 12s linear infinite',
+          },
+          keyframes: {
+            'bounce-short': {
+              '0%, 100%': { transform: 'scale(1)' },
+              '50%': { transform: 'scale(0.92)' },
+            },
+            'float': {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-12px)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- BEGIN: Custom Layout Styles -->
+  <style data-purpose="layout-styles">
+    body {
+      background: radial-gradient(circle, #4CAF50 0%, #2E7D32 100%);
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+
+    /* Playful Bone Pattern Overlay */
+    .bg-pattern {
+      position: absolute;
+      inset: 0;
+      opacity: 0.1;
+      background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 15a3 3 0 1 0 0-6 3 3 0 0 0-3 3v2h-14v-2a3 3 0 1 0-3-3 3 3 0 1 0 0 6 3 3 0 0 0 3-3v2h14v-2a3 3 0 1 0 3 3z' fill='%23ffffff' fill-opacity='1' fill-rule='evenodd'/%3E%3C/svg%3E");
+    }
+
+    .particle {
+      position: absolute;
+      pointer-events: none;
+      animation: particleUp 0.8s ease-out forwards;
+    }
+
+    @keyframes particleUp {
+      0% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+      }
+
+      100% {
+        transform: translateY(-120px) scale(1.5);
+        opacity: 0;
+      }
+    }
+  </style>
+  <!-- END: Custom Layout Styles -->
+</head>
+
+<body
+  class="h-screen w-full flex flex-col items-center justify-between p-6 text-white font-sans overflow-hidden select-none relative">
+  <div class="bg-pattern pointer-events-none"></div>
+  <!-- BEGIN: StatsHeader -->
+  <header class="w-full flex flex-col items-center mt-8 space-y-2 z-10" data-purpose="stats-container">
+    <div
+      class="bg-dog-brown/40 backdrop-blur-md px-10 py-4 rounded-3xl border-4 border-dog-tan/50 shadow-2xl text-center">
+      <span class="text-xs uppercase tracking-[0.2em] text-dog-tan font-black block mb-1">Barks Collected</span>
+      <h1 class="text-6xl font-black text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]" id="score-counter">0</h1>
+    </div>
+    <div class="flex gap-4">
+      <div
+        class="bg-dog-blue px-5 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 border-2 border-white/30 shadow-lg">
+        <span class="material-symbols-outlined text-lg">bolt</span>
+        <span>Wag Multiplier: <span id="multiplier-val">x1</span></span>
+      </div>
+    </div>
+  </header>
+  <!-- END: StatsHeader -->
+  <!-- BEGIN: MainClickArea -->
+  <main class="relative flex-1 flex items-center justify-center w-full" data-purpose="click-area">
+    <!-- Background Glow Effect -->
+    <div class="absolute w-80 h-80 bg-white/20 rounded-full blur-3xl animate-pulse"></div>
+    <!-- Rotating Rays Background -->
+    <div class="absolute w-full h-full flex items-center justify-center opacity-20 pointer-events-none">
+      <div
+        class="w-[600px] h-[600px] bg-[repeating-conic-gradient(from_0deg,white_0deg_10deg,transparent_10deg_20deg)] rounded-full animate-spin-slow">
+      </div>
+    </div>
+    <!-- The Clickable Golden Paw -->
+    <button class="relative z-20 w-72 h-72 transition-transform active:scale-90 focus:outline-none"
+      data-purpose="main-game-object" id="clicker-button">
+      <div
+        class="w-full h-full rounded-full bg-gradient-to-br from-yellow-300 via-yellow-500 to-amber-600 shadow-[0_25px_60px_rgba(0,0,0,0.4),inset_0_-8px_15px_rgba(0,0,0,0.3),inset_0_8px_15px_rgba(255,255,255,0.6)] flex items-center justify-center animate-float border-[12px] border-dog-brown/20">
+        <!-- Paw Print Icon -->
+        <div
+          class="w-56 h-56 rounded-full border-4 border-white/20 flex items-center justify-center bg-white/10 backdrop-blur-sm">
+          <span class="text-[120px] filter drop-shadow-[0_10px_10px_rgba(0,0,0,0.3)] select-none">🐾</span>
+        </div>
+      </div>
+    </button>
+  </main>
+  <!-- END: MainClickArea -->
+  <!-- BEGIN: NavigationFooter -->
+  <footer class="w-full flex flex-col items-center pb-10 z-10 gap-6" data-purpose="bottom-nav">
+    <button
+      class="group relative flex items-center gap-4 px-14 py-5 bg-dog-blue rounded-3xl shadow-[0_12px_0_rgb(20,90,160)] hover:brightness-110 transition-all active:translate-y-2 active:shadow-none"
+      id="shop-btn">
+      <span class="text-3xl">🦴</span>
+      <span class="text-2xl font-black uppercase tracking-wider">Treat Shop</span>
+      <!-- Tooltip -->
+      <div
+        class="absolute -top-10 left-1/2 -translate-x-1/2 bg-white text-dog-blue text-[11px] font-black px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-xl">
+        NEW TOYS AVAILABLE!
+      </div>
+    </button>
+    <div class="flex gap-4">
+      <button onclick="window.location.href='doggy_settings.html'"
+        class="bg-white/20 text-white font-bold py-2 px-6 rounded-full hover:bg-white/30 transition border-2 border-white/10">⚙️
+        Settings</button>
+      <button onclick="window.location.href='top_dog_milestone.html'"
+        class="bg-amber-500 text-white font-bold py-2 px-6 rounded-full shadow-[0_4px_0_#b45309] hover:brightness-110 transition active:translate-y-1 active:shadow-none">🎖️
+        Milestones</button>
+    </div>
+  </footer>
+  <!-- END: NavigationFooter -->
+  <!-- BEGIN: GameLogic -->
+  <script data-purpose="game-mechanics">
+    let score = parseInt(localStorage.getItem('dogScore') || '0');
+    let multiplier = parseFloat(localStorage.getItem('wagMultiplier') || '1');
+    const scoreElement = document.getElementById('score-counter');
+    const clickerButton = document.getElementById('clicker-button');
+    const multiplierElement = document.getElementById('multiplier-val');
+
+    // Init display
+    scoreElement.innerText = score.toLocaleString();
+    if (multiplier > 1) {
+      multiplierElement.innerText = 'x' + multiplier.toFixed(1);
+    }
+
+    clickerButton.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+
+      // Update Score
+      score += (1 * multiplier);
+      scoreElement.innerText = score.toLocaleString();
+      localStorage.setItem('dogScore', score.toString());
+
+      // Animation reset
+      clickerButton.classList.remove('animate-bounce-short');
+      void clickerButton.offsetWidth;
+      clickerButton.classList.add('animate-bounce-short');
+
+      // Create Floating Particle (Bone or Woof)
+      createParticle(e.clientX, e.clientY);
+    });
+
+    function createParticle(x, y) {
+      const p = document.createElement('div');
+      const texts = ['Woof!', 'Bark!', '🦴', '🐾', '+1'];
+      const randomText = texts[Math.floor(Math.random() * texts.length)];
+
+      p.className = 'particle text-3xl font-black text-white pointer-events-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]';
+      p.style.left = `${x}px`;
+      p.style.top = `${y}px`;
+      p.innerText = randomText;
+      document.body.appendChild(p);
+
+      setTimeout(() => {
+        p.remove();
+      }, 800);
+    }
+
+    document.getElementById('shop-btn').addEventListener('click', () => {
+      window.location.href = 'puppy_pro_shop.html';
+    });
+  </script>
+  <!-- END: GameLogic -->
+</body>
+
+</html>

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Pup Upgrade Shop</title>
+<!-- Tailwind CSS CDN with plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Material Symbols for dog-themed icons -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Custom Tailwind Config -->
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'game-primary': '#f97316', // Orange/Brown theme
+            'game-secondary': '#7c2d12', // Darker brown
+            'game-accent': '#fbbf24', // Gold/Bone yellow
+            'game-bg': '#fffaf3', // Creamy background
+            'game-panel': '#ffffff',
+            'game-text': '#431407',
+          },
+          borderRadius: {
+            'game-xl': '1.5rem',
+          }
+        }
+      }
+    }
+  </script>
+<!-- BEGIN: Custom Styles -->
+<style data-purpose="animations">
+    @keyframes bounce-small {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+    .animate-bounce-small {
+      animation: bounce-small 2s infinite;
+    }
+    .buy-button:active:not(:disabled) {
+      transform: scale(0.95);
+    }
+  </style>
+<style data-purpose="scroll-behavior">
+    /* Hide scrollbar for cleaner mobile look while keeping functionality */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+<!-- END: Custom Styles -->
+</head>
+<body class="bg-game-bg font-sans text-game-text min-h-screen flex flex-col">
+<!-- BEGIN: Navigation Header -->
+<header class="bg-white px-6 pt-8 pb-4 border-b border-orange-100 sticky top-0 z-10 shadow-sm" data-purpose="main-header">
+<div class="flex justify-between items-center mb-4">
+<button aria-label="Go back" class="text-game-text p-2 -ml-2 rounded-full hover:bg-orange-50 transition-colors" onclick="window.location.href='main_game.html'">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M15.75 19.5L8.25 12l7.5-7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<h1 class="text-2xl font-black tracking-tight uppercase italic text-game-secondary">Pup Shop</h1>
+<div class="w-10"></div> <!-- Spacer for centering title -->
+</div>
+<!-- Currency Display -->
+<div class="bg-game-accent/10 border-2 border-game-accent rounded-full py-2 px-6 flex items-center justify-center space-x-2 animate-bounce-small" data-purpose="currency-display">
+<div class="w-6 h-6 bg-game-accent rounded-full flex items-center justify-center shadow-inner">
+<span class="material-symbols-outlined text-[14px] text-white font-bold">pets</span>
+</div>
+<span class="text-xl font-black text-game-text" id="player-balance">1,250 Barks</span>
+</div>
+</header>
+<!-- END: Navigation Header -->
+<!-- BEGIN: Shop Content -->
+<main class="flex-grow p-4 space-y-4 no-scrollbar overflow-y-auto" data-purpose="shop-items-container">
+<!-- Item: Auto-Petter -->
+<div class="bg-game-panel rounded-game-xl p-4 flex items-center shadow-sm border border-orange-50" data-purpose="upgrade-card">
+<div class="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center mr-4 flex-shrink-0">
+<span class="material-symbols-outlined text-4xl text-game-primary">front_hand</span>
+</div>
+<div class="flex-grow">
+<h3 class="font-bold text-lg leading-tight">Auto-Petter</h3>
+<p class="text-xs text-gray-500 mb-2">Gives pets once per second for you automatically.</p>
+<div class="flex items-center justify-between">
+<span class="font-black text-game-primary text-sm">500 Barks</span>
+<button class="buy-button bg-game-primary text-white font-black px-6 py-2 rounded-full shadow-lg shadow-game-primary/30 transition-all hover:brightness-105 active:scale-95" data-purpose="buy-button">
+            BUY
+          </button>
+</div>
+</div>
+</div>
+<!-- Item: Gourmet Kibble -->
+<div class="bg-game-panel rounded-game-xl p-4 flex items-center shadow-sm border border-orange-50" data-purpose="upgrade-card">
+<div class="w-16 h-16 bg-yellow-100 rounded-2xl flex items-center justify-center mr-4 flex-shrink-0">
+<span class="material-symbols-outlined text-4xl text-game-accent">nutrition</span>
+</div>
+<div class="flex-grow">
+<h3 class="font-bold text-lg leading-tight">Gourmet Kibble</h3>
+<p class="text-xs text-gray-500 mb-2">Earn 2x barks for every manual pet.</p>
+<div class="flex items-center justify-between">
+<span class="font-black text-game-primary text-sm">1,000 Barks</span>
+<button class="buy-button bg-game-primary text-white font-black px-6 py-2 rounded-full shadow-lg shadow-game-primary/30 transition-all hover:brightness-105 active:scale-95" data-purpose="buy-button">
+            BUY
+          </button>
+</div>
+</div>
+</div>
+<!-- Item: Squeaky Toy (Locked/Unavailable) -->
+<div class="bg-gray-50/80 rounded-game-xl p-4 flex items-center shadow-none border border-gray-100 opacity-80" data-purpose="upgrade-card-locked">
+<div class="w-16 h-16 bg-gray-200 rounded-2xl flex items-center justify-center mr-4 flex-shrink-0 grayscale">
+<span class="material-symbols-outlined text-4xl text-gray-400">toys</span>
+</div>
+<div class="flex-grow">
+<h3 class="font-bold text-lg leading-tight text-gray-500">Squeaky Toy</h3>
+<p class="text-xs text-gray-400 mb-2">Decreases auto-petter delay by 20%.</p>
+<div class="flex items-center justify-between">
+<span class="font-black text-gray-400 text-sm">5,000 Barks</span>
+<button class="bg-gray-300 text-gray-500 font-black px-6 py-2 rounded-full cursor-not-allowed" data-purpose="buy-button-disabled" disabled="">
+            BUY
+          </button>
+</div>
+</div>
+</div>
+<!-- Item: Luxury Kennel (Locked/Unavailable) -->
+<div class="bg-gray-50/80 rounded-game-xl p-4 flex items-center shadow-none border border-gray-100 opacity-80" data-purpose="upgrade-card-locked">
+<div class="w-16 h-16 bg-gray-200 rounded-2xl flex items-center justify-center mr-4 flex-shrink-0 grayscale">
+<span class="material-symbols-outlined text-4xl text-gray-400">house</span>
+</div>
+<div class="flex-grow">
+<h3 class="font-bold text-lg leading-tight text-gray-500">Luxury Kennel</h3>
+<p class="text-xs text-gray-400 mb-2">Massively increases bark generation.</p>
+<div class="flex items-center justify-between">
+<span class="font-black text-gray-400 text-sm">25,000 Barks</span>
+<button class="bg-gray-300 text-gray-500 font-black px-6 py-2 rounded-full cursor-not-allowed" data-purpose="buy-button-disabled" disabled="">
+            BUY
+          </button>
+</div>
+</div>
+</div>
+</main>
+<!-- END: Shop Content -->
+<!-- BEGIN: Bottom Tab Navigation -->
+<footer class="bg-white border-t border-orange-100 pb-8 pt-2 px-6 flex justify-around items-center" data-purpose="footer-nav">
+<button class="flex flex-col items-center p-2 text-gray-400" onclick="window.location.href='main_game.html'">
+<span class="material-symbols-outlined">home</span>
+<span class="text-[10px] font-bold uppercase">Main</span>
+</button>
+<button class="flex flex-col items-center p-2 text-game-primary">
+<span class="material-symbols-outlined">shopping_basket</span>
+<span class="text-[10px] font-bold uppercase">Shop</span>
+</button>
+<button class="flex flex-col items-center p-2 text-gray-400" onclick="window.location.href='doggy_settings.html'">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-bold uppercase">Settings</span>
+</button>
+</footer>
+<!-- END: Bottom Tab Navigation -->
+</body></html>
