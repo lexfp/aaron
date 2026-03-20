@@ -12,7 +12,27 @@ export function createWeaponModel(weaponId) {
     const w = WEAPONS[weaponId];
     const group = new THREE.Group();
 
-    if (w.type === 'melee') {
+    if (weaponId === 'compass') {
+        const baseMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.8 });
+        const dialMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+        const needleMat = new THREE.MeshStandardMaterial({ color: 0xff2222 });
+
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.02, 16), baseMat);
+        base.position.set(0.15, -0.15, -0.3);
+        group.add(base);
+
+        const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.022, 16), dialMat);
+        dial.position.set(0.15, -0.15, -0.3);
+        group.add(dial);
+
+        const needleGeo = new THREE.ConeGeometry(0.012, 0.08, 4);
+        needleGeo.rotateX(Math.PI / 2);
+        needleGeo.translate(0, 0, 0.035);
+        const needle = new THREE.Mesh(needleGeo, needleMat);
+        needle.position.set(0.15, -0.135, -0.3);
+        needle.name = "needle";
+        group.add(needle);
+    } else if (w.type === 'melee') {
         buildMeleeModel(group, weaponId, w);
     } else if (w.type === 'throwable') {
         const mat = new THREE.MeshStandardMaterial({ color: weaponId === 'molotov' ? 0x884400 : 0x445544 });
@@ -73,14 +93,14 @@ function buildMeleeModel(group, weaponId, w) {
 
 // Gun model config per weapon type
 const GUN_CONFIGS = {
-    glock:          { bodyColor: 0x2a2a2a, accentColor: 0x1a1a1a, bodyLen: 0.2, bodyH: 0.035 },
-    revolver:       { bodyColor: 0x6B6B6B, accentColor: 0x3a2010, metalColor: 0x888888, bodyLen: 0.22, bodyH: 0.045, barrelRadius: 0.012 },
-    shotgun:        { bodyColor: 0x2a2a2a, accentColor: 0x5a3520, bodyLen: 0.45, barrelLen: 0.2, barrelRadius: 0.012 },
-    assault_rifle:  { bodyColor: 0x2d2d2d, accentColor: 0x3a3a3a, bodyLen: 0.5, bodyW: 0.035, barrelLen: 0.18 },
-    sniper:         { bodyColor: 0x1a2a1a, accentColor: 0x2a1a10, bodyLen: 0.55, bodyH: 0.035, barrelLen: 0.25, barrelRadius: 0.006 },
-    minigun:        { bodyColor: 0x3a3a3a, accentColor: 0x2a2a2a, metalColor: 0x666666, bodyLen: 0.55, bodyH: 0.06, bodyW: 0.05, barrelLen: 0.2, barrelRadius: 0.015 },
-    rpg:            { bodyColor: 0x4a5a3a, accentColor: 0x3a3a2a, bodyLen: 0.5, bodyH: 0.06, bodyW: 0.05, barrelLen: 0.15, barrelRadius: 0.025 },
-    crossbow:       { bodyColor: 0x3a2a1a, accentColor: 0x2a1a0a, bodyLen: 0.3, bodyH: 0.03 },
+    glock: { bodyColor: 0x2a2a2a, accentColor: 0x1a1a1a, bodyLen: 0.2, bodyH: 0.035 },
+    revolver: { bodyColor: 0x6B6B6B, accentColor: 0x3a2010, metalColor: 0x888888, bodyLen: 0.22, bodyH: 0.045, barrelRadius: 0.012 },
+    shotgun: { bodyColor: 0x2a2a2a, accentColor: 0x5a3520, bodyLen: 0.45, barrelLen: 0.2, barrelRadius: 0.012 },
+    assault_rifle: { bodyColor: 0x2d2d2d, accentColor: 0x3a3a3a, bodyLen: 0.5, bodyW: 0.035, barrelLen: 0.18 },
+    sniper: { bodyColor: 0x1a2a1a, accentColor: 0x2a1a10, bodyLen: 0.55, bodyH: 0.035, barrelLen: 0.25, barrelRadius: 0.006 },
+    minigun: { bodyColor: 0x3a3a3a, accentColor: 0x2a2a2a, metalColor: 0x666666, bodyLen: 0.55, bodyH: 0.06, bodyW: 0.05, barrelLen: 0.2, barrelRadius: 0.015 },
+    rpg: { bodyColor: 0x4a5a3a, accentColor: 0x3a3a2a, bodyLen: 0.5, bodyH: 0.06, bodyW: 0.05, barrelLen: 0.15, barrelRadius: 0.025 },
+    crossbow: { bodyColor: 0x3a2a1a, accentColor: 0x2a1a0a, bodyLen: 0.3, bodyH: 0.03 },
 };
 
 function buildGunModel(group, weaponId, w) {
@@ -290,7 +310,7 @@ export function refillAllAmmo() {
 export function dropCurrentWeapon() {
     if (playerState.weapons.length <= 1) return;
     const id = playerState.weapons[playerState.currentWeaponIndex];
-    if (id === 'fists') return;
+    if (id === 'fists' || id === 'compass') return;
 
     const pos = camera.position.clone();
     pos.y = 0.3;

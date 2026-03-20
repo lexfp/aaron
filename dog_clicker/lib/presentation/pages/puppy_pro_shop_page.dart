@@ -11,9 +11,10 @@ class PuppyProShopPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Puppy Pro Shop', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Puppy Pro Shop',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -28,7 +29,8 @@ class PuppyProShopPage extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Theme.of(context).colorScheme.secondary),
+                    border: Border.all(
+                        color: Theme.of(context).colorScheme.secondary),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -37,7 +39,8 @@ class PuppyProShopPage extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text(
                         '${state.dogState.score} Bones',
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
@@ -48,11 +51,13 @@ class PuppyProShopPage extends StatelessWidget {
                     itemBuilder: (context, index) {
                       final item = state.shopItems[index];
                       final canAfford = state.dogState.score >= item.cost;
-                      
+
                       return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         color: Theme.of(context).colorScheme.surface,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: Row(
@@ -61,11 +66,16 @@ class PuppyProShopPage extends StatelessWidget {
                                 width: 50,
                                 height: 50,
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withOpacity(0.2),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Icon(
-                                  item.clickPowerIncrease > 0 ? Icons.touch_app : Icons.timer,
+                                  item.clickPowerIncrease > 0
+                                      ? Icons.touch_app
+                                      : Icons.timer,
                                   color: Theme.of(context).colorScheme.primary,
                                 ),
                               ),
@@ -74,12 +84,15 @@ class PuppyProShopPage extends StatelessWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(item.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                    Text(item.name,
+                                        style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold)),
                                     const SizedBox(height: 4),
                                     Text(
-                                      item.clickPowerIncrease > 0 
-                                        ? '+${item.clickPowerIncrease} per click' 
-                                        : '+${item.autoClickPowerIncrease} per sec',
+                                      item.clickPowerIncrease > 0
+                                          ? '+${item.clickPowerIncrease} per click'
+                                          : '+${item.autoClickPowerIncrease} per sec',
                                       style: TextStyle(color: Colors.white70),
                                     ),
                                   ],
@@ -87,14 +100,19 @@ class PuppyProShopPage extends StatelessWidget {
                               ),
                               Column(
                                 children: [
-                                  Text('${item.cost} Bones', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
+                                  Text('${item.cost} Bones',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.amber)),
                                   const SizedBox(height: 8),
                                   CustomButton(
                                     text: 'Buy',
                                     isPrimary: canAfford,
                                     isDisabled: !canAfford,
                                     onPressed: () {
-                                      context.read<DogClickerBloc>().add(ShopItemBought(item));
+                                      context
+                                          .read<DogClickerBloc>()
+                                          .add(ShopItemBought(item));
                                     },
                                   ),
                                 ],

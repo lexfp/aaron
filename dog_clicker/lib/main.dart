@@ -30,11 +30,11 @@ class DogClickerApp extends StatelessWidget {
           colorScheme: ColorScheme.dark(
             primary: const Color(0xFF6B4EE6),
             secondary: const Color(0xFFF7931A),
-            background: const Color(0xFF1E1E2C),
             surface: const Color(0xFF2A2A3D),
           ),
           textTheme: const TextTheme(
-            displayLarge: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+            displayLarge:
+                TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
             bodyLarge: TextStyle(color: Colors.white70),
           ),
           useMaterial3: true,

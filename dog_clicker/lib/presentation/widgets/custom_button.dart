@@ -19,12 +19,14 @@ class CustomButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: isDisabled 
-          ? theme.colorScheme.surfaceVariant 
-          : (isPrimary ? theme.colorScheme.primary : theme.colorScheme.secondary),
+        backgroundColor: isDisabled
+            ? theme.colorScheme.surfaceContainerHighest
+            : (isPrimary
+                ? theme.colorScheme.primary
+                : theme.colorScheme.secondary),
         foregroundColor: isDisabled ? Colors.white38 : Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         shape: RoundedRectangleBorder(

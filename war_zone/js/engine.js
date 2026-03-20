@@ -23,7 +23,7 @@ export const gravity = 30;
 // Movement state
 export const velocity = new THREE.Vector3();
 export const direction = new THREE.Vector3();
-export const keys = { w: false, a: false, s: false, d: false, shift: false, space: false };
+export const keys = { w: false, a: false, s: false, d: false, shift: false, space: false, e: false };
 export let canJump = true;
 export function setCanJump(v) { canJump = v; }
 

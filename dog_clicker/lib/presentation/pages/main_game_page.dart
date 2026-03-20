@@ -15,7 +15,8 @@ class MainGamePage extends StatefulWidget {
   State<MainGamePage> createState() => _MainGamePageState();
 }
 
-class _MainGamePageState extends State<MainGamePage> with SingleTickerProviderStateMixin {
+class _MainGamePageState extends State<MainGamePage>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
 
@@ -45,13 +46,14 @@ class _MainGamePageState extends State<MainGamePage> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: BlocConsumer<DogClickerBloc, DogClickerState>(
         listener: (context, state) {
           if (state is DogClickerLoaded && state.newMilestoneReached != null) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Milestone Reached: ${state.newMilestoneReached!.title}!'),
+                content: Text(
+                    'Milestone Reached: ${state.newMilestoneReached!.title}!'),
                 backgroundColor: Theme.of(context).colorScheme.secondary,
                 duration: const Duration(seconds: 3),
               ),
@@ -79,13 +81,19 @@ class _MainGamePageState extends State<MainGamePage> with SingleTickerProviderSt
                               shape: BoxShape.circle,
                               gradient: RadialGradient(
                                 colors: [
-                                  Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                                  Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withOpacity(0.5),
                                   Colors.transparent,
                                 ],
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withOpacity(0.3),
                                   blurRadius: 40,
                                   spreadRadius: 10,
                                 ),
@@ -123,25 +131,27 @@ class _MainGamePageState extends State<MainGamePage> with SingleTickerProviderSt
           Text(
             '${state.dogState.score}',
             style: Theme.of(context).textTheme.displayLarge?.copyWith(
-              fontSize: 64,
-              color: Theme.of(context).colorScheme.secondary,
-            ),
+                  fontSize: 64,
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
           ),
           const SizedBox(height: 8),
           Text(
             'Bones',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              fontSize: 24,
-              letterSpacing: 2,
-            ),
+                  fontSize: 24,
+                  letterSpacing: 2,
+                ),
           ),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildStatBadge(context, Icons.touch_app, '${state.dogState.clickPower}/click'),
+              _buildStatBadge(context, Icons.touch_app,
+                  '${state.dogState.clickPower}/click'),
               const SizedBox(width: 16),
-              _buildStatBadge(context, Icons.timer, '${state.dogState.autoClickers}/sec'),
+              _buildStatBadge(
+                  context, Icons.timer, '${state.dogState.autoClickers}/sec'),
             ],
           ),
         ],
@@ -155,7 +165,8 @@ class _MainGamePageState extends State<MainGamePage> with SingleTickerProviderSt
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
+        border: Border.all(
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
       ),
       child: Row(
         children: [
@@ -176,17 +187,20 @@ class _MainGamePageState extends State<MainGamePage> with SingleTickerProviderSt
           IconButton(
             icon: const Icon(Icons.settings, size: 32),
             color: Colors.white54,
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DoggySettingsPage())),
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const DoggySettingsPage())),
           ),
           CustomButton(
             text: 'SHOP',
             icon: Icons.store,
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PuppyProShopPage())),
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const PuppyProShopPage())),
           ),
           IconButton(
             icon: const Icon(Icons.military_tech, size: 32),
             color: Colors.white54,
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TopDogMilestonePage())),
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const TopDogMilestonePage())),
           ),
         ],
       ),

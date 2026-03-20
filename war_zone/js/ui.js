@@ -217,16 +217,16 @@ export function renderMapScreen(startGameFn) {
     for (const [id, m] of Object.entries(MAPS)) {
         const card = document.createElement('div');
         card.className = 'map-card';
-        
+
         let bgUrl = '';
         if (id === 'warehouse') bgUrl = 'linear-gradient(135deg, #222, #444)';
         else if (id === 'desert') bgUrl = 'linear-gradient(135deg, #c2a645, #dcb95e)';
         else if (id === 'city') bgUrl = 'linear-gradient(135deg, #555, #888)';
         else if (id === 'forest') bgUrl = 'linear-gradient(135deg, #1d3a1e, #2d5a2e)';
         else if (id === 'mountain') bgUrl = 'linear-gradient(135deg, #444, #777)';
-        
+
         card.style.background = bgUrl;
-        
+
         card.innerHTML = `
             <div style="background:rgba(0,0,0,0.6); padding: 15px; border-radius: 8px; height: 100%;">
                 <h3 style="color:#fff; text-shadow: 1px 1px 2px #000;">${m.name}</h3>

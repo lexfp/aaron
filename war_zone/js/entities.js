@@ -203,7 +203,7 @@ export function updateZombies(dt) {
         if (gameState.zombieSpawnTimer <= 0) {
             spawnZombie(gameState.wave >= 3 && Math.random() < 0.15 + gameState.wave * 0.02);
             gameState.zombiesToSpawn--;
-            gameState.zombieSpawnTimer = 0.5;
+            gameState.zombieSpawnTimer = gameState.mode === 'rescue' ? 0.15 : 0.5;
         }
     }
 
@@ -237,11 +237,17 @@ export function updateZombies(dt) {
         let stopDist = 1.5;
         if (playerState.weapons[playerState.currentWeaponIndex] === 'shield') stopDist = 2.5;
 
-        // Stair climbing via Raycaster
-        const zRay = new THREE.Raycaster(new THREE.Vector3(z.mesh.position.x, z.mesh.position.y + 2, z.mesh.position.z), new THREE.Vector3(0, -1, 0), 0, 4);
+        // Gravity & Raycast Floor Tracking
+        const zRay = new THREE.Raycaster(new THREE.Vector3(z.mesh.position.x, z.mesh.position.y + 2, z.mesh.position.z), new THREE.Vector3(0, -1, 0));
         const zHits = zRay.intersectObjects(obstacles.filter(o => o.mesh).map(o => o.mesh));
-        if (zHits.length > 0) {
+        if (zHits.length > 0 && zHits[0].distance < 4) {
             z.mesh.position.y += (zHits[0].point.y - z.mesh.position.y) * dt * 10;
+        } else if (zHits.length > 0) {
+            z.mesh.position.y -= 15 * dt;
+            if (z.mesh.position.y < zHits[0].point.y) z.mesh.position.y = zHits[0].point.y;
+        } else {
+            z.mesh.position.y -= 15 * dt;
+            if (z.mesh.position.y < 0) z.mesh.position.y = 0;
         }
 
         // Movement with collision sliding
@@ -338,10 +344,14 @@ export function spawnPvPEnemy() {
     lArm.position.set(-0.4, 0.9, 0); group.add(lArm);
     const rArm = lArm.clone(); rArm.position.x = 0.4; group.add(rArm);
 
-    group.position.set(
-        (Math.random() - 0.5) * mapSize * 0.8, 0,
-        (Math.random() - 0.5) * mapSize * 0.8
-    );
+    let spawnX = (Math.random() - 0.5) * mapSize * 0.8;
+    let spawnZ = (Math.random() - 0.5) * mapSize * 0.8;
+    let spawnY = 0;
+    const spawnRay = new THREE.Raycaster(new THREE.Vector3(spawnX, 100, spawnZ), new THREE.Vector3(0, -1, 0));
+    const hits = spawnRay.intersectObjects(obstacles.filter(o => o.mesh).map(o => o.mesh));
+    if (hits.length > 0) spawnY = hits[0].point.y;
+
+    group.position.set(spawnX, spawnY, spawnZ);
     scene.add(group);
 
     gameState.pvpEnemy = {
@@ -385,6 +395,18 @@ export function updatePvPEnemy(dt) {
     const size = MAPS[gameState.currentMap].size * 0.95;
     e.mesh.position.x = Math.max(-size, Math.min(size, e.mesh.position.x));
     e.mesh.position.z = Math.max(-size, Math.min(size, e.mesh.position.z));
+
+    const eRay = new THREE.Raycaster(new THREE.Vector3(e.mesh.position.x, e.mesh.position.y + 2, e.mesh.position.z), new THREE.Vector3(0, -1, 0));
+    const eHits = eRay.intersectObjects(obstacles.filter(o => o.mesh).map(o => o.mesh));
+    if (eHits.length > 0 && eHits[0].distance < 4) {
+        e.mesh.position.y += (eHits[0].point.y - e.mesh.position.y) * dt * 10;
+    } else if (eHits.length > 0) {
+        e.mesh.position.y -= 15 * dt;
+        if (e.mesh.position.y < eHits[0].point.y) e.mesh.position.y = eHits[0].point.y;
+    } else {
+        e.mesh.position.y -= 15 * dt;
+        if (e.mesh.position.y < 0) e.mesh.position.y = 0;
+    }
 
     // Shoot
     e.shootCooldown -= dt;

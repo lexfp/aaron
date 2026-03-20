@@ -1,7 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../domain/entities/dog_state.dart';
 import '../../domain/entities/shop_item.dart';
-import '../../domain/entities/milestone.dart';
 
 abstract class DogClickerEvent extends Equatable {
   const DogClickerEvent();

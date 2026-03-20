@@ -48,17 +48,16 @@ export function shoot() {
     else playGunshot();
 
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const colliders = [...getEnemyMeshes(), ...obstacles.filter(o => o.mesh).map(o => o.mesh)];
+    const hits = raycaster.intersectObjects(colliders, true);
+    const startPoint = camera.position.clone().add(new THREE.Vector3(0.1, -0.2, -0.5).applyQuaternion(camera.quaternion));
 
     if (def.explosive) {
-        createExplosion(
-            camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(15)),
-            def.radius || 5, def.damage
-        );
+        let hitPos = hits.length > 0 ? hits[0].point : camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(100));
+        createExplosion(hitPos, def.radius || 5, def.damage);
+        createTracer(startPoint, hitPos);
+        createMuzzleFlash();
     } else {
-        const colliders = [...getEnemyMeshes(), ...obstacles.filter(o => o.mesh).map(o => o.mesh)];
-        const hits = raycaster.intersectObjects(colliders, true);
-        const startPoint = camera.position.clone().add(new THREE.Vector3(0.1, -0.2, -0.5).applyQuaternion(camera.quaternion));
-        
         if (hits.length > 0) {
             const hitEnemy = findEntityFromHit(hits[0]);
             if (hitEnemy) applyDamageToEnemy(hits[0], calculateDamage(def, hits[0]));
@@ -68,11 +67,11 @@ export function shoot() {
         }
         createMuzzleFlash();
     }
-    
+
     if ((id === 'sniper' || id === 'crossbow') && playerState.isZoomed) {
         setTimeout(toggleZoom, 200);
     }
-    
+
     updateHUD();
 }
 
@@ -129,7 +128,7 @@ function applyDamageToEnemy(hit, dmg) {
     showDamageNumber(hit.point, dmg);
 
     if (entity.hp <= 0) {
-        if (gameState.mode === 'zombie') {
+        if (gameState.mode === 'zombie' || gameState.mode === 'rescue') {
             const idx = gameState.zombieEntities.indexOf(entity);
             if (idx >= 0) killZombie(entity, idx);
         } else if (gameState.mode === 'pvp') {
@@ -167,13 +166,19 @@ export function damagePlayer(amount) {
 // --- Throwables & Explosions ---
 
 function throwProjectile(def) {
-    const dir = new THREE.Vector3();
-    camera.getWorldDirection(dir);
-    // Add upward arc so it lands center
-    dir.y += 0.2; dir.normalize();
-    const start = camera.position.clone();
-    if (def.explosive) createExplosion(start.clone().add(dir.clone().multiplyScalar(20)), def.radius, def.damage);
-    if (def.fire) createFireZone(start.clone().add(dir.clone().multiplyScalar(15)), def.radius, def.damage, def.duration);
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const colliders = [...getEnemyMeshes(), ...obstacles.filter(o => o.mesh).map(o => o.mesh)];
+    const hits = raycaster.intersectObjects(colliders, true);
+
+    let explodePos;
+    if (hits.length > 0 && hits[0].distance < 30) {
+        explodePos = hits[0].point;
+    } else {
+        explodePos = camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(30));
+    }
+
+    if (def.explosive) createExplosion(explodePos, def.radius, def.damage);
+    if (def.fire) createFireZone(explodePos, def.radius, def.damage, def.duration);
 }
 
 function createExplosion(pos, radius, damage) {

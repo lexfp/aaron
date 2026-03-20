@@ -77,7 +77,7 @@ const downRaycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3
 
 function getFloorHeight(pos) {
     let floor = 0;
-    
+
     // Check AABB boxes first
     for (const obs of obstacles) {
         if (obs.box) {
@@ -101,7 +101,7 @@ function getFloorHeight(pos) {
             if (hitY > floor && hitY < pos.y + 1.5) floor = hitY;
         }
     }
-    
+
     return floor;
 }
 
@@ -112,7 +112,6 @@ function startGame(mode, mapId) {
     gameState.currentMap = mapId in MAPS ? mapId : 'warehouse';
 
     if (!playerData.equippedLoadout?.length) playerData.equippedLoadout = ['fists'];
-    if (!playerData.equippedLoadout.includes('fists')) playerData.equippedLoadout.unshift('fists');
 
     ['homepage', 'shop-screen', 'loadout-screen', 'map-screen'].forEach(s =>
         document.getElementById(s).style.display = 'none'
@@ -121,9 +120,15 @@ function startGame(mode, mapId) {
 
     buildMap(mapId);
 
-    const maxSlots = mode === 'pvp' ? 3 : 4;
+    const maxSlots = mode === 'rescue' ? 5 : (mode === 'pvp' ? 3 : 4);
+    const initialWeapons = playerData.equippedLoadout.slice(0, maxSlots);
+    if (mode === 'rescue' && !initialWeapons.includes('compass')) {
+        if (initialWeapons.length === 5) initialWeapons[4] = 'compass';
+        else initialWeapons.push('compass');
+    }
+
     resetPlayerState({
-        weapons: playerData.equippedLoadout.slice(0, maxSlots),
+        weapons: initialWeapons,
         maxSlots
     });
 
@@ -172,7 +177,7 @@ function startGame(mode, mapId) {
     } else if (mode === 'rescue') {
         spawnHostage(MAPS[mapId].size);
         gameState.zombiesAlive = 0;
-        gameState.zombiesToSpawn = 15;
+        gameState.zombiesToSpawn = 80;
         gameState.zombieSpawnTimer = 0;
         document.getElementById('wave-hud').style.display = 'block';
         document.getElementById('wave-hud').textContent = 'Find the Hostage!';
@@ -279,7 +284,7 @@ function animate() {
 
         if (camera.position.y < targetFloorY) {
             if (velocity.y < -15) {
-                damagePlayer(Math.floor((-velocity.y - 15) * 5));
+                damagePlayer(Math.floor((-velocity.y - 15) * 1.5));
             }
             camera.position.y = targetFloorY;
             velocity.y = 0;
@@ -302,18 +307,19 @@ function animate() {
                     scene.remove(gameState.hostage.mesh);
                     spawnExtractionZone(MAPS[gameState.currentMap].size);
                     document.getElementById('wave-hud').textContent = 'Get to Extraction (Green Pillar)!';
-                    gameState.zombiesToSpawn += 25;
+                    gameState.zombiesToSpawn += 100;
                     playPickup();
                 }
             } else if (gameState.extractionZone) {
                 const ex = gameState.extractionZone;
                 const dist = Math.sqrt(Math.pow(camera.position.x - ex.x, 2) + Math.pow(camera.position.z - ex.z, 2));
-                if (dist < 5) {
+                if (dist < 5 && gameState.active) {
+                    gameState.active = false;
+                    controls.unlock();
                     playerData.missions++;
                     playerData.money += 3000;
                     savePlayerData();
-                    showRoundOverlay('MISSION ACCOMPLISHED', 'Hostage Extracted! +$3000', 3000, true);
-                    quitToMenu();
+                    showRoundOverlay('MISSION ACCOMPLISHED', 'Hostage Extracted! +$3000', 0, true);
                 }
             }
         }
@@ -346,6 +352,23 @@ function animate() {
         checkInteractionPrompt();
 
         if (weaponModel) {
+            const currentWep = playerState.weapons[playerState.currentWeaponIndex];
+            if (currentWep === 'compass') {
+                const targetPos = (gameState.hostage && !gameState.hostage.rescued) ?
+                    gameState.hostage.mesh.position :
+                    (gameState.extractionZone ? new THREE.Vector3(gameState.extractionZone.x, camera.position.y, gameState.extractionZone.z) : null);
+
+                if (targetPos) {
+                    const dx = targetPos.x - camera.position.x;
+                    const dz = targetPos.z - camera.position.z;
+                    const angleToTarget = Math.atan2(dx, dz);
+                    const needle = weaponModel.getObjectByName("needle");
+                    if (needle) {
+                        needle.rotation.y = angleToTarget - camera.rotation.y + Math.PI;
+                    }
+                }
+            }
+
             const bobSpeed = keys.shift ? 12 : 8;
             const bobAmt = keys.shift ? 0.015 : 0.008;
             if (direction.x !== 0 || direction.z !== 0) {
@@ -369,7 +392,7 @@ function animate() {
 renderMapScreen(startGame);
 
 document.getElementById('btn-zombie').addEventListener('click', () => { gameState.pendingMode = 'zombie'; showScreen('map-screen'); });
-document.getElementById('btn-rescue').addEventListener('click', () => { gameState.pendingMode = 'rescue'; showScreen('map-screen'); });
+document.getElementById('btn-rescue').addEventListener('click', () => { startGame('rescue', 'mountain'); });
 document.getElementById('btn-pvp').addEventListener('click', () => { gameState.pendingMode = 'pvp'; showScreen('map-screen'); });
 document.getElementById('btn-shop').addEventListener('click', showShop);
 document.getElementById('btn-loadout').addEventListener('click', showLoadout);

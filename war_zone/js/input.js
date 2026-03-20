@@ -30,8 +30,8 @@ export function setupInput(CHEATS, resumeGameFn) {
         if (!gameState.active) return;
 
         if (key >= '1' && key <= '9') switchWeapon(parseInt(key) - 1);
-        if (key === 'r') reload();
-        if (key === 'g') dropCurrentWeapon();
+        if (key === 'r') dropCurrentWeapon();
+        if (key === 'g') reload();
         if (key === 'e') tryPickup();
         if (key === 'escape') {
             if (gameState.paused) {
@@ -113,14 +113,25 @@ function tryPickup() {
 
 export function checkInteractionPrompt() {
     let showPrompt = false;
-    for (const dw of gameState.droppedWeapons) {
-        if (camera.position.distanceTo(dw.mesh.position) < 3) {
-            document.getElementById('interaction-prompt').textContent =
-                `Press [E] to pick up ${WEAPONS[dw.weaponId].name}`;
+
+    if (gameState.mode === 'rescue' && gameState.hostage && !gameState.hostage.rescued) {
+        if (camera.position.distanceTo(gameState.hostage.mesh.position) < 5) {
+            document.getElementById('interaction-prompt').textContent = `Press [E] to Rescue Hostage`;
             showPrompt = true;
-            break;
         }
     }
+
+    if (!showPrompt) {
+        for (const dw of gameState.droppedWeapons) {
+            if (camera.position.distanceTo(dw.mesh.position) < 3) {
+                document.getElementById('interaction-prompt').textContent =
+                    `Press [E] to pick up ${WEAPONS[dw.weaponId].name}`;
+                showPrompt = true;
+                break;
+            }
+        }
+    }
+
     document.getElementById('interaction-prompt').style.display = showPrompt ? 'block' : 'none';
 }
 

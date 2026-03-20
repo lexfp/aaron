@@ -14,9 +14,10 @@ class _DoggySettingsPageState extends State<DoggySettingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Doggy Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Doggy Settings',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -41,13 +42,19 @@ class _DoggySettingsPageState extends State<DoggySettingsPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
             ),
             onPressed: () {
               // TODO: Implement Reset Data logic in BLoC if requested
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Data Reset not implemented yet')));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Data Reset not implemented yet')));
             },
-            child: const Text('Reset Save Data', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+            child: const Text('Reset Save Data',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white)),
           ),
         ],
       ),
@@ -70,7 +77,7 @@ class _DoggySettingsPageState extends State<DoggySettingsPage> {
         secondary: Icon(icon, color: Theme.of(context).colorScheme.primary),
         value: value,
         onChanged: onChanged,
-        activeColor: Theme.of(context).colorScheme.secondary,
+        activeThumbColor: Theme.of(context).colorScheme.secondary,
       ),
     );
   }
