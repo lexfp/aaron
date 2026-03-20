@@ -45,27 +45,40 @@ function killAllEnemies() {
 // --- Collision ---
 
 function checkCollision(newPos) {
-    if (playerState.noClip) return false;
+    if (playerState.godMode || playerState.noClip) return false;
     const size = gameState.currentMap ? MAPS[gameState.currentMap].size * 0.95 : 50;
     if (Math.abs(newPos.x) > size || Math.abs(newPos.z) > size) return true;
 
-    const playerBox = new THREE.Box3().setFromCenterAndSize(newPos, new THREE.Vector3(0.5, 1.7, 0.5));
+    const playerCylRadius = 0.3;
+    const pMinY = newPos.y - 1.7;
+    const pMaxY = newPos.y + 0.2;
+
     for (const obs of obstacles) {
-        if (obs.box && obs.box.intersectsBox(playerBox)) {
-            if (newPos.y - 1.7 >= obs.box.max.y - 0.3) continue;
-            return true;
+        if (obs.box) {
+            const b = obs.box;
+            if (newPos.x + playerCylRadius > b.min.x && newPos.x - playerCylRadius < b.max.x &&
+                newPos.z + playerCylRadius > b.min.z && newPos.z - playerCylRadius < b.max.z) {
+                if (pMinY < b.max.y && pMaxY > b.min.y) {
+                    if (pMinY >= b.max.y - 0.4) continue; // Allow stepping up heights up to 0.4
+                    return true;
+                }
+            }
         }
         if (obs.radius) {
             const dx = newPos.x - obs.mesh.position.x;
             const dz = newPos.z - obs.mesh.position.z;
-            if (Math.sqrt(dx * dx + dz * dz) < obs.radius + 0.3) return true;
+            if (Math.sqrt(dx * dx + dz * dz) < obs.radius + playerCylRadius) return true;
         }
     }
     return false;
 }
 
+const downRaycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
+
 function getFloorHeight(pos) {
     let floor = 0;
+    
+    // Check AABB boxes first
     for (const obs of obstacles) {
         if (obs.box) {
             if (pos.x >= obs.box.min.x - 0.3 && pos.x <= obs.box.max.x + 0.3 &&
@@ -76,6 +89,19 @@ function getFloorHeight(pos) {
             }
         }
     }
+
+    // Check perfectly accurate sloped meshes via vertical Raycast
+    const slopeMeshes = obstacles.filter(o => o.isSlope).map(o => o.mesh);
+    if (slopeMeshes.length > 0) {
+        downRaycaster.set(new THREE.Vector3(pos.x, pos.y + 1.5, pos.z), new THREE.Vector3(0, -1, 0));
+        const hits = downRaycaster.intersectObjects(slopeMeshes);
+        if (hits.length > 0) {
+            const hitY = hits[0].point.y;
+            // Only step up onto slopes if we aren't clipping into a sheer massive cliff
+            if (hitY > floor && hitY < pos.y + 1.5) floor = hitY;
+        }
+    }
+    
     return floor;
 }
 

@@ -48,11 +48,11 @@ export function spawnZombie(isBoss) {
 
     const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
     const eye1 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.05), eyeMat);
-    eye1.position.set(0.1, 0.05, bodySize*0.22); head.add(eye1);
+    eye1.position.set(0.1, 0.05, bodySize * 0.22); head.add(eye1);
     const eye2 = eye1.clone(); eye2.position.x = -0.1; head.add(eye2);
     const mouthMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
     const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.02, 0.05), mouthMat);
-    mouth.position.set(0, -0.1, bodySize*0.24);
+    mouth.position.set(0, -0.1, bodySize * 0.24);
     mouth.rotation.z = (Math.random() - 0.5) * 0.4;
     head.add(mouth);
 
@@ -83,7 +83,7 @@ export function spawnZombie(isBoss) {
 
     let spawnX = Math.cos(angle) * dist;
     let spawnZ = Math.sin(angle) * dist;
-    
+
     // Ensure we don't spawn inside a bounding box
     for (let attempts = 0; attempts < 10; attempts++) {
         if (!checkZombieCollision(new THREE.Vector3(spawnX, 1, spawnZ), isBoss ? 0.7 : 0.5)) break;
@@ -91,13 +91,13 @@ export function spawnZombie(isBoss) {
         spawnX = Math.cos(angle) * dist;
         spawnZ = Math.sin(angle) * dist;
     }
-    
+
     group.position.set(spawnX, 0, spawnZ);
-    
+
     const canvas = document.createElement('canvas');
     canvas.width = 64; canvas.height = 16;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ff0000'; ctx.fillRect(0,0,64,16);
+    ctx.fillStyle = '#ff0000'; ctx.fillRect(0, 0, 64, 16);
     const tex = new THREE.CanvasTexture(canvas);
     const hpSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
     hpSprite.scale.set(1, 0.25, 1);
@@ -126,7 +126,7 @@ export function spawnHostage(mapSize) {
 
     let spawnX = (Math.random() - 0.5) * mapSize * 0.8;
     let spawnZ = (Math.random() - 0.5) * mapSize * 0.8;
-    
+
     // Ensure we don't spawn inside a bounding box
     for (let attempts = 0; attempts < 10; attempts++) {
         if (!checkZombieCollision(new THREE.Vector3(spawnX, 1, spawnZ), 0.5)) break;
@@ -134,11 +134,11 @@ export function spawnHostage(mapSize) {
         spawnZ = (Math.random() - 0.5) * mapSize * 0.8;
     }
     group.position.set(spawnX, 0, spawnZ);
-    
+
     const canvas = document.createElement('canvas');
     canvas.width = 128; canvas.height = 32;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#00aaff'; ctx.font = '20px Arial'; ctx.textAlign="center"; ctx.fillText('HOSTAGE (E)', 64, 24);
+    ctx.fillStyle = '#00aaff'; ctx.font = '20px Arial'; ctx.textAlign = "center"; ctx.fillText('HOSTAGE (E)', 64, 24);
     const tex = new THREE.CanvasTexture(canvas);
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
     sprite.position.y = 2.2; sprite.scale.set(1.5, 0.35, 1);
@@ -160,7 +160,7 @@ export function killZombie(z, idx) {
     playerData.money += z.dropMoney;
     if (z.hpSprite) { z.mesh.remove(z.hpSprite); z.hpSprite = null; }
     if (z.weaponId) dropWeapon(z.weaponId, z.mesh.position.clone());
-    
+
     if (Math.random() < 0.03) {
         const mat = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), mat);
@@ -175,12 +175,17 @@ export function killZombie(z, idx) {
 }
 
 function checkZombieCollision(pos, radius) {
+    const pMinY = pos.y;
+    const pMaxY = pos.y + 1.8;
+
     for (const obs of obstacles) {
         if (obs.box) {
-            const expanded = obs.box.clone().expandByScalar(radius);
-            if (expanded.containsPoint(new THREE.Vector3(pos.x, obs.box.min.y + 0.5, pos.z))) return true;
-        }
-        if (obs.radius) {
+            const b = obs.box;
+            if (pos.x + radius > b.min.x && pos.x - radius < b.max.x &&
+                pos.z + radius > b.min.z && pos.z - radius < b.max.z) {
+                if (pMinY < b.max.y && pMaxY > b.min.y) return true;
+            }
+        } else if (obs.radius) {
             const dx = pos.x - obs.mesh.position.x;
             const dz = pos.z - obs.mesh.position.z;
             if (Math.sqrt(dx * dx + dz * dz) < obs.radius + radius) return true;
@@ -214,7 +219,7 @@ export function updateZombies(dt) {
         const z = gameState.zombieEntities[i];
         if (z.dead) {
             z.mesh.rotation.x -= dt * 3;
-            if (z.mesh.rotation.x <= -Math.PI/2) {
+            if (z.mesh.rotation.x <= -Math.PI / 2) {
                 z.mesh.position.y -= dt * 2;
                 if (z.mesh.position.y < -1) {
                     scene.remove(z.mesh);
@@ -261,15 +266,15 @@ export function updateZombies(dt) {
         // Anim
         const walkPhase = Date.now() * 0.006 + i * 1.7;
         let isAttacking = dist < stopDist + 0.5 && z.attackCooldown <= 0;
-        
+
         if (isAttacking) {
-            z.mesh.children[2].rotation.x = -Math.PI/2 + Math.sin(Date.now() * 0.02) * 0.5;
-            z.mesh.children[3].rotation.x = -Math.PI/2 + Math.sin(Date.now() * 0.02 + Math.PI) * 0.5;
+            z.mesh.children[2].rotation.x = -Math.PI / 2 + Math.sin(Date.now() * 0.02) * 0.5;
+            z.mesh.children[3].rotation.x = -Math.PI / 2 + Math.sin(Date.now() * 0.02 + Math.PI) * 0.5;
         } else {
             z.mesh.children[2].rotation.x = Math.sin(walkPhase) * 0.6;
             z.mesh.children[3].rotation.x = Math.sin(walkPhase + Math.PI) * 0.6;
         }
-        
+
         z.mesh.children[2].rotation.z = 0.15;
         z.mesh.children[3].rotation.z = -0.15;
         z.mesh.children[4].rotation.x = Math.sin(walkPhase + Math.PI) * 0.5;
@@ -278,9 +283,9 @@ export function updateZombies(dt) {
         z.mesh.children[1].rotation.z = Math.sin(walkPhase * 0.7) * 0.1;
 
         if (z.hpCtx) {
-            z.hpCtx.clearRect(0,0,64,16);
+            z.hpCtx.clearRect(0, 0, 64, 16);
             z.hpCtx.fillStyle = '#ff0000';
-            z.hpCtx.fillRect(0,0,64 * (z.hp / z.maxHp),16);
+            z.hpCtx.fillRect(0, 0, 64 * (z.hp / z.maxHp), 16);
             z.hpTex.needsUpdate = true;
         }
 
