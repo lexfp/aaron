@@ -359,12 +359,17 @@ function animate() {
                     (gameState.extractionZone ? new THREE.Vector3(gameState.extractionZone.x, camera.position.y, gameState.extractionZone.z) : null);
 
                 if (targetPos) {
-                    const dx = targetPos.x - camera.position.x;
-                    const dz = targetPos.z - camera.position.z;
-                    const angleToTarget = Math.atan2(dx, dz);
                     const needle = weaponModel.getObjectByName("needle");
                     if (needle) {
-                        needle.rotation.y = angleToTarget - camera.rotation.y + Math.PI;
+                        const dirToTarget = new THREE.Vector3(
+                            targetPos.x - camera.position.x,
+                            0,
+                            targetPos.z - camera.position.z
+                        ).normalize();
+                        camera.updateMatrixWorld();
+                        const invMatrix = new THREE.Matrix4().copy(camera.matrixWorld).invert();
+                        const localDir = dirToTarget.transformDirection(invMatrix);
+                        needle.rotation.y = Math.atan2(localDir.x, localDir.z);
                     }
                 }
             }
