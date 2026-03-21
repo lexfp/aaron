@@ -123,6 +123,7 @@ function findEntityFromHit(hit) {
 function applyDamageToEnemy(hit, dmg) {
     const entity = findEntityFromHit(hit);
     if (!entity) return;
+    if (entity.damageReduction) dmg = Math.max(1, Math.floor(dmg * (1 - entity.damageReduction)));
     entity.hp -= dmg;
     playHit();
     showDamageNumber(hit.point, dmg);

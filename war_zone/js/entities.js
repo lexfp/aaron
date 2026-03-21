@@ -18,6 +18,7 @@ export function spawnZombie(isBoss) {
 
     let hp, damage, dropMoney, weaponId = null;
     const bodySize = isBoss ? 1.2 : 0.9;
+    let armoredEnemy = false;
 
     if (isBoss) {
         hp = 75; damage = 20; dropMoney = 10;
@@ -25,6 +26,14 @@ export function spawnZombie(isBoss) {
         if (r < 0.01) weaponId = pickRandomWeapon('long');
         else if (r < 5.01) weaponId = pickRandomWeapon('middle');
         else if (r < 15.01) weaponId = pickRandomWeapon('close');
+    } else if (gameState.mode === 'rescue') {
+        // Rescue mode hostiles: always armed, some armored
+        hp = 40; damage = 8; dropMoney = 3;
+        const rr = Math.random();
+        if (rr < 0.3) weaponId = pickRandomWeapon('long');
+        else if (rr < 0.65) weaponId = pickRandomWeapon('middle');
+        else weaponId = pickRandomWeapon('close');
+        if (Math.random() < 0.4) armoredEnemy = true;
     } else {
         hp = 25; damage = 5; dropMoney = 1;
         if (Math.random() * 100 < 5) weaponId = pickRandomWeapon('close');
@@ -81,6 +90,34 @@ export function spawnZombie(isBoss) {
         tie.position.set(0, bodySize * 0.7, bodySize * 0.21); group.add(tie);
     }
 
+    // Armor visual for rescue hostiles
+    if (armoredEnemy) {
+        const armorMat = new THREE.MeshStandardMaterial({ color: 0x334455, metalness: 0.6, roughness: 0.4 });
+        const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.65, bodySize * 0.55, bodySize * 0.12), armorMat);
+        chestPlate.position.set(0, bodySize * 0.9, bodySize * 0.16); group.add(chestPlate);
+        const shoulderL = new THREE.Mesh(new THREE.SphereGeometry(bodySize * 0.12, 6, 6), armorMat);
+        shoulderL.position.set(-bodySize * 0.42, bodySize * 1.1, 0); group.add(shoulderL);
+        const shoulderR = shoulderL.clone(); shoulderR.position.x = bodySize * 0.42; group.add(shoulderR);
+    }
+
+    // Visible weapon mesh on armed zombies (attached to right arm position)
+    if (weaponId) {
+        const wDef = WEAPONS[weaponId];
+        const wpnMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.6 });
+        let wpnMesh;
+        if (wDef.type === 'gun') {
+            wpnMesh = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.12, bodySize * 0.12, bodySize * 0.55), wpnMat);
+            wpnMesh.position.set(bodySize * 0.5, bodySize * 0.7, bodySize * 0.25);
+            wpnMesh.rotation.x = -0.3;
+        } else if (wDef.type === 'melee') {
+            wpnMesh = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.06, bodySize * 0.7, bodySize * 0.06),
+                new THREE.MeshStandardMaterial({ color: 0xbbbbbb, metalness: 0.8 }));
+            wpnMesh.position.set(bodySize * 0.52, bodySize * 0.9, bodySize * 0.1);
+            wpnMesh.rotation.x = -0.5;
+        }
+        if (wpnMesh) { wpnMesh.castShadow = true; group.add(wpnMesh); }
+    }
+
     let spawnX = Math.cos(angle) * dist;
     let spawnZ = Math.sin(angle) * dist;
 
@@ -108,9 +145,14 @@ export function spawnZombie(isBoss) {
 
     gameState.zombieEntities.push({
         mesh: group, hp, maxHp: hp, damage, dropMoney, isBoss,
-        weaponId, speed: isBoss ? 2.5 : 3.5, attackCooldown: 0,
-        lastNoiseCheck: 0, attracted: false, dead: false,
-        hpCtx: ctx, hpTex: tex
+        weaponId, speed: isBoss ? 2.5 : (gameState.mode === 'rescue' ? 4.0 : 3.5),
+        attackCooldown: 0, lastNoiseCheck: 0, attracted: false, dead: false,
+        hpCtx: ctx, hpTex: tex,
+        damageReduction: armoredEnemy ? 0.35 : 0,
+        aiState: 'charge', aiTimer: 0,
+        flankAngle: (Math.random() > 0.5 ? 1 : -1) * (Math.PI / 4 + Math.random() * Math.PI / 4),
+        strafeDir: Math.random() > 0.5 ? 1 : -1,
+        coverTarget: null, prevHp: hp
     });
     gameState.zombiesAlive++;
 }
@@ -210,7 +252,7 @@ export function updateZombies(dt) {
     // Wave complete
     if (gameState.zombiesAlive <= 0 && gameState.zombiesToSpawn <= 0) {
         gameState.wave++;
-        gameState.zombiesToSpawn = 5 + gameState.wave * 3;
+        gameState.zombiesToSpawn = 8 + gameState.wave * 5;
         document.getElementById('wave-hud').textContent = 'Wave ' + gameState.wave;
         showRoundOverlay('Wave ' + gameState.wave, 'Incoming!', 2000);
     }
@@ -250,11 +292,62 @@ export function updateZombies(dt) {
             if (z.mesh.position.y < 0) z.mesh.position.y = 0;
         }
 
+        // AI state machine — re-evaluate periodically
+        z.aiTimer -= dt;
+        if (z.aiTimer <= 0) {
+            // When damaged recently, seek cover more often
+            const hpRatio = z.hp / z.maxHp;
+            const r = Math.random();
+            if (hpRatio < 0.4 && r < 0.35) {
+                z.aiState = 'cover';
+                // Pick nearest obstacle as cover target
+                let bestDist = Infinity;
+                for (const obs of obstacles) {
+                    if (!obs.mesh) continue;
+                    const od = z.mesh.position.distanceTo(obs.mesh.position);
+                    if (od < bestDist && od > 1.5) { bestDist = od; z.coverTarget = obs.mesh.position.clone(); }
+                }
+            } else if (r < 0.25 && dist > 6) {
+                z.aiState = 'flank';
+                z.flankAngle = (Math.random() > 0.5 ? 1 : -1) * (Math.PI / 3 + Math.random() * Math.PI / 6);
+            } else if (r < 0.45 && dist < 15) {
+                z.aiState = 'strafe';
+                z.strafeDir = Math.random() > 0.5 ? 1 : -1;
+            } else {
+                z.aiState = 'charge';
+            }
+            z.aiTimer = 1.2 + Math.random() * 2.5;
+            z.prevHp = z.hp;
+        }
+
         // Movement with collision sliding
         if (dist > stopDist) {
-            const moveX = (dx / dist) * z.speed * dt;
-            const moveZ = (dz / dist) * z.speed * dt;
             const zombieRadius = z.isBoss ? 0.7 : 0.5;
+            let moveAngle = Math.atan2(dx, dz);
+
+            if (z.aiState === 'flank') {
+                // Blend flank angle in at close range, pure charge when far
+                const blendFactor = Math.min(1, dist / 14);
+                moveAngle += z.flankAngle * blendFactor;
+            } else if (z.aiState === 'strafe') {
+                // Circle the player — blend strafing with approach when far
+                const perpAngle = moveAngle + Math.PI / 2 * z.strafeDir;
+                const blendFactor = dist > 10 ? 0.35 : 0.7;
+                moveAngle = moveAngle * (1 - blendFactor) + perpAngle * blendFactor;
+            } else if (z.aiState === 'cover' && z.coverTarget) {
+                const cdx = z.coverTarget.x - z.mesh.position.x;
+                const cdz = z.coverTarget.z - z.mesh.position.z;
+                const cdist = Math.sqrt(cdx * cdx + cdz * cdz);
+                if (cdist > 1.2) {
+                    moveAngle = Math.atan2(cdx, cdz);
+                } else {
+                    // Reached cover — peek toward player
+                    z.aiState = 'charge';
+                }
+            }
+
+            const moveX = Math.sin(moveAngle) * z.speed * dt;
+            const moveZ = Math.cos(moveAngle) * z.speed * dt;
             const newPos = z.mesh.position.clone();
             newPos.x += moveX; newPos.z += moveZ;
 
@@ -271,18 +364,22 @@ export function updateZombies(dt) {
 
         // Anim
         const walkPhase = Date.now() * 0.006 + i * 1.7;
-        let isAttacking = dist < stopDist + 0.5 && z.attackCooldown <= 0;
+        const isAttacking = dist < stopDist + 0.5 && z.attackCooldown <= 0;
 
         if (isAttacking) {
-            z.mesh.children[2].rotation.x = -Math.PI / 2 + Math.sin(Date.now() * 0.02) * 0.5;
-            z.mesh.children[3].rotation.x = -Math.PI / 2 + Math.sin(Date.now() * 0.02 + Math.PI) * 0.5;
+            // Alternating punch animation: arms lunge forward
+            const punchPhase = (Date.now() * 0.015) % (Math.PI * 2);
+            z.mesh.children[2].rotation.x = -Math.PI * 0.55 * Math.max(0, Math.sin(punchPhase));
+            z.mesh.children[3].rotation.x = -Math.PI * 0.55 * Math.max(0, Math.sin(punchPhase + Math.PI));
+            z.mesh.children[2].rotation.z = 0.1;
+            z.mesh.children[3].rotation.z = -0.1;
         } else {
             z.mesh.children[2].rotation.x = Math.sin(walkPhase) * 0.6;
             z.mesh.children[3].rotation.x = Math.sin(walkPhase + Math.PI) * 0.6;
+            z.mesh.children[2].rotation.z = 0.15;
+            z.mesh.children[3].rotation.z = -0.15;
         }
 
-        z.mesh.children[2].rotation.z = 0.15;
-        z.mesh.children[3].rotation.z = -0.15;
         z.mesh.children[4].rotation.x = Math.sin(walkPhase + Math.PI) * 0.5;
         z.mesh.children[5].rotation.x = Math.sin(walkPhase) * 0.5;
         z.mesh.children[0].rotation.z = Math.sin(walkPhase * 0.5) * 0.05;

@@ -206,6 +206,54 @@ export function showLoadout() {
         };
         grid.appendChild(item);
     }
+
+    // --- Armor equip slots ---
+    const armorSection = document.createElement('div');
+    armorSection.style.cssText = 'max-width:700px;margin:30px auto 0;';
+    armorSection.innerHTML = '<h3 style="color:#00aaff;font-size:22px;text-align:center;margin-bottom:15px">Armor Slots</h3>';
+
+    const armorSlotContainer = document.createElement('div');
+    armorSlotContainer.style.cssText = 'display:flex;gap:16px;justify-content:center;flex-wrap:wrap;';
+
+    const armorSlots = [
+        { key: 'equippedArmor', label: 'CHEST ARMOR', color: '#00aaff' },
+        { key: 'equippedHelmet', label: 'HELMET', color: '#aa88ff' }
+    ];
+
+    for (const { key, label, color } of armorSlots) {
+        const slotDiv = document.createElement('div');
+        slotDiv.style.cssText = `background:rgba(0,0,0,0.5);border:2px solid ${color};border-radius:10px;padding:18px 24px;text-align:center;min-width:180px;`;
+        const eq = playerData[key] ? EQUIPMENT[playerData[key]] : null;
+        let statsHtml = '';
+        if (eq) {
+            if (eq.armor) statsHtml += `<div style="color:#aaa;font-size:12px;margin-top:4px">+${eq.armor} armor</div>`;
+            if (eq.damageReduction) statsHtml += `<div style="color:#aaa;font-size:12px">-${eq.damageReduction * 100}% dmg</div>`;
+            if (eq.headshotReduction) statsHtml += `<div style="color:#aaa;font-size:12px">-${eq.headshotReduction * 100}% headshots</div>`;
+        }
+        slotDiv.innerHTML = `
+            <div style="font-size:11px;color:#888;letter-spacing:1px;margin-bottom:8px">${label}</div>
+            <div style="font-weight:700;font-size:16px;color:${eq ? color : '#444'}">${eq ? eq.name : 'None'}</div>
+            ${statsHtml}
+            <div style="margin-top:10px">
+                ${eq
+                ? `<button data-remove-key="${key}" style="background:#cc2222;color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:13px;cursor:pointer">Remove</button>`
+                : `<div style="color:#555;font-size:12px;margin-top:4px">Purchase in Shop</div>`}
+            </div>`;
+        const removeBtn = slotDiv.querySelector('[data-remove-key]');
+        if (removeBtn) {
+            removeBtn.onclick = () => {
+                playerData[key] = null;
+                savePlayerData();
+                showLoadout();
+            };
+        }
+        armorSlotContainer.appendChild(slotDiv);
+    }
+
+    armorSection.appendChild(armorSlotContainer);
+    const loadoutScreen = document.getElementById('loadout-screen');
+    const backBtn = loadoutScreen.querySelector('.back-btn');
+    loadoutScreen.insertBefore(armorSection, backBtn);
 }
 window.showLoadout = showLoadout;
 

@@ -18,3 +18,43 @@ do the following:
     give desert cactus instead of blocks and make cactus do 5 damage to anything that hits it
 
 check all of the above thoroughly for bugs
+
+
+-------------------------------------------
+
+
+                                                                                                    
+  ---
+  Step 1 — data.js: All melee weapons now have reach > 2 (hostile attack range), so the player can hit enemies    
+  before they can retaliate. Fists→1.7, knife→2.2, axe→2.5, shield→2.0, chainsaw→2.8, katana→3.0, longsword→3.5.                                                                                                                    
+  Step 2 — weapons.js: Unique viewmodel for every melee weapon:                                                   
+  - Chainsaw: orange motor body, guide bar, 10 chain link toruses
+  - Katana: long thin blade (0.92 height), blood groove, tsuba guard, wrapped handle
+  - Longsword: wide blade (0.052 wide) with fuller, ornate cross-guard with sphere tips, pommel
+  - Axe: wooden handle + wide axe head with polished edge
+  - Knife & Shield also got detail improvements
+
+  Step 3 — entities.js: Zombies have a 3-state AI (charge / flank / strafe / cover). Rescue mode hostiles always  
+  carry weapons, 40% have visible chest plate + shoulder armor with 35% damage reduction. Armed zombies show a    
+  weapon mesh on their right side. Attack animation now alternates arms in a distinct punching motion. Wave       
+  formula increased from 5+wave*3 to 8+wave*5.
+
+  Step 4 — map.js:
+  - Desert: Cacti (cylinder body + arms, isCactus flag) replace featureless boxes. Added rocks and debris.        
+  - City: Buildings have jumpable side-wall window openings (1.5–3.8m gap), interior furniture, roof parapets + AC
+   units, exterior crates/barrels/graffiti decals, street lights.
+  - Forest/Jungle: 1800 trees with min 2.5m spacing via Poisson-disk placement. Trunks marked isTrunk for
+  climbing. Fallen logs added. Dense fog increased.
+  - Warehouse: Metal shelving units, wooden pallets, oil barrel clusters, concrete pillars.
+  - Initial ammo pickups reduced from 3→1. Medkits now only 8% chance on timed spawns.
+
+  Step 5 — ui.js: Loadout screen now shows Chest Armor and Helmet slots below the weapon grid, with stats and a   
+  Remove button.
+
+  Step 6 — main.js + combat.js:
+  - Ammo crate timer: 60s → 90s. Medkits on a separate 2.5–3.5 min timer.
+  - Cactus damage: 5 damage/second when touching a cactus in the desert.
+  - Tree climbing: Holding Space while adjacent to a tree trunk in the forest gives upward velocity (scale trees).
+  - Armored rescue enemies take reduced damage (combat.js).
+
+✻ Crunched for 12m 14s   

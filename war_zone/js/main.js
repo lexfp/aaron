@@ -166,6 +166,8 @@ function startGame(mode, mapId) {
     gameState.zombieEntities = [];
     gameState.droppedWeapons = [];
     gameState.fireZones = [];
+    gameState.pickupSpawnTimer = 0;
+    gameState.medkitSpawnTimer = 180;
 
     if (mode === 'zombie') {
         gameState.wave = 1;
@@ -258,7 +260,18 @@ function animate() {
         velocity.y -= gravity * dt;
         if (direction.z !== 0) velocity.z -= direction.z * speed * dt * 15;
         if (direction.x !== 0) velocity.x -= direction.x * speed * dt * 15;
-        if (keys.space && canJump) { velocity.y = jumpForce; setCanJump(false); }
+        if (keys.space) {
+            if (canJump) {
+                velocity.y = jumpForce;
+                setCanJump(false);
+            } else if (gameState.currentMap === 'forest') {
+                // Tree scaling: holding Space near a trunk climbs it
+                const nearTrunk = obstacles.some(o => o.isTrunk &&
+                    Math.abs(o.mesh.position.x - camera.position.x) < 1.1 &&
+                    Math.abs(o.mesh.position.z - camera.position.z) < 1.1);
+                if (nearTrunk) velocity.y = 5;
+            }
+        }
 
         const rightDir = new THREE.Vector3();
         const forwardDir = new THREE.Vector3();
@@ -325,10 +338,29 @@ function animate() {
         }
 
         gameState.pickupSpawnTimer = (gameState.pickupSpawnTimer || 0) + dt;
-        if (gameState.pickupSpawnTimer > 60) {
+        if (gameState.pickupSpawnTimer > 90) {
             const size = MAPS[gameState.currentMap].size;
-            spawnSinglePickup(size);
+            // Ammo crates spawn regularly; medkits much less often (separate slower timer)
+            spawnSinglePickup(size, false);
             gameState.pickupSpawnTimer = 0;
+        }
+        gameState.medkitSpawnTimer = (gameState.medkitSpawnTimer || 120) - dt;
+        if (gameState.medkitSpawnTimer <= 0) {
+            spawnSinglePickup(MAPS[gameState.currentMap].size, true);
+            gameState.medkitSpawnTimer = 150 + Math.random() * 60;
+        }
+
+        // Cactus damage (desert map)
+        if (gameState.currentMap === 'desert') {
+            for (const obs of obstacles) {
+                if (!obs.isCactus) continue;
+                const cdx = camera.position.x - obs.mesh.position.x;
+                const cdz = camera.position.z - obs.mesh.position.z;
+                if (Math.sqrt(cdx * cdx + cdz * cdz) < (obs.radius || 0.5) + 0.35) {
+                    damagePlayer(5 * dt);
+                    break;
+                }
+            }
         }
 
         for (const pickup of gameState.ammoPickups) {

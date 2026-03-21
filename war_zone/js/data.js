@@ -9,7 +9,7 @@ export const WEAPONS = {
     fists: {
         name: 'Fists', type: 'melee', range: 'close', damage: 3, fireRate: 0.5,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
-        cost: 0, starter: true, reach: 1.5
+        cost: 0, starter: true, reach: 1.7
     },
     glock: {
         name: 'Glock', type: 'gun', range: 'middle', damage: 2, fireRate: 0.5,
@@ -44,32 +44,32 @@ export const WEAPONS = {
     axe: {
         name: 'Axe', type: 'melee', range: 'close', damage: 5, fireRate: 0.7,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
-        cost: 800, reach: 1.5
+        cost: 800, reach: 2.5
     },
     knife: {
         name: 'Knife', type: 'melee', range: 'close', damage: 5, fireRate: 0.1, headshot: 60,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
-        cost: 1000, reach: 1.2
+        cost: 1000, reach: 2.2
     },
     katana: {
         name: 'Katana', type: 'melee', range: 'close', damage: 8, fireRate: 0.4,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
-        cost: 1500, reach: 1.8
+        cost: 1500, reach: 3.0
     },
     longsword: {
         name: 'Longsword', type: 'melee', range: 'close', damage: 10, fireRate: 0.8,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
-        cost: 2000, reach: 2.0
+        cost: 2000, reach: 3.5
     },
     chainsaw: {
         name: 'Chainsaw', type: 'melee', range: 'close', damage: 4, fireRate: 0.1,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
-        cost: 3000, reach: 1.5, makesNoise: true
+        cost: 3000, reach: 2.8, makesNoise: true
     },
     shield: {
         name: 'Shield', type: 'melee', range: 'close', damage: 1, fireRate: 0.8,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
-        cost: 1200, reach: 1.2, damageReduction: 1.0
+        cost: 1200, reach: 2.0, damageReduction: 1.0
     },
     minigun: {
         name: 'Minigun', type: 'gun', range: 'long', damage: 1, fireRate: 0.03,

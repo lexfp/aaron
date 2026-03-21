@@ -57,24 +57,165 @@ function buildMeleeModel(group, weaponId, w) {
         fist2.position.x = -0.15;
         group.add(fist2);
     } else if (weaponId === 'shield') {
-        const shield = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.05), new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5 }));
+        const shieldMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5 });
+        const shield = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.05), shieldMat);
         shield.position.set(0.0, -0.1, -0.4);
         group.add(shield);
+        // Shield boss (center emblem)
+        const boss = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.04, 8), new THREE.MeshStandardMaterial({ color: 0xaa8833, metalness: 0.8 }));
+        boss.rotation.x = Math.PI / 2;
+        boss.position.set(0.0, -0.1, -0.38);
+        group.add(boss);
         const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), skinMat);
         hand.position.set(0.1, -0.1, -0.35);
         group.add(hand);
     } else if (weaponId === 'knife') {
-        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.1), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+        const handleMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 });
+        const bladeMat = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 0.9, roughness: 0.1 });
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.12, 8), handleMat);
         handle.position.set(0.15, -0.15, -0.3);
         handle.rotation.x = -Math.PI / 4;
         group.add(handle);
-        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.2, 0.04), new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 0.8 }));
-        blade.position.set(0.15, -0.05, -0.38);
+        // Guard
+        const guard = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.012, 0.012), new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.7 }));
+        guard.position.set(0.15, -0.09, -0.345);
+        guard.rotation.x = -Math.PI / 4;
+        group.add(guard);
+        // Single-edged blade (tapered)
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.24, 0.038), bladeMat);
+        blade.position.set(0.15, -0.02, -0.395);
         blade.rotation.x = -Math.PI / 4;
         group.add(blade);
         const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), skinMat);
         hand.position.set(0.15, -0.15, -0.3);
-        hand.rotation.x = -Math.PI / 4;
+        group.add(hand);
+    } else if (weaponId === 'chainsaw') {
+        const motorMat = new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.5 });
+        const darkMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6 });
+        const barMat = new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 0.8 });
+        const chainMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.9 });
+        // Motor body
+        const motor = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.09, 0.18), motorMat);
+        motor.position.set(0.15, -0.18, -0.3);
+        group.add(motor);
+        // Air vents on motor
+        for (let v = 0; v < 3; v++) {
+            const vent = new THREE.Mesh(new THREE.BoxGeometry(0.101, 0.01, 0.025), darkMat);
+            vent.position.set(0.15, -0.14 + v * 0.025, -0.3);
+            group.add(vent);
+        }
+        // Guide bar
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.032, 0.44), barMat);
+        bar.position.set(0.15, -0.18, -0.53);
+        group.add(bar);
+        // Chain links along the bar
+        for (let c = 0; c < 10; c++) {
+            const link = new THREE.Mesh(new THREE.TorusGeometry(0.017, 0.006, 4, 5), chainMat);
+            link.position.set(0.15, -0.163, -0.315 - c * 0.045);
+            link.rotation.x = Math.PI / 2;
+            link.rotation.z = (c % 2 === 0) ? 0 : Math.PI / 4;
+            group.add(link);
+        }
+        // Rear handle
+        const rearHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.12, 6), darkMat);
+        rearHandle.rotation.x = Math.PI / 2;
+        rearHandle.position.set(0.15, -0.13, -0.17);
+        group.add(rearHandle);
+        const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), skinMat);
+        hand.position.set(0.15, -0.15, -0.25);
+        group.add(hand);
+    } else if (weaponId === 'katana') {
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x2a1a08, roughness: 0.85 });
+        const bladeMat = new THREE.MeshStandardMaterial({ color: 0xdcdcdc, metalness: 0.95, roughness: 0.04 });
+        const guardMat = new THREE.MeshStandardMaterial({ color: 0xcc9920, metalness: 0.6 });
+        // Long thin blade
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.011, 0.92, 0.032), bladeMat);
+        blade.position.set(0.15, 0.22, -0.67);
+        blade.rotation.x = -Math.PI / 4;
+        group.add(blade);
+        // Blood groove (darker strip on blade)
+        const groove = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.85, 0.008), new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.7 }));
+        groove.position.set(0.151, 0.22, -0.67);
+        groove.rotation.x = -Math.PI / 4;
+        group.add(groove);
+        // Tsuba (guard)
+        const guard = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.018, 0.018), guardMat);
+        guard.position.set(0.15, -0.095, -0.355);
+        guard.rotation.x = -Math.PI / 4;
+        group.add(guard);
+        // Tsuka (handle) with wrap
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.02, 0.24, 8), woodMat);
+        handle.position.set(0.15, -0.225, -0.275);
+        handle.rotation.x = -Math.PI / 4;
+        group.add(handle);
+        // Handle wrap lines
+        for (let r = 0; r < 4; r++) {
+            const wrap = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.004, 4, 8), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+            wrap.rotation.y = Math.PI / 2;
+            wrap.position.set(0.15, -0.19 - r * 0.032, -0.3 + r * 0.032);
+            wrap.rotation.x = -Math.PI / 4;
+            group.add(wrap);
+        }
+        const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), skinMat);
+        hand.position.set(0.15, -0.18, -0.28);
+        group.add(hand);
+    } else if (weaponId === 'longsword') {
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a3520, roughness: 0.8 });
+        const bladeMat = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 0.88, roughness: 0.12 });
+        const goldMat = new THREE.MeshStandardMaterial({ color: 0xcc9933, metalness: 0.75 });
+        // Wide long blade with fuller
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.72, 0.14), bladeMat);
+        blade.position.set(0.15, 0.1, -0.58);
+        blade.rotation.x = -Math.PI / 4;
+        group.add(blade);
+        // Fuller (groove down center of blade)
+        const fuller = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.6, 0.025), new THREE.MeshStandardMaterial({ color: 0xaaaaaa }));
+        fuller.position.set(0.15, 0.1, -0.58);
+        fuller.rotation.x = -Math.PI / 4;
+        group.add(fuller);
+        // Cross-guard
+        const crossGuard = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.028, 0.028), goldMat);
+        crossGuard.position.set(0.15, -0.1, -0.375);
+        crossGuard.rotation.x = -Math.PI / 4;
+        group.add(crossGuard);
+        // Cross-guard ends (spheres)
+        for (const xOff of [-0.13, 0.13]) {
+            const tip = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 6), goldMat);
+            tip.position.set(0.15 + xOff, -0.1, -0.375);
+            group.add(tip);
+        }
+        // Handle
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.28, 8), woodMat);
+        handle.position.set(0.15, -0.225, -0.278);
+        handle.rotation.x = -Math.PI / 4;
+        group.add(handle);
+        // Pommel
+        const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.038, 7, 7), goldMat);
+        pommel.position.set(0.15, -0.31, -0.225);
+        group.add(pommel);
+        const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), skinMat);
+        hand.position.set(0.15, -0.18, -0.29);
+        group.add(hand);
+    } else if (weaponId === 'axe') {
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a3520, roughness: 0.85 });
+        const metalMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.82 });
+        // Handle
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.028, 0.5, 8), woodMat);
+        handle.position.set(0.15, -0.1, -0.44);
+        handle.rotation.x = -Math.PI / 4;
+        group.add(handle);
+        // Axe head (wide blade)
+        const axeHead = new THREE.Mesh(new THREE.BoxGeometry(0.068, 0.24, 0.12), metalMat);
+        axeHead.position.set(0.15, 0.16, -0.63);
+        axeHead.rotation.x = -Math.PI / 4;
+        group.add(axeHead);
+        // Edge bevel
+        const edge = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.22, 0.04), new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.95 }));
+        edge.position.set(0.15, 0.16, -0.69);
+        edge.rotation.x = -Math.PI / 4;
+        group.add(edge);
+        const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), skinMat);
+        hand.position.set(0.15, -0.18, -0.3);
         group.add(hand);
     } else {
         const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 8), new THREE.MeshStandardMaterial({ color: 0x4a3520 }));
