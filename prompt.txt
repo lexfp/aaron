@@ -1,59 +1,20 @@
 war_zone/index.html
 do the following:
-    teach zombies how to climb staircases
-    add zombies that have 3% chance of dropping medkit on death
-    make zombies collide with me & my weapons(specifically shield, as they pass thru it and it doesn't block them)
-    make me stop glitching inside building walls
-    the entire game appears to speed up when minigun or assult rifle is used. Fix that
-    automatically exit zoom-in mode after firing a shot with sniper/crossbow
+    give zombies 'intelligence', as in don't just run at me, but also try to flank me, and use cover, etc.
+    give hostile entities in rescue mode weapons and armor make sure they can use it
     add armor equip slots to the loadout tab
-    make me able to deselect fists in the loadout tab
-    give the zombies proper facial expressions(drooling, bloodthirsty, etc.)
-    make me not fall through roofs of buildings
-    hollow out buildings and add doorways
-    fix grenade and molotov trajectories so they land at the center of the screen
-    add color to buildings
-    add windows to buildings
-    add decorations to all maps(graffiti, furniture, boxes, etc.)
-    add a stamina bar that slowly recovers over time and slowly gets used up when you sprint
-    make sure zombies can't get stuck inside of walls when they spawn
-    add knife weapon
-        close-ranged weapon
-        5 damage
-        60 damage if headshot
-        0.1 seconds between hits
-        $1000 in shop
-    add air strike that costs $200 but kills all zombies in reigon(click f to activate)(should be bought in shop)
-    add mountain map
+    make buildings more detailed
+    allow me to jump out windows
+    add more decorations to all maps(graffiti, furniture, boxes, etc.)
     make jungle map have a lot more trees and make them a lot more compact(basically 2-3 meters from each other)
     allow tree scaling in jungle map
-    make jungle canopy block out most light
-    make tree roots in jungle
-    add slight fall damage
-    make me go up staircases by just going foward
-    add pictures to choose map thing
-    add zombie death animations
-    show zombie health bars
-    style melee weapons to look realistic
-    make less ammo crates when you first spawn in but have more slowly spawn in over time(around 1 every 2 mins)
+    style melee weapons to look realistic, and give them unique looks(chains for chainsaw, katana longer, longsword wider, etc.)
+    make less ammo crates when you first spawn in but have more slowly spawn in over time(around 1 every 1.5 mins)
     do the same with medkits, and make them spawn even less
-    increase melee weapon attack ranges
     add zombie attack animations(punching, etc)
     make it more clear when zombies are holding weapons
-    show your hands holding all the weapons
-    add weapon attack animations
-    show bullets
-    make sure bullets can't phase thru structures
-
-    Rescue Mode: 
-        You start at a custom map where you must go through many enemies at choke points 
-        like a valley surrounded by mountains with enemies with guns, and checkpoints with towers/sandbags 
-        with enemies taking cover behind. After traveling thought these choke points there will be a 
-        central enemy point like a town or militant base covered with enemies. While you fight them 
-        you need to find a hostage or smth. Then you need to go back where you came from or another area 
-        like a helipad or beach to escape to get lots of money.
-
-./index.html
-    decorate it with css
+    add a lot more zombies to all levels of zombie apocalypse
+    give meelee weapons more range than hostiles
+    give desert cactus instead of blocks and make cactus do 5 damage to anything that hits it
 
 check all of the above thoroughly for bugs
