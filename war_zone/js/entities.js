@@ -13,8 +13,17 @@ import { damagePlayer, checkPvPEnd } from './combat.js';
 
 export function spawnZombie(isBoss) {
     const mapSize = MAPS[gameState.currentMap].size;
+    let centerX, centerZ, dist;
+    if (gameState.mode === 'rescue' && gameState.extractionZone) {
+        centerX = gameState.extractionZone.x;
+        centerZ = gameState.extractionZone.z;
+        dist = 8 + Math.random() * 20;
+    } else {
+        centerX = 0;
+        centerZ = 0;
+        dist = mapSize * 0.7 + Math.random() * mapSize * 0.2;
+    }
     const angle = Math.random() * Math.PI * 2;
-    const dist = mapSize * 0.7 + Math.random() * mapSize * 0.2;
 
     let hp, damage, dropMoney, weaponId = null;
     const bodySize = isBoss ? 1.2 : 0.9;
@@ -118,15 +127,15 @@ export function spawnZombie(isBoss) {
         if (wpnMesh) { wpnMesh.castShadow = true; group.add(wpnMesh); }
     }
 
-    let spawnX = Math.cos(angle) * dist;
-    let spawnZ = Math.sin(angle) * dist;
+    let spawnX = centerX + Math.cos(angle) * dist;
+    let spawnZ = centerZ + Math.sin(angle) * dist;
 
     // Ensure we don't spawn inside a bounding box
     for (let attempts = 0; attempts < 10; attempts++) {
         if (!checkZombieCollision(new THREE.Vector3(spawnX, 1, spawnZ), isBoss ? 0.7 : 0.5)) break;
         dist += 2;
-        spawnX = Math.cos(angle) * dist;
-        spawnZ = Math.sin(angle) * dist;
+        spawnX = centerX + Math.cos(angle) * dist;
+        spawnZ = centerZ + Math.sin(angle) * dist;
     }
 
     group.position.set(spawnX, 0, spawnZ);
