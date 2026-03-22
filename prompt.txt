@@ -271,30 +271,31 @@ All tests must pass with 0 failures before committing.
 
 ---
 
-## GitHub Workflow
-The commit and push are the very last step. Do not commit until the game is fully built,
-runs without errors, and all tests pass with 0 failures.
-
-1. Confirm all tests pass: `npm test`
-2. Stage all files: `git add -A`
-3. Commit: `git commit -m "feat: initial working build of Tic-Tac-Toe vs. Bot"`
-4. Push: `git push`
-   If the push fails due to no upstream being set, run:
-   ```
-   git push --set-upstream origin main
-   ```
-5. Confirm commit with: `git log --oneline -3`
-
----
-
 ## README.md
 
-Write a README.md with the following sections:
+Write README.md before committing. It must include:
 - **Tic-Tac-Toe vs. Bot** — one-paragraph description of the game
 - **How to play** — open index.html in a browser; choose symbol and difficulty; click cells to move
 - **Difficulty modes** — brief description of Easy vs. Hard
 - **How to run tests** — `npm install && npm test`
 - **Tech** — Vanilla JS, HTML, CSS; Jest for testing
+
+---
+
+## GitHub Workflow
+The commit and push are the very last step — after the game is built, all tests pass,
+and README.md is written.
+
+1. Confirm all tests pass: `npm test`
+2. Confirm README.md exists and is complete.
+3. Stage all files: `git add -A`
+4. Commit: `git commit -m "feat: initial working build of Tic-Tac-Toe vs. Bot"`
+5. Push: `git push`
+   If the push fails due to no upstream being set, run:
+   ```
+   git push --set-upstream origin main
+   ```
+6. Confirm commit with: `git log --oneline -3`
 
 ---
 
