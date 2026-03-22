@@ -38,12 +38,14 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
         else if (r < 5.01) weaponId = pickRandomWeapon('middle');
         else if (r < 15.01) weaponId = pickRandomWeapon('close');
     } else if (gameState.mode === 'rescue') {
-        // Rescue mode hostiles: always armed, some armored
+        // Rescue mode hostiles: only 50% are armed
         hp = 40; damage = 8; dropMoney = 3;
-        const rr = Math.random();
-        if (rr < 0.3) weaponId = pickRandomWeapon('long');
-        else if (rr < 0.65) weaponId = pickRandomWeapon('middle');
-        else weaponId = pickRandomWeapon('close');
+        if (Math.random() < 0.5) {
+            const rr = Math.random();
+            if (rr < 0.3) weaponId = pickRandomWeapon('long');
+            else if (rr < 0.65) weaponId = pickRandomWeapon('middle');
+            else weaponId = pickRandomWeapon('close');
+        }
         if (Math.random() < 0.4) armoredEnemy = true;
     } else {
         hp = 25; damage = 5; dropMoney = 1;
