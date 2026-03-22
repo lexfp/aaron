@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tic-Tac-Toe vs. Bot</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1 class="game-title">Tic-Tac-Toe vs. Bot</h1>
+
+  <!-- Symbol Selection Screen -->
+  <div id="selection-screen">
+    <p class="selection-prompt">Choose your symbol</p>
+    <div class="symbol-buttons">
+      <button id="play-x" class="symbol-btn">Play as X</button>
+      <button id="play-o" class="symbol-btn">Play as O</button>
+    </div>
+    <div class="difficulty-row">
+      <span class="diff-option">Easy</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="difficulty-toggle" checked />
+        <span class="slider"></span>
+      </label>
+      <span class="diff-option">Hard</span>
+      <span id="difficulty-label" class="diff-active">Hard</span>
+    </div>
+  </div>
+
+  <!-- Game Screen -->
+  <div id="game-screen" class="hidden">
+    <p id="assignment-label" class="assignment-label"></p>
+    <p id="turn-indicator" class="turn-indicator"></p>
+    <div id="board" class="board"></div>
+    <p id="result-message" class="result-message hidden"></p>
+    <button id="play-again" class="play-again-btn hidden">Play Again</button>
+  </div>
+
+  <script src="game.js"></script>
+  <script>
+    // Expose game functions to window so ui.js can access them
+    window.checkWinner = checkWinner;
+    window.isDraw = isDraw;
+    window.getEmptyCells = getEmptyCells;
+    window.getBotMoveEasy = getBotMoveEasy;
+    window.getBotMoveHard = getBotMoveHard;
+    window.minimax = minimax;
+  </script>
+  <script src="ui.js"></script>
+</body>
+</html>

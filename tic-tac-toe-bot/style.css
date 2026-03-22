@@ -1,0 +1,277 @@
+/* style.css — Clean minimal styling for Tic-Tac-Toe vs. Bot */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #f0f4f8;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px;
+  color: #1a202c;
+}
+
+/* ── Title ── */
+.game-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 32px;
+  text-align: center;
+  letter-spacing: 1px;
+  color: #2d3748;
+}
+
+/* ── Selection Screen ── */
+#selection-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.selection-prompt {
+  font-size: 1.2rem;
+  color: #4a5568;
+}
+
+.symbol-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.symbol-btn {
+  width: 140px;
+  height: 64px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #4299e1;
+  color: #fff;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.symbol-btn:hover {
+  background: #2b6cb0;
+  transform: translateY(-2px);
+}
+
+.symbol-btn:active {
+  transform: translateY(0);
+}
+
+/* ── Difficulty Toggle ── */
+.difficulty-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+  color: #4a5568;
+}
+
+.diff-option {
+  font-weight: 500;
+}
+
+.diff-active {
+  font-weight: 700;
+  color: #2d3748;
+  min-width: 36px;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: #cbd5e0;
+  border-radius: 26px;
+  transition: background 0.2s;
+}
+
+.slider::before {
+  content: '';
+  position: absolute;
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.toggle-switch input:checked + .slider {
+  background: #48bb78;
+}
+
+.toggle-switch input:checked + .slider::before {
+  transform: translateX(22px);
+}
+
+/* ── Game Screen ── */
+#game-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ── Assignment Label ── */
+.assignment-label {
+  font-size: 0.95rem;
+  color: #4a5568;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* ── Turn Indicator ── */
+.turn-indicator {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2b6cb0;
+  min-height: 1.5em;
+  text-align: center;
+}
+
+/* ── Board ── */
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  width: 100%;
+  max-width: 300px;
+}
+
+.cell {
+  min-width: 80px;
+  min-height: 80px;
+  background: #fff;
+  border: 2px solid #a0aec0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #2d3748;
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+  aspect-ratio: 1;
+}
+
+.cell:hover:not(.filled) {
+  background: #ebf8ff;
+  border-color: #4299e1;
+}
+
+.cell.filled {
+  cursor: default;
+}
+
+.cell.winning {
+  background: #c6f6d5;
+  border-color: #38a169;
+  color: #22543d;
+}
+
+/* ── Result Message ── */
+.result-message {
+  font-size: 1.8rem;
+  font-weight: 700;
+  text-align: center;
+  color: #2d3748;
+  margin-top: 8px;
+}
+
+/* ── Play Again Button ── */
+.play-again-btn {
+  margin-top: 4px;
+  padding: 12px 36px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #48bb78;
+  color: #fff;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.play-again-btn:hover {
+  background: #276749;
+  transform: translateY(-2px);
+}
+
+.play-again-btn:active {
+  transform: translateY(0);
+}
+
+/* ── Responsive ── */
+@media (max-width: 360px) {
+  .game-title {
+    font-size: 1.4rem;
+  }
+
+  .symbol-btn {
+    width: 120px;
+    height: 56px;
+    font-size: 1rem;
+  }
+
+  .board {
+    max-width: 270px;
+  }
+
+  .cell {
+    min-width: 70px;
+    min-height: 70px;
+    font-size: 1.8rem;
+  }
+
+  .result-message {
+    font-size: 1.4rem;
+  }
+}
+
+@media (max-width: 320px) {
+  .board {
+    max-width: 240px;
+  }
+
+  .cell {
+    min-width: 60px;
+    min-height: 60px;
+    font-size: 1.5rem;
+  }
+}
