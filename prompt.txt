@@ -272,10 +272,13 @@ All tests must pass with 0 failures before committing.
 ---
 
 ## GitHub Workflow
+The commit and push are the very last step. Do not commit until the game is fully built,
+runs without errors, and all tests pass with 0 failures.
+
 1. Confirm all tests pass: `npm test`
 2. Stage all files: `git add -A`
 3. Commit: `git commit -m "feat: initial working build of Tic-Tac-Toe vs. Bot"`
-4. Push to remote: `git push`
+4. Push: `git push`
    If the push fails due to no upstream being set, run:
    ```
    git push --set-upstream origin main
