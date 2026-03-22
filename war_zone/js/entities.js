@@ -410,6 +410,20 @@ export function updateZombies(dt) {
             z.prevHp = z.hp;
         }
 
+        // Auto-attract if player is very close or in line of sight
+        if (gameState.mode === 'zombie' && !z.attracted) {
+            if (dist < 4) {
+                z.attracted = true;
+                z.speed *= 1.5;
+            } else if (dist < 20) {
+                const eyePos = new THREE.Vector3(z.mesh.position.x, z.mesh.position.y + 1.5, z.mesh.position.z);
+                if (hasLineOfSight(eyePos, playerPos)) {
+                    z.attracted = true;
+                    z.speed *= 1.5;
+                }
+            }
+        }
+
         // Movement: wander if not attracted (zombie mode), else chase player
         const isWandering = gameState.mode === 'zombie' && !z.attracted;
         if (isWandering) {
