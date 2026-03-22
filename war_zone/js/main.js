@@ -13,7 +13,7 @@ import { buildMap, spawnSinglePickup, spawnExtractionZone } from './map.js';
 import {
     showScreen, updateHomeStats, showShop, showLoadout,
     renderMapScreen, updateHUD, renderWeaponSlots,
-    showRoundOverlay, buildCheats, showCheatMenu, hideCheatMenu
+    showRoundOverlay, buildCheats
 } from './ui.js';
 import { createWeaponModel, getCurrentWeapon, switchWeapon, updateReload, refillAllAmmo } from './weapons.js';
 import { spawnPvPEnemy, updatePvPEnemy, killZombie, spawnZombie, updateZombies, spawnHostage } from './entities.js';
@@ -125,10 +125,13 @@ function startGame(mode, mapId) {
     buildMap(mapId);
 
     const maxSlots = mode === 'rescue' ? 5 : (mode === 'pvp' ? 3 : 4);
-    const initialWeapons = playerData.equippedLoadout.slice(0, maxSlots);
-    if (mode === 'rescue' && !initialWeapons.includes('compass')) {
-        if (initialWeapons.length === 5) initialWeapons[4] = 'compass';
-        else initialWeapons.push('compass');
+    let initialWeapons = playerData.equippedLoadout.slice(0, maxSlots);
+    if (mode === 'rescue') {
+        initialWeapons = initialWeapons.filter(w => w !== 'shield');
+        if (!initialWeapons.includes('compass')) {
+            if (initialWeapons.length === 5) initialWeapons[4] = 'compass';
+            else initialWeapons.push('compass');
+        }
     }
 
     resetPlayerState({
@@ -450,10 +453,6 @@ document.getElementById('btn-rescue').addEventListener('click', () => { startGam
 document.getElementById('btn-pvp').addEventListener('click', () => { gameState.pendingMode = 'pvp'; showScreen('map-screen'); });
 document.getElementById('btn-shop').addEventListener('click', showShop);
 document.getElementById('btn-loadout').addEventListener('click', showLoadout);
-document.getElementById('btn-cheat').addEventListener('click', () => showCheatMenu(CHEATS));
-
-window.showCheatMenu = () => showCheatMenu(CHEATS);
-
 setupInput(CHEATS, resumeGame);
 updateHomeStats();
 animate();

@@ -476,6 +476,7 @@ export function dropWeapon(weaponId, position) {
 }
 
 export function pickupWeapon(dropped) {
+    if (gameState.mode === 'rescue' && dropped.weaponId === 'shield') return;
     if (playerState.weapons.length >= playerState.maxSlots) return;
     if (playerState.weapons.includes(dropped.weaponId)) return;
 

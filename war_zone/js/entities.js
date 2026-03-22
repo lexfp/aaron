@@ -209,6 +209,18 @@ function pickRandomWeapon(range) {
     return options[Math.floor(Math.random() * options.length)][0];
 }
 
+const WEAPON_RANGE_UNITS = { close: 8, middle: 25, long: 50 };
+
+function hasLineOfSight(from, to) {
+    const dir = new THREE.Vector3().subVectors(to, from).normalize();
+    const ray = new THREE.Raycaster(from, dir);
+    const distToTarget = from.distanceTo(to);
+    const obsMeshes = obstacles.filter(o => o.mesh).map(o => o.mesh);
+    const hits = ray.intersectObjects(obsMeshes, true);
+    if (hits.length === 0) return true;
+    return hits[0].distance > distToTarget - 0.5;
+}
+
 export function killZombie(z, idx) {
     if (z.dead) return;
     z.dead = true; z.hp = 0;
@@ -348,6 +360,21 @@ export function updateZombies(dt) {
         const canReachPlayer = vertDist < 2.5;
 
         let stopDist = z.isGiga ? 3.5 : 1.5;
+        let attackDist = z.attackDist || 2;
+        let weaponDamage = z.damage;
+        const wDef = (z.weaponId && WEAPONS[z.weaponId]) ? WEAPONS[z.weaponId] : null;
+        const useWeapon = wDef && (wDef.type === 'gun' || wDef.type === 'melee');
+        if (useWeapon) {
+            if (wDef.type === 'gun') {
+                stopDist = WEAPON_RANGE_UNITS[wDef.range] || 25;
+                attackDist = stopDist;
+                weaponDamage = wDef.damage;
+            } else if (wDef.type === 'melee') {
+                stopDist = wDef.reach || 2;
+                attackDist = stopDist;
+                weaponDamage = wDef.damage;
+            }
+        }
         if (playerState.weapons[playerState.currentWeaponIndex] === 'shield') stopDist = Math.max(stopDist, 2.5);
 
         // Gravity & Raycast Floor Tracking
@@ -422,10 +449,14 @@ export function updateZombies(dt) {
 
         // Anim
         const walkPhase = Date.now() * 0.006 + i * 1.7;
-        const isAttacking = canReachPlayer && dist < stopDist + 0.5 && z.attackCooldown <= 0;
+        const isInCombat = canReachPlayer && dist < attackDist;
 
-        if (isAttacking) {
-            // Alternating punch animation: arms lunge forward
+        if (isInCombat && useWeapon && wDef.type === 'gun') {
+            z.mesh.children[2].rotation.x = -0.4;
+            z.mesh.children[3].rotation.x = -0.5;
+            z.mesh.children[2].rotation.z = 0.1;
+            z.mesh.children[3].rotation.z = -0.1;
+        } else if (isInCombat && z.attackCooldown <= 0) {
             const punchPhase = (Date.now() * 0.015) % (Math.PI * 2);
             z.mesh.children[2].rotation.x = -Math.PI * 0.55 * Math.max(0, Math.sin(punchPhase));
             z.mesh.children[3].rotation.x = -Math.PI * 0.55 * Math.max(0, Math.sin(punchPhase + Math.PI));
@@ -450,12 +481,22 @@ export function updateZombies(dt) {
             z.hpTex.needsUpdate = true;
         }
 
-        // Attack
-        if (canReachPlayer && dist < (z.attackDist || 2)) {
+        // Attack (melee or ranged)
+        if (canReachPlayer && dist < attackDist) {
             z.attackCooldown -= dt;
             if (z.attackCooldown <= 0) {
-                damagePlayer(z.damage);
-                z.attackCooldown = 1;
+                if (useWeapon && wDef.type === 'gun') {
+                    const eyePos = new THREE.Vector3(z.mesh.position.x, z.mesh.position.y + 1.5, z.mesh.position.z);
+                    const playerTarget = camera.position.clone();
+                    if (hasLineOfSight(eyePos, playerTarget)) {
+                        damagePlayer(Math.floor(weaponDamage * (0.8 + Math.random() * 0.4)));
+                        playGunshot();
+                        z.attackCooldown = 1 / (wDef.fireRate || 0.5);
+                    }
+                } else {
+                    damagePlayer(weaponDamage);
+                    z.attackCooldown = useWeapon && wDef.type === 'melee' ? (1 / (wDef.fireRate || 0.5)) : 1;
+                }
             }
         }
 
