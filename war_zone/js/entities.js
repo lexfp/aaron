@@ -11,7 +11,7 @@ import { damagePlayer, checkPvPEnd } from './combat.js';
 
 // --- Zombies ---
 
-export function spawnZombie(isBoss) {
+export function spawnZombie(isBoss, isGiga = false) {
     const mapSize = MAPS[gameState.currentMap].size;
     let centerX, centerZ, dist;
     if (gameState.mode === 'rescue' && gameState.extractionZone) {
@@ -26,11 +26,13 @@ export function spawnZombie(isBoss) {
     const angle = Math.random() * Math.PI * 2;
 
     let hp, damage, dropMoney, weaponId = null;
-    const bodySize = isBoss ? 1.2 : 0.9;
+    const bodySize = isGiga ? 4.5 : (isBoss ? 2.5 : 0.9);
     let armoredEnemy = false;
 
-    if (isBoss) {
-        hp = 75; damage = 20; dropMoney = 10;
+    if (isGiga) {
+        hp = 1000; damage = 50; dropMoney = 75;
+    } else if (isBoss) {
+        hp = 100; damage = 20; dropMoney = 10;
         const r = Math.random() * 100;
         if (r < 0.01) weaponId = pickRandomWeapon('long');
         else if (r < 5.01) weaponId = pickRandomWeapon('middle');
@@ -49,7 +51,7 @@ export function spawnZombie(isBoss) {
     }
 
     const group = new THREE.Group();
-    const skinColor = isBoss ? 0x880044 : [0x445533, 0x3a5530, 0x504a38, 0x3d4a33][Math.floor(Math.random() * 4)];
+    const skinColor = isGiga ? 0x220011 : (isBoss ? 0x880044 : [0x445533, 0x3a5530, 0x504a38, 0x3d4a33][Math.floor(Math.random() * 4)]);
     const bodyMat = new THREE.MeshStandardMaterial({ color: skinColor });
 
     const shirtColors = [0x8B0000, 0x2F4F4F, 0x4B3621, 0x556B2F, 0x8B4513, 0x36454F, 0x702963, 0x1C1C1C, 0x3B5998, 0xA0522D];
@@ -153,10 +155,12 @@ export function spawnZombie(isBoss) {
     scene.add(group);
 
     gameState.zombieEntities.push({
-        mesh: group, hp, maxHp: hp, damage, dropMoney, isBoss,
-        weaponId, speed: isBoss ? 2.5 : (gameState.mode === 'rescue' ? 4.0 : 3.5),
+        mesh: group, hp, maxHp: hp, damage, dropMoney, isBoss, isGiga,
+        weaponId, speed: isGiga ? 2.0 : (isBoss ? 2.5 : (gameState.mode === 'rescue' ? 4.0 : 3.5)),
         attackCooldown: 0, lastNoiseCheck: 0, attracted: false, dead: false,
         hpCtx: ctx, hpTex: tex,
+        zombieRadius: isGiga ? 1.5 : (isBoss ? 0.7 : 0.5),
+        attackDist: isGiga ? 4 : 2,
         damageReduction: armoredEnemy ? 0.35 : 0,
         aiState: 'charge', aiTimer: 0,
         flankAngle: (Math.random() > 0.5 ? 1 : -1) * (Math.PI / 4 + Math.random() * Math.PI / 4),
@@ -221,7 +225,7 @@ export function killZombie(z, idx) {
         gameState.ammoPickups.push({ mesh, collected: false, isMedkit: true });
     }
 
-    addKillFeed(z.isBoss ? 'Boss Zombie' : 'Zombie');
+    addKillFeed(z.isGiga ? 'GIGA ZOMBIE SLAIN!' : (z.isBoss ? 'Boss Zombie' : 'Zombie'), z.isGiga ? '#ff00ff' : '#fff');
     savePlayerData();
 }
 
@@ -305,7 +309,10 @@ export function updateZombies(dt) {
     if (gameState.zombiesToSpawn > 0) {
         gameState.zombieSpawnTimer -= dt;
         if (gameState.zombieSpawnTimer <= 0) {
-            spawnZombie(gameState.wave >= 3 && Math.random() < 0.15 + gameState.wave * 0.02);
+            const gigaChance = gameState.mode === 'zombie' ? (gameState.wave - 1) * 0.01 : 0;
+            const isGiga = Math.random() < gigaChance;
+            const isBoss = !isGiga && gameState.wave >= 3 && Math.random() < 0.15 + gameState.wave * 0.02;
+            spawnZombie(isBoss, isGiga);
             gameState.zombiesToSpawn--;
             gameState.zombieSpawnTimer = gameState.mode === 'rescue' ? 0.15 : (gameState.mode === 'zombie' ? 0.32 : 0.5);
         }
@@ -338,8 +345,8 @@ export function updateZombies(dt) {
         const dz = playerPos.z - z.mesh.position.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
 
-        let stopDist = 1.5;
-        if (playerState.weapons[playerState.currentWeaponIndex] === 'shield') stopDist = 2.5;
+        let stopDist = z.isGiga ? 3.5 : 1.5;
+        if (playerState.weapons[playerState.currentWeaponIndex] === 'shield') stopDist = Math.max(stopDist, 2.5);
 
         // Gravity & Raycast Floor Tracking
         const zRay = new THREE.Raycaster(new THREE.Vector3(z.mesh.position.x, z.mesh.position.y + 2, z.mesh.position.z), new THREE.Vector3(0, -1, 0));
@@ -373,7 +380,7 @@ export function updateZombies(dt) {
 
         // Movement: steer toward player with multi-angle probe to go around walls
         if (dist > stopDist) {
-            const zombieRadius = z.isBoss ? 0.7 : 0.5;
+            const zombieRadius = z.zombieRadius || (z.isBoss ? 0.7 : 0.5);
             let moveAngle = Math.atan2(dx, dz);
 
             if (z.aiState === 'flank') {
@@ -442,7 +449,7 @@ export function updateZombies(dt) {
         }
 
         // Attack
-        if (dist < 2) {
+        if (dist < (z.attackDist || 2)) {
             z.attackCooldown -= dt;
             if (z.attackCooldown <= 0) {
                 damagePlayer(z.damage);

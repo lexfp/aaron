@@ -54,6 +54,7 @@ function checkCollision(newPos) {
     const pMaxY = newPos.y + 0.2;
 
     for (const obs of obstacles) {
+        if (obs.passThrough) continue;
         if (obs.box) {
             const b = obs.box;
             if (newPos.x + playerCylRadius > b.min.x && newPos.x - playerCylRadius < b.max.x &&
@@ -65,6 +66,8 @@ function checkCollision(newPos) {
             }
         }
         if (obs.radius) {
+            // Skip radius collision if player is above this obstacle (e.g. standing on top of trunk)
+            if (obs.box && pMinY >= obs.box.max.y - 0.1) continue;
             const dx = newPos.x - obs.mesh.position.x;
             const dz = newPos.z - obs.mesh.position.z;
             if (Math.sqrt(dx * dx + dz * dz) < obs.radius + playerCylRadius) return true;
@@ -80,6 +83,7 @@ function getFloorHeight(pos) {
 
     // Check AABB boxes first
     for (const obs of obstacles) {
+        if (obs.passThrough) continue;
         if (obs.box) {
             if (pos.x >= obs.box.min.x - 0.3 && pos.x <= obs.box.max.x + 0.3 &&
                 pos.z >= obs.box.min.z - 0.3 && pos.z <= obs.box.max.z + 0.3) {
@@ -142,14 +146,31 @@ function startGame(mode, mapId) {
 
     if (playerData.equippedArmor) {
         const eq = EQUIPMENT[playerData.equippedArmor];
-        playerState.armor = eq.armor;
-        playerState.maxArmor = eq.armor;
-        playerState.damageReduction = eq.damageReduction;
+        playerState.armor += eq.armor;
+        playerState.maxArmor += eq.armor;
+        playerState.damageReduction += eq.damageReduction || 0;
     }
     if (playerData.equippedHelmet) {
         const eq = EQUIPMENT[playerData.equippedHelmet];
         playerState.armor += eq.armor;
-        playerState.headshotReduction = eq.headshotReduction;
+        playerState.maxArmor += eq.armor;
+        playerState.headshotReduction = eq.headshotReduction || 0;
+    }
+    if (playerData.equippedPants) {
+        const eq = EQUIPMENT[playerData.equippedPants];
+        if (eq) {
+            playerState.armor += eq.armor || 0;
+            playerState.maxArmor += eq.armor || 0;
+            playerState.damageReduction = Math.min(0.9, playerState.damageReduction + (eq.damageReduction || 0));
+        }
+    }
+    if (playerData.equippedBoots) {
+        const eq = EQUIPMENT[playerData.equippedBoots];
+        if (eq) {
+            playerState.armor += eq.armor || 0;
+            playerState.maxArmor += eq.armor || 0;
+            playerState.damageReduction = Math.min(0.9, playerState.damageReduction + (eq.damageReduction || 0));
+        }
     }
     for (const id of playerData.ownedEquipment) {
         const eq = EQUIPMENT[id];

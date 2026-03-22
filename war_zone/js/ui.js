@@ -67,22 +67,39 @@ function renderWeaponShop() {
 function renderEquipmentShop() {
     const grid = document.getElementById('equipment-shop');
     grid.innerHTML = '';
-    for (const [id, e] of Object.entries(EQUIPMENT)) {
-        let desc = '';
-        if (e.armor) desc += `Armor: +${e.armor}<br>`;
-        if (e.damageReduction) desc += `Damage Reduction: ${e.damageReduction * 100}%<br>`;
-        if (e.headshotReduction) desc += `Headshot Reduction: ${e.headshotReduction * 100}%<br>`;
-        if (e.hpRestore) desc += `Restores ${e.hpRestore} HP<br>`;
-        if (e.hpBoost) desc += `+${e.hpBoost} Temp HP<br>`;
-        if (e.airstrikes) desc += `Press F to kill all zombies (+${e.airstrikes} use)<br>`;
-        const item = document.createElement('div');
-        item.className = 'shop-item';
-        item.innerHTML = `
-            <h3>${e.name}</h3><div class="price">$${e.cost}</div>
-            <div class="stats">${desc}</div>
-            <button class="buy-btn" onclick="buyEquipment('${id}')">BUY</button>
-        `;
-        grid.appendChild(item);
+
+    const sections = [
+        { title: 'Helmets', filter: e => e.type === 'head' },
+        { title: 'Breastplates', filter: e => e.type === 'armor' },
+        { title: 'Pants', filter: e => e.type === 'pants' },
+        { title: 'Boots', filter: e => e.type === 'boots' },
+        { title: 'Consumables', filter: e => e.type === 'consumable' }
+    ];
+
+    for (const { title, filter } of sections) {
+        const entries = Object.entries(EQUIPMENT).filter(([, e]) => filter(e));
+        if (entries.length === 0) continue;
+        const header = document.createElement('h4');
+        header.style.cssText = 'color:#ffaa00;width:100%;margin:18px 0 8px;font-size:18px;';
+        header.textContent = title;
+        grid.appendChild(header);
+        for (const [id, e] of entries) {
+            let desc = '';
+            if (e.armor) desc += `Armor: +${e.armor}<br>`;
+            if (e.damageReduction) desc += `Damage Reduction: ${e.damageReduction * 100}%<br>`;
+            if (e.headshotReduction) desc += `Headshot Reduction: ${e.headshotReduction * 100}%<br>`;
+            if (e.hpRestore) desc += `Restores ${e.hpRestore} HP<br>`;
+            if (e.hpBoost) desc += `+${e.hpBoost} Temp HP<br>`;
+            if (e.airstrikes) desc += `Press F to kill all zombies (+${e.airstrikes} use)<br>`;
+            const item = document.createElement('div');
+            item.className = 'shop-item';
+            item.innerHTML = `
+                <h3>${e.name}</h3><div class="price">$${e.cost}</div>
+                <div class="stats">${desc}</div>
+                <button class="buy-btn" onclick="buyEquipment('${id}')">BUY</button>
+            `;
+            grid.appendChild(item);
+        }
     }
 }
 
@@ -127,6 +144,8 @@ window.buyEquipment = function (id) {
         playerData.money -= e.cost;
         if (e.type === 'armor') playerData.equippedArmor = id;
         else if (e.type === 'head') playerData.equippedHelmet = id;
+        else if (e.type === 'pants') playerData.equippedPants = id;
+        else if (e.type === 'boots') playerData.equippedBoots = id;
         else if (e.airstrikes) playerData.airstrikes = (playerData.airstrikes || 0) + e.airstrikes;
         else playerData.ownedEquipment.push(id);
         savePlayerData();
@@ -216,8 +235,10 @@ export function showLoadout() {
     armorSlotContainer.style.cssText = 'display:flex;gap:16px;justify-content:center;flex-wrap:wrap;';
 
     const armorSlots = [
-        { key: 'equippedArmor', label: 'CHEST ARMOR', color: '#00aaff' },
-        { key: 'equippedHelmet', label: 'HELMET', color: '#aa88ff' }
+        { key: 'equippedHelmet', label: 'HELMET', color: '#aa88ff' },
+        { key: 'equippedArmor', label: 'BREASTPLATE', color: '#00aaff' },
+        { key: 'equippedPants', label: 'PANTS', color: '#00cc66' },
+        { key: 'equippedBoots', label: 'BOOTS', color: '#ffaa00' }
     ];
 
     for (const { key, label, color } of armorSlots) {

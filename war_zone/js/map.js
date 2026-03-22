@@ -400,7 +400,7 @@ export function buildMap(mapId) {
             canopy.scale.y = 0.85;
             canopy.castShadow = true;
             scene.add(canopy);
-            obs.push({ mesh: canopy, box: new THREE.Box3().setFromObject(canopy) });
+            obs.push({ mesh: canopy, box: new THREE.Box3().setFromObject(canopy), passThrough: true });
 
             if (scale > 1.2) {
                 const canopy2 = new THREE.Mesh(new THREE.SphereGeometry(2.2 * scale, 6, 4), thisLeafMat);
@@ -454,7 +454,7 @@ export function buildMap(mapId) {
 
 export function spawnSinglePickup(mapSize, forceMedkit = null) {
     // Medkits are rare (8% chance); most timed spawns are ammo
-    const isMedkit = forceMedkit !== null ? forceMedkit : Math.random() < 0.08;
+    const isMedkit = forceMedkit !== null ? forceMedkit : Math.random() < 0.20;
     const mat = new THREE.MeshStandardMaterial({ color: isMedkit ? 0x00ff00 : 0xffff00, emissive: isMedkit ? 0x004400 : 0x888800 });
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), mat);
 

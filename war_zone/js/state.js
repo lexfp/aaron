@@ -11,6 +11,8 @@ function defaultPlayerData() {
         equippedLoadout: ['fists', 'glock'],
         equippedArmor: null,
         equippedHelmet: null,
+        equippedPants: null,
+        equippedBoots: null,
         reserveAmmo: {},
         airstrikes: 0
     };
