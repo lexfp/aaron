@@ -161,7 +161,7 @@ export function spawnZombie(isBoss) {
         aiState: 'charge', aiTimer: 0,
         flankAngle: (Math.random() > 0.5 ? 1 : -1) * (Math.PI / 4 + Math.random() * Math.PI / 4),
         strafeDir: Math.random() > 0.5 ? 1 : -1,
-        coverTarget: null, prevHp: hp
+        stuckTimer: 0, prevHp: hp
     });
     gameState.zombiesAlive++;
 }
@@ -245,6 +245,59 @@ function checkZombieCollision(pos, radius) {
     return false;
 }
 
+/** Try many headings around desired angle; pick one that clears obstacles and gets closest to the player. */
+function computeZombieSteer(cx, cz, px, pz, baseAngle, radius, step) {
+    const toPx = px - cx;
+    const toPz = pz - cz;
+    const dist0 = Math.hypot(toPx, toPz);
+    if (dist0 < 0.01) return { mx: 0, mz: 0 };
+
+    const idealSin = Math.sin(baseAngle);
+    const idealCos = Math.cos(baseAngle);
+    const stepVec = new THREE.Vector3();
+
+    const tryStep = (scale) => {
+        let bestMx = 0, bestMz = 0, bestScore = -1e9;
+        for (const off of ZOMBIE_STEER_OFFSETS) {
+            const ang = baseAngle + off;
+            const mx = Math.sin(ang) * step * scale;
+            const mz = Math.cos(ang) * step * scale;
+            const nx = cx + mx, nz = cz + mz;
+            stepVec.set(nx, 1, nz);
+            if (checkZombieCollision(stepVec, radius)) continue;
+
+            const nd = Math.hypot(px - nx, pz - nz);
+            const closer = dist0 - nd;
+            const mag = Math.hypot(mx, mz) || 1;
+            const align = (idealSin * mx + idealCos * mz) / mag;
+            const score = closer * 5 + align * step * scale;
+            if (score > bestScore) {
+                bestScore = score;
+                bestMx = mx;
+                bestMz = mz;
+            }
+        }
+        if (bestScore > -1e8) return { mx: bestMx, mz: bestMz };
+        return null;
+    };
+
+    let out = tryStep(1);
+    if (!out) out = tryStep(0.55);
+    if (!out) out = tryStep(0.3);
+    return out || { mx: 0, mz: 0 };
+}
+
+/** Radians: straight at target first, then shallow dodges, then 90° for sliding along walls. */
+const ZOMBIE_STEER_OFFSETS = [
+    0,
+    0.3, -0.3, 0.55, -0.55, 0.85, -0.85,
+    1.15, -1.15, 1.45, -1.45,
+    Math.PI / 2, -Math.PI / 2,
+    1.8, -1.8, 2.15, -2.15,
+    Math.PI * 0.72, -Math.PI * 0.72,
+    Math.PI * 0.85, -Math.PI * 0.85,
+];
+
 export function updateZombies(dt) {
     const playerPos = camera.position;
 
@@ -254,14 +307,14 @@ export function updateZombies(dt) {
         if (gameState.zombieSpawnTimer <= 0) {
             spawnZombie(gameState.wave >= 3 && Math.random() < 0.15 + gameState.wave * 0.02);
             gameState.zombiesToSpawn--;
-            gameState.zombieSpawnTimer = gameState.mode === 'rescue' ? 0.15 : 0.5;
+            gameState.zombieSpawnTimer = gameState.mode === 'rescue' ? 0.15 : (gameState.mode === 'zombie' ? 0.32 : 0.5);
         }
     }
 
-    // Wave complete
-    if (gameState.zombiesAlive <= 0 && gameState.zombiesToSpawn <= 0) {
+    // Wave complete (zombie invasion only — rescue uses a fixed horde count)
+    if (gameState.mode === 'zombie' && gameState.zombiesAlive <= 0 && gameState.zombiesToSpawn <= 0) {
         gameState.wave++;
-        gameState.zombiesToSpawn = 8 + gameState.wave * 5;
+        gameState.zombiesToSpawn = 70 + gameState.wave * 45;
         document.getElementById('wave-hud').textContent = 'Wave ' + gameState.wave;
         showRoundOverlay('Wave ' + gameState.wave, 'Incoming!', 2000);
     }
@@ -301,73 +354,60 @@ export function updateZombies(dt) {
             if (z.mesh.position.y < 0) z.mesh.position.y = 0;
         }
 
-        // AI state machine — re-evaluate periodically
+        // AI state — always player-focused (no "cover" toward buildings)
         z.aiTimer -= dt;
         if (z.aiTimer <= 0) {
-            // When damaged recently, seek cover more often
-            const hpRatio = z.hp / z.maxHp;
             const r = Math.random();
-            if (hpRatio < 0.4 && r < 0.35) {
-                z.aiState = 'cover';
-                // Pick nearest obstacle as cover target
-                let bestDist = Infinity;
-                for (const obs of obstacles) {
-                    if (!obs.mesh) continue;
-                    const od = z.mesh.position.distanceTo(obs.mesh.position);
-                    if (od < bestDist && od > 1.5) { bestDist = od; z.coverTarget = obs.mesh.position.clone(); }
-                }
-            } else if (r < 0.25 && dist > 6) {
+            if (r < 0.1 && dist > 14) {
                 z.aiState = 'flank';
-                z.flankAngle = (Math.random() > 0.5 ? 1 : -1) * (Math.PI / 3 + Math.random() * Math.PI / 6);
-            } else if (r < 0.45 && dist < 15) {
+                z.flankAngle = (Math.random() > 0.5 ? 1 : -1) * (Math.PI / 6 + Math.random() * Math.PI / 10);
+            } else if (r < 0.1 && dist > 5 && dist < 14) {
                 z.aiState = 'strafe';
                 z.strafeDir = Math.random() > 0.5 ? 1 : -1;
             } else {
                 z.aiState = 'charge';
             }
-            z.aiTimer = 1.2 + Math.random() * 2.5;
+            z.aiTimer = 0.7 + Math.random() * 1.2;
             z.prevHp = z.hp;
         }
 
-        // Movement with collision sliding
+        // Movement: steer toward player with multi-angle probe to go around walls
         if (dist > stopDist) {
             const zombieRadius = z.isBoss ? 0.7 : 0.5;
             let moveAngle = Math.atan2(dx, dz);
 
             if (z.aiState === 'flank') {
-                // Blend flank angle in at close range, pure charge when far
-                const blendFactor = Math.min(1, dist / 14);
+                const blendFactor = Math.min(1, dist / 16);
                 moveAngle += z.flankAngle * blendFactor;
             } else if (z.aiState === 'strafe') {
-                // Circle the player — blend strafing with approach when far
                 const perpAngle = moveAngle + Math.PI / 2 * z.strafeDir;
-                const blendFactor = dist > 10 ? 0.35 : 0.7;
+                const blendFactor = dist > 11 ? 0.22 : 0.42;
                 moveAngle = moveAngle * (1 - blendFactor) + perpAngle * blendFactor;
-            } else if (z.aiState === 'cover' && z.coverTarget) {
-                const cdx = z.coverTarget.x - z.mesh.position.x;
-                const cdz = z.coverTarget.z - z.mesh.position.z;
-                const cdist = Math.sqrt(cdx * cdx + cdz * cdz);
-                if (cdist > 1.2) {
-                    moveAngle = Math.atan2(cdx, cdz);
-                } else {
-                    // Reached cover — peek toward player
-                    z.aiState = 'charge';
+            }
+
+            const step = z.speed * dt;
+            const steer = computeZombieSteer(
+                z.mesh.position.x, z.mesh.position.z,
+                playerPos.x, playerPos.z,
+                moveAngle, zombieRadius, step
+            );
+            z.mesh.position.x += steer.mx;
+            z.mesh.position.z += steer.mz;
+
+            // Dead-end escape: briefly sidestep along walls if fully blocked
+            const movedSq = steer.mx * steer.mx + steer.mz * steer.mz;
+            if (movedSq < 1e-10) {
+                z.stuckTimer = (z.stuckTimer || 0) + dt;
+                if (z.stuckTimer > 0.2) {
+                    z.flankAngle = (Math.random() > 0.5 ? 1 : -1) * (Math.PI / 2 + Math.random() * 0.35);
+                    z.aiState = 'flank';
+                    z.aiTimer = 0.4;
+                    z.stuckTimer = 0;
                 }
-            }
-
-            const moveX = Math.sin(moveAngle) * z.speed * dt;
-            const moveZ = Math.cos(moveAngle) * z.speed * dt;
-            const newPos = z.mesh.position.clone();
-            newPos.x += moveX; newPos.z += moveZ;
-
-            if (!checkZombieCollision(newPos, zombieRadius)) {
-                z.mesh.position.x = newPos.x; z.mesh.position.z = newPos.z;
             } else {
-                const posX = z.mesh.position.clone(); posX.x += moveX;
-                if (!checkZombieCollision(posX, zombieRadius)) z.mesh.position.x = posX.x;
-                const posZ = z.mesh.position.clone(); posZ.z += moveZ;
-                if (!checkZombieCollision(posZ, zombieRadius)) z.mesh.position.z = posZ.z;
+                z.stuckTimer = 0;
             }
+
             z.mesh.rotation.y = Math.atan2(dx, dz);
         }
 

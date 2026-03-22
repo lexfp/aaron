@@ -1,60 +1,12 @@
 war_zone/index.html
-do the following:
-    give zombies 'intelligence', as in don't just run at me, but also try to flank me, and use cover, etc.
-    give hostile entities in rescue mode weapons and armor make sure they can use it
-    add armor equip slots to the loadout tab
-    make buildings more detailed
-    allow me to jump out windows
-    add more decorations to all maps(graffiti, furniture, boxes, etc.)
-    make jungle map have a lot more trees and make them a lot more compact(basically 2-3 meters from each other)
-    allow tree scaling in jungle map
-    style melee weapons to look realistic, and give them unique looks(chains for chainsaw, katana longer, longsword wider, etc.)
-    make less ammo crates when you first spawn in but have more slowly spawn in over time(around 1 every 1.5 mins)
-    do the same with medkits, and make them spawn even less
-    add zombie attack animations(punching, etc)
-    make it more clear when zombies are holding weapons
-    add a lot more zombies to all levels of zombie apocalypse
-    give meelee weapons more range than hostiles
-    give desert cactus instead of blocks and make cactus do 5 damage to anything that hits it
+implement the following in steps so that disconnect doesn't cause restart:
+  divide armor into helmets, breastplates, pants, boots(sell options for all at shop)(light, heavy, chainmail, etc.)
+  allow me to stand on trees after they get climbed
+  make cactus deal damage
+  make medkits spawn rate 20% instead of 8%
+  make air strike $400
+  make boss zombies a lot bigger than normal ones&
+  make them have 100hp
+  add giga zombie with 1k hp & 50 damage per hit and starts with 0% chance of spawn, +1% every wave
 
 check all of the above thoroughly for bugs
-
-
--------------------------------------------
-
-
-                                                                                                    
-  ---
-  Step 1 — data.js: All melee weapons now have reach > 2 (hostile attack range), so the player can hit enemies    
-  before they can retaliate. Fists→1.7, knife→2.2, axe→2.5, shield→2.0, chainsaw→2.8, katana→3.0, longsword→3.5.                                                                                                                    
-  Step 2 — weapons.js: Unique viewmodel for every melee weapon:                                                   
-  - Chainsaw: orange motor body, guide bar, 10 chain link toruses
-  - Katana: long thin blade (0.92 height), blood groove, tsuba guard, wrapped handle
-  - Longsword: wide blade (0.052 wide) with fuller, ornate cross-guard with sphere tips, pommel
-  - Axe: wooden handle + wide axe head with polished edge
-  - Knife & Shield also got detail improvements
-
-  Step 3 — entities.js: Zombies have a 3-state AI (charge / flank / strafe / cover). Rescue mode hostiles always  
-  carry weapons, 40% have visible chest plate + shoulder armor with 35% damage reduction. Armed zombies show a    
-  weapon mesh on their right side. Attack animation now alternates arms in a distinct punching motion. Wave       
-  formula increased from 5+wave*3 to 8+wave*5.
-
-  Step 4 — map.js:
-  - Desert: Cacti (cylinder body + arms, isCactus flag) replace featureless boxes. Added rocks and debris.        
-  - City: Buildings have jumpable side-wall window openings (1.5–3.8m gap), interior furniture, roof parapets + AC
-   units, exterior crates/barrels/graffiti decals, street lights.
-  - Forest/Jungle: 1800 trees with min 2.5m spacing via Poisson-disk placement. Trunks marked isTrunk for
-  climbing. Fallen logs added. Dense fog increased.
-  - Warehouse: Metal shelving units, wooden pallets, oil barrel clusters, concrete pillars.
-  - Initial ammo pickups reduced from 3→1. Medkits now only 8% chance on timed spawns.
-
-  Step 5 — ui.js: Loadout screen now shows Chest Armor and Helmet slots below the weapon grid, with stats and a   
-  Remove button.
-
-  Step 6 — main.js + combat.js:
-  - Ammo crate timer: 60s → 90s. Medkits on a separate 2.5–3.5 min timer.
-  - Cactus damage: 5 damage/second when touching a cactus in the desert.
-  - Tree climbing: Holding Space while adjacent to a tree trunk in the forest gives upward velocity (scale trees).
-  - Armored rescue enemies take reduced damage (combat.js).
-
-✻ Crunched for 12m 14s   

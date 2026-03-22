@@ -172,7 +172,7 @@ function startGame(mode, mapId) {
     if (mode === 'zombie') {
         gameState.wave = 1;
         gameState.zombiesAlive = 0;
-        gameState.zombiesToSpawn = 5;
+        gameState.zombiesToSpawn = 90;
         gameState.zombieSpawnTimer = 0;
         document.getElementById('wave-hud').style.display = 'block';
         document.getElementById('wave-hud').textContent = 'Wave 1';
