@@ -169,7 +169,8 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
         aiState: 'charge', aiTimer: 0,
         flankAngle: (Math.random() > 0.5 ? 1 : -1) * (Math.PI / 4 + Math.random() * Math.PI / 4),
         strafeDir: Math.random() > 0.5 ? 1 : -1,
-        stuckTimer: 0, prevHp: hp
+        stuckTimer: 0, prevHp: hp,
+        wanderAngle: Math.random() * Math.PI * 2, wanderTimer: 0
     });
     gameState.zombiesAlive++;
 }
@@ -335,7 +336,7 @@ export function updateZombies(dt) {
     // Wave complete (zombie invasion only — rescue uses a fixed horde count)
     if (gameState.mode === 'zombie' && gameState.zombiesAlive <= 0 && gameState.zombiesToSpawn <= 0) {
         gameState.wave++;
-        gameState.zombiesToSpawn = 70 + gameState.wave * 45;
+        gameState.zombiesToSpawn = (70 + gameState.wave * 45) * 3;
         document.getElementById('wave-hud').textContent = 'Wave ' + gameState.wave;
         showRoundOverlay('Wave ' + gameState.wave, 'Incoming!', 2000);
     }
@@ -409,8 +410,26 @@ export function updateZombies(dt) {
             z.prevHp = z.hp;
         }
 
-        // Movement: steer toward player with multi-angle probe to go around walls
-        if (dist > stopDist) {
+        // Movement: wander if not attracted (zombie mode), else chase player
+        const isWandering = gameState.mode === 'zombie' && !z.attracted;
+        if (isWandering) {
+            z.wanderTimer -= dt;
+            if (z.wanderTimer <= 0) {
+                z.wanderAngle += (Math.random() - 0.5) * Math.PI;
+                z.wanderTimer = 1.5 + Math.random() * 2;
+            }
+            const wanderSpeed = z.speed * 0.3;
+            const wanderZR = z.zombieRadius || (z.isBoss ? 0.7 : 0.5);
+            const nx = z.mesh.position.x + Math.sin(z.wanderAngle) * wanderSpeed * dt;
+            const nz = z.mesh.position.z + Math.cos(z.wanderAngle) * wanderSpeed * dt;
+            if (!checkZombieCollision(new THREE.Vector3(nx, z.mesh.position.y, nz), wanderZR)) {
+                z.mesh.position.x = nx;
+                z.mesh.position.z = nz;
+            } else {
+                z.wanderAngle += Math.PI * (0.5 + Math.random() * 0.5);
+            }
+            z.mesh.rotation.y = z.wanderAngle;
+        } else if (dist > stopDist) {
             const zombieRadius = z.zombieRadius || (z.isBoss ? 0.7 : 0.5);
             let moveAngle = Math.atan2(dx, dz);
 
@@ -451,7 +470,7 @@ export function updateZombies(dt) {
 
         // Anim
         const walkPhase = Date.now() * 0.006 + i * 1.7;
-        const isInCombat = canReachPlayer && dist < attackDist;
+        const isInCombat = !isWandering && canReachPlayer && dist < attackDist;
 
         if (isInCombat && useWeapon && wDef.type === 'gun') {
             z.mesh.children[2].rotation.x = -0.4;
@@ -483,8 +502,8 @@ export function updateZombies(dt) {
             z.hpTex.needsUpdate = true;
         }
 
-        // Attack (melee or ranged)
-        if (canReachPlayer && dist < attackDist) {
+        // Attack (melee or ranged) — wandering zombies don't attack
+        if (!isWandering && canReachPlayer && dist < attackDist) {
             z.attackCooldown -= dt;
             if (z.attackCooldown <= 0) {
                 if (useWeapon && wDef.type === 'gun') {

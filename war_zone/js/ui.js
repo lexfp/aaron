@@ -107,12 +107,23 @@ function renderAttachmentShop() {
     const grid = document.getElementById('attachment-shop');
     grid.innerHTML = '';
     for (const [id, a] of Object.entries(ATTACHMENTS)) {
+        const eligible = playerData.ownedWeapons.filter(wid => {
+            const w = WEAPONS[wid];
+            if (w.type !== 'gun') return false;
+            if (id === 'scope' && w.hasScope) return false;
+            return !(playerData.weaponAttachments[wid] || []).includes(id);
+        });
         const item = document.createElement('div');
         item.className = 'shop-item';
+        const canAfford = playerData.money >= a.cost;
+        const weaponBtns = eligible.length > 0 && canAfford
+            ? eligible.map(wid => `<button class="buy-btn" style="font-size:11px;margin:2px" onclick="attachToWeapon('${id}','${wid}')">Attach to ${WEAPONS[wid].name}</button>`).join('')
+            : eligible.length === 0 ? '<div style="color:#888;font-size:11px">No eligible weapons</div>'
+            : '<div style="color:#f88;font-size:11px">Not enough money</div>';
         item.innerHTML = `
             <h3>${a.name}</h3><div class="price">$${a.cost}</div>
             <div class="stats">${a.description}</div>
-            <button class="buy-btn" onclick="buyAttachment('${id}')">BUY</button>
+            ${weaponBtns}
         `;
         grid.appendChild(item);
     }
@@ -153,25 +164,15 @@ window.buyEquipment = function (id) {
     }
 };
 
-window.buyAttachment = function (id) {
-    const a = ATTACHMENTS[id];
+window.attachToWeapon = function (attachId, weaponId) {
+    const a = ATTACHMENTS[attachId];
     if (playerData.money < a.cost) return;
-    const eligible = playerData.ownedWeapons.filter(wid => {
-        const w = WEAPONS[wid];
-        if (w.type !== 'gun') return false;
-        if (id === 'scope' && w.hasScope) return false;
-        return !(playerData.weaponAttachments[wid] || []).includes(id);
-    });
-    if (eligible.length === 0) return;
-    const choice = prompt('Attach to which weapon?\n' + eligible.map((w, i) => `${i + 1}. ${WEAPONS[w].name}`).join('\n'));
-    const idx = parseInt(choice) - 1;
-    if (idx >= 0 && idx < eligible.length) {
-        playerData.money -= a.cost;
-        if (!playerData.weaponAttachments[eligible[idx]]) playerData.weaponAttachments[eligible[idx]] = [];
-        playerData.weaponAttachments[eligible[idx]].push(id);
-        savePlayerData();
-        showShop();
-    }
+    if (!playerData.weaponAttachments[weaponId]) playerData.weaponAttachments[weaponId] = [];
+    if (playerData.weaponAttachments[weaponId].includes(attachId)) return;
+    playerData.money -= a.cost;
+    playerData.weaponAttachments[weaponId].push(attachId);
+    savePlayerData();
+    showShop();
 };
 
 // --- Loadout ---
