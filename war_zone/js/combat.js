@@ -1,10 +1,10 @@
 // Shooting, damage calculation, throwables, explosions, fire zones
 
 import * as THREE from 'three';
-import { WEAPONS } from './data.js';
+import { WEAPONS, EQUIPMENT } from './data.js';
 import { playerData, playerState, savePlayerData, gameState } from './state.js';
 import { scene, camera, controls, raycaster, setWeaponSwingTime, obstacles } from './engine.js';
-import { playSound, playGunshot, playHit, playExplosion } from './audio.js';
+import { playSound, playGunshot, playHit, playExplosion, playPickup } from './audio.js';
 import { updateHUD, addKillFeed, showRoundOverlay } from './ui.js';
 import { getCurrentWeapon, hasSilencer, hasScope, reload, toggleZoom } from './weapons.js';
 import { killZombie, attractZombies, spawnPvPEnemy } from './entities.js';
@@ -38,8 +38,21 @@ export function shoot() {
     }
 
     // Gun
-    if (state.ammo <= 0) { if (state.reserveAmmo > 0) reload(); return; }
-    state.ammo--;
+    if (state.ammo <= 0) {
+        if (state.reserveAmmo > 0) {
+            if (def.explosive && def.maxAmmo === 1) {
+                state.ammo = 1;
+                state.reserveAmmo--;
+            } else {
+                reload();
+                return;
+            }
+        } else {
+            return;
+        }
+    } else {
+        state.ammo--;
+    }
     state.lastFired = now;
     setWeaponSwingTime(0.1);
 
@@ -162,6 +175,31 @@ export function damagePlayer(amount) {
     updateHUD();
 
     if (playerState.hp <= 0) gameOver();
+}
+
+export function useMedkit() {
+    const idx = playerData.ownedEquipment.indexOf('med_kit');
+    if (idx < 0) return false;
+    const eq = EQUIPMENT.med_kit;
+    playerState.hp = Math.min(playerState.maxHp, playerState.hp + eq.hpRestore);
+    playerData.ownedEquipment.splice(idx, 1);
+    savePlayerData();
+    playPickup();
+    updateHUD();
+    return true;
+}
+
+export function useAdrenaline() {
+    const idx = playerData.ownedEquipment.indexOf('adrenaline');
+    if (idx < 0) return false;
+    const eq = EQUIPMENT.adrenaline;
+    playerState.maxHp += eq.hpBoost;
+    playerState.hp += eq.hpBoost;
+    playerData.ownedEquipment.splice(idx, 1);
+    savePlayerData();
+    playPickup();
+    updateHUD();
+    return true;
 }
 
 // --- Throwables & Explosions ---
@@ -314,7 +352,11 @@ export function callAirstrike() {
         for (let i = gameState.zombieEntities.length - 1; i >= 0; i--) {
             const z = gameState.zombieEntities[i];
             if (z.mesh.position.distanceTo(pos) < radius) {
-                z.hp -= 10000;
+                if (z.isGiga) {
+                    z.hp -= z.maxHp * 0.9;
+                } else {
+                    z.hp -= 10000;
+                }
                 if (z.hp <= 0) killZombie(z, i);
             }
         }

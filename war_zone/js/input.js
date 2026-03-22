@@ -3,7 +3,7 @@
 import { keys, controls } from './engine.js';
 import { gameState, playerState, playerData, savePlayerData } from './state.js';
 import { switchWeapon, reload, dropCurrentWeapon, toggleZoom, pickupWeapon } from './weapons.js';
-import { shoot, callAirstrike } from './combat.js';
+import { shoot, callAirstrike, useMedkit, useAdrenaline } from './combat.js';
 import { camera } from './engine.js';
 import { WEAPONS } from './data.js';
 
@@ -42,7 +42,10 @@ export function setupInput(CHEATS, resumeGameFn) {
                 controls.unlock();
             }
         }
-        if (key === 'q') switchWeapon(playerState.currentWeaponIndex - 1);
+        if (key === 'q') {
+            if (!useMedkit()) switchWeapon(playerState.currentWeaponIndex - 1);
+        }
+        if (key === 'y') useAdrenaline();
         if (key === 'f') {
             if (playerData.airstrikes > 0) {
                 playerData.airstrikes--;

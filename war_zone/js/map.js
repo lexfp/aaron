@@ -353,7 +353,6 @@ export function buildMap(mapId) {
             const slope = new THREE.Mesh(new THREE.BoxGeometry(w * 1.5, h * 0.5, d * 1.5), rockMat);
             slope.rotation.x = (rng() - 0.5); slope.rotation.z = (rng() - 0.5);
             slope.position.set(bx, h / 4, bz);
-            slope.updateMatrixWorld(true);
             scene.add(slope);
             obs.push({ mesh: slope, isSlope: true });
         }

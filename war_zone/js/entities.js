@@ -11,7 +11,7 @@ import { damagePlayer, checkPvPEnd } from './combat.js';
 
 // --- Zombies ---
 
-export function spawnZombie(isBoss, isGiga = false) {
+export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
     const mapSize = MAPS[gameState.currentMap].size;
     let centerX, centerZ, dist;
     if (gameState.mode === 'rescue' && gameState.extractionZone) {
@@ -133,8 +133,9 @@ export function spawnZombie(isBoss, isGiga = false) {
     let spawnZ = centerZ + Math.sin(angle) * dist;
 
     // Ensure we don't spawn inside a bounding box
+    const spawnRadius = isGiga ? 1.5 : (isBoss ? 0.7 : 0.5);
     for (let attempts = 0; attempts < 10; attempts++) {
-        if (!checkZombieCollision(new THREE.Vector3(spawnX, 1, spawnZ), isBoss ? 0.7 : 0.5)) break;
+        if (!checkZombieCollision(new THREE.Vector3(spawnX, 1, spawnZ), spawnRadius)) break;
         dist += 2;
         spawnX = centerX + Math.cos(angle) * dist;
         spawnZ = centerZ + Math.sin(angle) * dist;
@@ -154,9 +155,10 @@ export function spawnZombie(isBoss, isGiga = false) {
 
     scene.add(group);
 
+    const defaultSpeed = isGiga ? 7.0 : (isBoss ? 2.5 : (gameState.mode === 'rescue' ? 4.0 : 3.5));
     gameState.zombieEntities.push({
         mesh: group, hp, maxHp: hp, damage, dropMoney, isBoss, isGiga,
-        weaponId, speed: isGiga ? 2.0 : (isBoss ? 2.5 : (gameState.mode === 'rescue' ? 4.0 : 3.5)),
+        weaponId, speed: speedOverride != null ? speedOverride : defaultSpeed,
         attackCooldown: 0, lastNoiseCheck: 0, attracted: false, dead: false,
         hpCtx: ctx, hpTex: tex,
         zombieRadius: isGiga ? 1.5 : (isBoss ? 0.7 : 0.5),
@@ -181,9 +183,7 @@ export function spawnHostage(mapSize) {
 
     let spawnX = (Math.random() - 0.5) * mapSize * 0.8;
     let spawnZ = (Math.random() - 0.5) * mapSize * 0.8;
-
-    // Ensure we don't spawn inside a bounding box
-    for (let attempts = 0; attempts < 10; attempts++) {
+    for (let attempts = 0; attempts < 25; attempts++) {
         if (!checkZombieCollision(new THREE.Vector3(spawnX, 1, spawnZ), 0.5)) break;
         spawnX = (Math.random() - 0.5) * mapSize * 0.8;
         spawnZ = (Math.random() - 0.5) * mapSize * 0.8;
@@ -344,6 +344,8 @@ export function updateZombies(dt) {
         const dx = playerPos.x - z.mesh.position.x;
         const dz = playerPos.z - z.mesh.position.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
+        const vertDist = Math.abs(playerPos.y - z.mesh.position.y);
+        const canReachPlayer = vertDist < 2.5;
 
         let stopDist = z.isGiga ? 3.5 : 1.5;
         if (playerState.weapons[playerState.currentWeaponIndex] === 'shield') stopDist = Math.max(stopDist, 2.5);
@@ -420,7 +422,7 @@ export function updateZombies(dt) {
 
         // Anim
         const walkPhase = Date.now() * 0.006 + i * 1.7;
-        const isAttacking = dist < stopDist + 0.5 && z.attackCooldown <= 0;
+        const isAttacking = canReachPlayer && dist < stopDist + 0.5 && z.attackCooldown <= 0;
 
         if (isAttacking) {
             // Alternating punch animation: arms lunge forward
@@ -449,7 +451,7 @@ export function updateZombies(dt) {
         }
 
         // Attack
-        if (dist < (z.attackDist || 2)) {
+        if (canReachPlayer && dist < (z.attackDist || 2)) {
             z.attackCooldown -= dt;
             if (z.attackCooldown <= 0) {
                 damagePlayer(z.damage);

@@ -226,8 +226,10 @@ export function showLoadout() {
         grid.appendChild(item);
     }
 
-    // --- Armor equip slots ---
+    // --- Armor equip slots ---   
+    document.getElementById('loadout-armor-section')?.remove();
     const armorSection = document.createElement('div');
+    armorSection.id = 'loadout-armor-section';
     armorSection.style.cssText = 'max-width:700px;margin:30px auto 0;';
     armorSection.innerHTML = '<h3 style="color:#00aaff;font-size:22px;text-align:center;margin-bottom:15px">Armor Slots</h3>';
 

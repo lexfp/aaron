@@ -1,12 +1,8 @@
 war_zone/index.html
 implement the following in steps so that disconnect doesn't cause restart:
-  divide armor into helmets, breastplates, pants, boots(sell options for all at shop)(light, heavy, chainmail, etc.)
-  allow me to stand on trees after they get climbed
-  make cactus deal damage
-  make medkits spawn rate 20% instead of 8%
-  make air strike $400
-  make boss zombies a lot bigger than normal ones&
-  make them have 100hp
-  add giga zombie with 1k hp & 50 damage per hit and starts with 0% chance of spawn, +1% every wave
+  make giga zombies 10% smaller
+  make it so that only one air strike can be used per game, or after 5mins
+  click "e" to see list of all consumables
+  add tutorial for new players that shows them through how the game works
 
 check all of the above thoroughly for bugs

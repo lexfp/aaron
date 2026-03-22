@@ -172,12 +172,7 @@ function startGame(mode, mapId) {
             playerState.damageReduction = Math.min(0.9, playerState.damageReduction + (eq.damageReduction || 0));
         }
     }
-    for (const id of playerData.ownedEquipment) {
-        const eq = EQUIPMENT[id];
-        if (eq.hpRestore) playerState.hp = Math.min(playerState.maxHp, playerState.hp + eq.hpRestore);
-        if (eq.hpBoost) { playerState.maxHp += eq.hpBoost; playerState.hp += eq.hpBoost; }
-    }
-    playerData.ownedEquipment = [];
+    // Med kits and adrenaline are used in-game via Q/Y; don't consume at match start
 
     camera.position.set(0, 1.7, 0);
     scene.add(camera);
@@ -340,6 +335,7 @@ function animate() {
                     gameState.hostage.rescued = true;
                     scene.remove(gameState.hostage.mesh);
                     spawnExtractionZone(MAPS[gameState.currentMap].size);
+                    for (let i = 0; i < 3; i++) spawnZombie(false, true, 7.0);
                     document.getElementById('wave-hud').textContent = 'Get to Extraction (Green Pillar)!';
                     gameState.zombiesToSpawn += 100;
                     playPickup();
