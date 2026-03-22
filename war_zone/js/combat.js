@@ -5,7 +5,12 @@ import { WEAPONS, EQUIPMENT } from './data.js';
 import { playerData, playerState, savePlayerData, gameState } from './state.js';
 import { scene, camera, controls, raycaster, setWeaponSwingTime, obstacles } from './engine.js';
 import { playSound, playGunshot, playHit, playExplosion, playPickup } from './audio.js';
-import { updateHUD, addKillFeed, showRoundOverlay } from './ui.js';
+import { updateHUD, addKillFeed, showRoundOverlay, updateConsumablesPanel } from './ui.js';
+
+function refreshConsumablesIfOpen() {
+    const panel = document.getElementById('consumables-panel');
+    if (panel && panel.style.display === 'flex') updateConsumablesPanel();
+}
 import { getCurrentWeapon, hasSilencer, hasScope, reload, toggleZoom } from './weapons.js';
 import { killZombie, attractZombies, spawnPvPEnemy } from './entities.js';
 import { cb } from './callbacks.js';
@@ -186,6 +191,7 @@ export function useMedkit() {
     savePlayerData();
     playPickup();
     updateHUD();
+    refreshConsumablesIfOpen();
     return true;
 }
 
@@ -199,6 +205,7 @@ export function useAdrenaline() {
     savePlayerData();
     playPickup();
     updateHUD();
+    refreshConsumablesIfOpen();
     return true;
 }
 

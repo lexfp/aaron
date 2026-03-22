@@ -4,6 +4,7 @@ import { keys, controls } from './engine.js';
 import { gameState, playerState, playerData, savePlayerData } from './state.js';
 import { switchWeapon, reload, dropCurrentWeapon, toggleZoom, pickupWeapon } from './weapons.js';
 import { shoot, callAirstrike, useMedkit, useAdrenaline } from './combat.js';
+import { addKillFeed, updateConsumablesPanel } from './ui.js';
 import { camera } from './engine.js';
 import { WEAPONS } from './data.js';
 
@@ -32,7 +33,14 @@ export function setupInput(CHEATS, resumeGameFn) {
         if (key >= '1' && key <= '9') switchWeapon(parseInt(key) - 1);
         if (key === 'r') dropCurrentWeapon();
         if (key === 'g') reload();
-        if (key === 'e') tryPickup();
+        if (key === 'e') {
+            if (!tryPickup()) {
+                const panel = document.getElementById('consumables-panel');
+                const isVisible = panel.style.display === 'flex';
+                updateConsumablesPanel();
+                panel.style.display = isVisible ? 'none' : 'flex';
+            }
+        }
         if (key === 'escape') {
             if (gameState.paused) {
                 resumeGameFn();
@@ -46,13 +54,22 @@ export function setupInput(CHEATS, resumeGameFn) {
             if (!useMedkit()) switchWeapon(playerState.currentWeaponIndex - 1);
         }
         if (key === 'y') useAdrenaline();
+        if (key === 'c') switchWeapon(playerState.currentWeaponIndex + 1);
         if (key === 'f') {
             if (playerData.airstrikes > 0) {
-                playerData.airstrikes--;
-                savePlayerData();
-                callAirstrike();
-            } else {
-                switchWeapon(playerState.currentWeaponIndex + 1);
+                const AIRSTRIKE_COOLDOWN = 5 * 60 * 1000;
+                const now = performance.now();
+                const elapsed = gameState.airstrikeLastUsed !== null ? now - gameState.airstrikeLastUsed : Infinity;
+                if (elapsed >= AIRSTRIKE_COOLDOWN) {
+                    playerData.airstrikes--;
+                    savePlayerData();
+                    gameState.airstrikeLastUsed = now;
+                    callAirstrike();
+                    updateConsumablesPanel();
+                } else {
+                    const remaining = Math.ceil((AIRSTRIKE_COOLDOWN - elapsed) / 1000);
+                    addKillFeed(`Airstrike on cooldown: ${remaining}s`);
+                }
             }
         }
         if (key === 'z') toggleZoom();
@@ -106,12 +123,19 @@ export function setupInput(CHEATS, resumeGameFn) {
 }
 
 function tryPickup() {
+    if (gameState.mode === 'rescue' && gameState.hostage && !gameState.hostage.rescued) {
+        if (camera.position.distanceTo(gameState.hostage.mesh.position) < 5) {
+            // Hostage rescue handled by weapons.js callback; returning true suppresses consumables panel
+            return true;
+        }
+    }
     for (const dw of gameState.droppedWeapons) {
         if (camera.position.distanceTo(dw.mesh.position) < 3) {
             pickupWeapon(dw);
-            return;
+            return true;
         }
     }
+    return false;
 }
 
 export function checkInteractionPrompt() {

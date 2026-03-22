@@ -13,7 +13,7 @@ import { buildMap, spawnSinglePickup, spawnExtractionZone } from './map.js';
 import {
     showScreen, updateHomeStats, showShop, showLoadout,
     renderMapScreen, updateHUD, renderWeaponSlots,
-    showRoundOverlay, buildCheats
+    showRoundOverlay, buildCheats, initTutorial
 } from './ui.js';
 import { createWeaponModel, getCurrentWeapon, switchWeapon, updateReload, refillAllAmmo } from './weapons.js';
 import { spawnPvPEnemy, updatePvPEnemy, killZombie, spawnZombie, updateZombies, spawnHostage } from './entities.js';
@@ -188,6 +188,8 @@ function startGame(mode, mapId) {
     gameState.pickupSpawnTimer = 0;
     gameState.medkitSpawnTimer = 180;
 
+    gameState.airstrikeLastUsed = null;
+
     if (mode === 'zombie') {
         gameState.wave = 1;
         gameState.zombiesAlive = 0;
@@ -227,6 +229,7 @@ function quitToMenu() {
     document.getElementById('hud').style.display = 'none';
     document.getElementById('pause-menu').style.display = 'none';
     document.getElementById('round-overlay').style.display = 'none';
+    document.getElementById('consumables-panel').style.display = 'none';
     gameState.zombieEntities = [];
     gameState.droppedWeapons = [];
     gameState.fireZones = [];
@@ -455,4 +458,5 @@ document.getElementById('btn-shop').addEventListener('click', showShop);
 document.getElementById('btn-loadout').addEventListener('click', showLoadout);
 setupInput(CHEATS, resumeGame);
 updateHomeStats();
+initTutorial();
 animate();

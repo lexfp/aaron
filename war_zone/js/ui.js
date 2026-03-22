@@ -421,3 +421,89 @@ export function hideCheatMenu() {
     document.getElementById('cheat-menu').style.display = 'none';
 }
 window.hideCheatMenu = hideCheatMenu;
+
+// --- Consumables Panel ---
+
+export function updateConsumablesPanel() {
+    const panel = document.getElementById('consumables-panel');
+    if (!panel) return;
+    const medkits = playerData.ownedEquipment.filter(e => e === 'med_kit').length;
+    const adrenalines = playerData.ownedEquipment.filter(e => e === 'adrenaline').length;
+    const airstrikes = playerData.airstrikes || 0;
+
+    const AIRSTRIKE_COOLDOWN = 5 * 60 * 1000;
+    let airstrikeStatus = '';
+    if (gameState.airstrikeLastUsed !== null) {
+        const remaining = Math.max(0, Math.ceil((AIRSTRIKE_COOLDOWN - (performance.now() - gameState.airstrikeLastUsed)) / 1000));
+        airstrikeStatus = remaining > 0 ? ` <span style="color:#ff4444">(cooldown: ${remaining}s)</span>` : ' <span style="color:#00ff88">(ready)</span>';
+    }
+
+    panel.innerHTML = `
+        <div style="font-size:20px;font-weight:bold;color:#ffaa00;margin-bottom:12px;border-bottom:1px solid #555;padding-bottom:8px">Consumables [E]</div>
+        <div style="margin:8px 0"><span style="color:#00ff88">Med Kit</span> &times;${medkits} &nbsp;<span style="color:#888">Q to use</span></div>
+        <div style="margin:8px 0"><span style="color:#ff88ff">Adrenaline</span> &times;${adrenalines} &nbsp;<span style="color:#888">Y to use</span></div>
+        <div style="margin:8px 0"><span style="color:#ff4444">Airstrike</span> &times;${airstrikes}${airstrikeStatus} &nbsp;<span style="color:#888">F to use</span></div>
+        <div style="margin-top:12px;color:#666;font-size:13px">Press E to close</div>
+    `;
+}
+
+// --- Tutorial ---
+
+const TUTORIAL_STEPS = [
+    { title: 'Welcome to Warzone!', body: "You're a soldier fighting for survival. This tutorial will teach you the basics." },
+    { title: 'Movement', body: '<b>WASD</b> to move &bull; <b>Shift</b> to sprint &bull; <b>Space</b> to jump<br>On forest maps, hold <b>Space</b> near a tree trunk to climb it.' },
+    { title: 'Combat', body: '<b>Left Click</b> to shoot &bull; <b>Right Click</b> or <b>Z</b> to zoom<br><b>G</b> to reload &bull; Aim for the head for bonus damage!' },
+    { title: 'Weapons', body: '<b>1&ndash;9</b> or <b>mouse wheel</b> to switch weapons &bull; <b>C</b> switches forward<br><b>R</b> drops your current weapon &bull; <b>E</b> picks up dropped weapons.' },
+    { title: 'Consumables', body: '<b>Q</b> &ndash; Use Med Kit (restores 50 HP)<br><b>Y</b> &ndash; Use Adrenaline (temp HP boost)<br><b>F</b> &ndash; Call Airstrike (once per 5 min)<br><b>E</b> &ndash; View your consumables list' },
+    { title: 'Armor & Shop', body: 'Buy weapons, armor (helmet, breastplate, pants, boots), and consumables in the <b>Shop</b>.<br>Equip your gear before a mission in <b>Loadout</b>.' },
+    { title: 'Game Modes', body: '<b>Zombie Apocalypse</b> &ndash; Survive waves of zombies. Bosses & Giga Zombies spawn later.<br><b>Rescue Mission</b> &ndash; Find and extract the hostage.<br><b>PvP Arena</b> &ndash; Fight an AI opponent.' },
+    { title: "You're Ready!", body: "Kill zombies to earn money. Spend it in the shop between matches. Good luck!" }
+];
+
+let tutorialStep = 0;
+
+export function initTutorial() {
+    if (localStorage.getItem('warzone_tutorial_seen')) return;
+    showTutorial();
+}
+
+export function showTutorial() {
+    tutorialStep = 0;
+    renderTutorialStep();
+    document.getElementById('tutorial-overlay').style.display = 'flex';
+}
+window.showTutorial = showTutorial;
+
+function renderTutorialStep() {
+    const step = TUTORIAL_STEPS[tutorialStep];
+    const overlay = document.getElementById('tutorial-overlay');
+    const isLast = tutorialStep === TUTORIAL_STEPS.length - 1;
+    overlay.innerHTML = `
+        <div id="tutorial-box">
+            <div style="color:#888;font-size:13px;margin-bottom:6px">Step ${tutorialStep + 1} / ${TUTORIAL_STEPS.length}</div>
+            <h2 style="color:#ffaa00;margin:0 0 14px;font-size:26px">${step.title}</h2>
+            <p style="color:#ddd;font-size:16px;line-height:1.7;margin:0 0 24px">${step.body}</p>
+            <div style="display:flex;gap:12px;justify-content:center">
+                ${tutorialStep > 0 ? '<button class="menu-btn" style="font-size:15px;padding:8px 20px" onclick="tutorialPrev()">Back</button>' : ''}
+                <button class="menu-btn" style="font-size:15px;padding:8px 20px" onclick="tutorialSkip()">Skip</button>
+                <button class="menu-btn" style="font-size:15px;padding:8px 28px;background:#ffaa00;color:#000" onclick="tutorialNext()">${isLast ? 'Done' : 'Next'}</button>
+            </div>
+        </div>
+    `;
+}
+
+window.tutorialNext = function () {
+    if (tutorialStep < TUTORIAL_STEPS.length - 1) {
+        tutorialStep++;
+        renderTutorialStep();
+    } else {
+        tutorialSkip();
+    }
+};
+window.tutorialPrev = function () {
+    if (tutorialStep > 0) { tutorialStep--; renderTutorialStep(); }
+};
+window.tutorialSkip = function () {
+    localStorage.setItem('warzone_tutorial_seen', '1');
+    document.getElementById('tutorial-overlay').style.display = 'none';
+};

@@ -95,21 +95,21 @@ export const WEAPONS = {
 
 export const EQUIPMENT = {
     // Helmets
-    light_helmet: { name: 'Light Helmet', type: 'head', armor: 10, cost: 100, headshotReduction: 0.2 },
-    chainmail_helmet: { name: 'Chainmail Helmet', type: 'head', armor: 18, cost: 220, headshotReduction: 0.35 },
-    heavy_helmet: { name: 'Heavy Helmet', type: 'head', armor: 28, cost: 380, headshotReduction: 0.55 },
+    light_helmet: { name: 'Light Helmet', type: 'head', armor: 40, cost: 100, headshotReduction: 0.4 },
+    chainmail_helmet: { name: 'Chainmail Helmet', type: 'head', armor: 70, cost: 220, headshotReduction: 0.6 },
+    heavy_helmet: { name: 'Heavy Helmet', type: 'head', armor: 100, cost: 380, headshotReduction: 0.85 },
     // Breastplates
-    light_armor: { name: 'Light Breastplate', type: 'armor', armor: 25, cost: 300, damageReduction: 0.1 },
-    chainmail_breastplate: { name: 'Chainmail Breastplate', type: 'armor', armor: 50, cost: 550, damageReduction: 0.18 },
-    heavy_armor: { name: 'Heavy Breastplate', type: 'armor', armor: 75, cost: 800, damageReduction: 0.25 },
+    light_armor: { name: 'Light Breastplate', type: 'armor', armor: 100, cost: 300, damageReduction: 0.3 },
+    chainmail_breastplate: { name: 'Chainmail Breastplate', type: 'armor', armor: 175, cost: 550, damageReduction: 0.45 },
+    heavy_armor: { name: 'Heavy Breastplate', type: 'armor', armor: 250, cost: 800, damageReduction: 0.6 },
     // Pants
-    light_pants: { name: 'Light Pants', type: 'pants', armor: 10, cost: 100, damageReduction: 0.05 },
-    chainmail_pants: { name: 'Chainmail Pants', type: 'pants', armor: 18, cost: 200, damageReduction: 0.08 },
-    heavy_pants: { name: 'Heavy Pants', type: 'pants', armor: 25, cost: 300, damageReduction: 0.12 },
+    light_pants: { name: 'Light Pants', type: 'pants', armor: 50, cost: 100, damageReduction: 0.15 },
+    chainmail_pants: { name: 'Chainmail Pants', type: 'pants', armor: 90, cost: 200, damageReduction: 0.25 },
+    heavy_pants: { name: 'Heavy Pants', type: 'pants', armor: 130, cost: 300, damageReduction: 0.35 },
     // Boots
-    light_boots: { name: 'Light Boots', type: 'boots', armor: 5, cost: 75, damageReduction: 0.03 },
-    chainmail_boots: { name: 'Chainmail Boots', type: 'boots', armor: 10, cost: 150, damageReduction: 0.05 },
-    heavy_boots: { name: 'Heavy Boots', type: 'boots', armor: 15, cost: 200, damageReduction: 0.07 },
+    light_boots: { name: 'Light Boots', type: 'boots', armor: 30, cost: 75, damageReduction: 0.1 },
+    chainmail_boots: { name: 'Chainmail Boots', type: 'boots', armor: 60, cost: 150, damageReduction: 0.2 },
+    heavy_boots: { name: 'Heavy Boots', type: 'boots', armor: 90, cost: 200, damageReduction: 0.3 },
     // Consumables
     med_kit: { name: 'Med Kit', type: 'consumable', hpRestore: 50, cost: 100 },
     adrenaline: { name: 'Adrenaline', type: 'consumable', hpBoost: 25, cost: 250, tempHP: true },

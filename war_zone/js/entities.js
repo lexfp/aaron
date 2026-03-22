@@ -26,7 +26,7 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
     const angle = Math.random() * Math.PI * 2;
 
     let hp, damage, dropMoney, weaponId = null;
-    const bodySize = isGiga ? 4.5 : (isBoss ? 2.5 : 0.9);
+    const bodySize = isGiga ? 4.05 : (isBoss ? 2.5 : 0.9);
     let armoredEnemy = false;
 
     if (isGiga) {

@@ -18,6 +18,7 @@
         <button id="btn-pvp" class="menu-btn">PvP Arena</button>
         <button id="btn-shop" class="menu-btn">Shop</button>
         <button id="btn-loadout" class="menu-btn">Loadout</button>
+        <button class="menu-btn" style="font-size:15px;opacity:0.75" onclick="showTutorial()">Tutorial</button>
         <div class="player-stats">
             Money: <span id="home-money">$100</span><br>
             Missions: <span id="home-missions">0</span>
@@ -97,7 +98,12 @@
         <div id="damage-overlay"></div>
         <div id="cheat-console"><input id="cheat-input" placeholder="Enter cheat code..." /></div>
         <div id="cheat-msg"></div>
+        <!-- Consumables panel (toggled with E) -->
+        <div id="consumables-panel" style="display:none;position:fixed;top:50%;right:24px;transform:translateY(-50%);background:rgba(0,0,0,0.82);border:1px solid #444;border-radius:10px;padding:20px 28px;color:#fff;font-size:15px;z-index:500;flex-direction:column;min-width:220px;pointer-events:none;"></div>
     </div>
+
+    <!-- Tutorial overlay -->
+    <div id="tutorial-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;justify-content:center;align-items:center;"></div>
 
     <!-- Round overlay -->
     <div id="round-overlay">

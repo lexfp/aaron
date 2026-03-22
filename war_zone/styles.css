@@ -773,3 +773,14 @@ canvas {
     border-radius: 6px;
     width: 100%;
 }
+/* Tutorial */
+#tutorial-box {
+    background: linear-gradient(135deg, #0a0a1a, #1a1a2e);
+    border: 1px solid #444;
+    border-radius: 14px;
+    padding: 40px 50px;
+    max-width: 560px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 0 60px rgba(0,0,0,0.8);
+}
