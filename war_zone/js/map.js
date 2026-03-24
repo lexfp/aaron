@@ -29,6 +29,7 @@ export function buildMap(mapId) {
     const obs = [];
     setObstacles(obs);
     setWallBounds([]);
+    gameState.slopeMeshes = [];
 
     const map = MAPS[mapId];
     const size = map.size;
@@ -355,6 +356,7 @@ export function buildMap(mapId) {
             slope.position.set(bx, h / 4, bz);
             scene.add(slope);
             obs.push({ mesh: slope, isSlope: true });
+            gameState.slopeMeshes.push(slope);
         }
     } else if (mapId === 'forest') {
         const treeMat = new THREE.MeshStandardMaterial({ color: 0x3d2b1f });

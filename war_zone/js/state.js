@@ -83,5 +83,6 @@ export const gameState = {
     pvpEnemyScore: 0,
     pvpEnemy: null,
     // Airstrike cooldown: timestamp (ms) of last use, resets on new game
-    airstrikeLastUsed: null
+    airstrikeLastUsed: null,
+    slopeMeshes: []
 };

@@ -73,13 +73,23 @@ function checkCollision(newPos) {
             if (Math.sqrt(dx * dx + dz * dz) < obs.radius + playerCylRadius) return true;
         }
     }
+
+    // Slope steepness/height check: if the slope in front is too high, block horizontal movement
+    if (gameState.currentMap === 'mountain') {
+        const floorAtNew = getFloorHeight(newPos);
+        // If floor at new position is > 0.6m above our current feet position, it's too steep to walk up
+        if (floorAtNew > pMinY + 0.6) return true;
+    }
+
     return false;
 }
 
 const downRaycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
+const upRaycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
 
 function getFloorHeight(pos) {
     let floor = 0;
+    const feetY = pos.y - 1.7;
 
     // Check AABB boxes first
     for (const obs of obstacles) {
@@ -88,21 +98,34 @@ function getFloorHeight(pos) {
             if (pos.x >= obs.box.min.x - 0.3 && pos.x <= obs.box.max.x + 0.3 &&
                 pos.z >= obs.box.min.z - 0.3 && pos.z <= obs.box.max.z + 0.3) {
                 const obsTop = obs.box.max.y;
-                const feetY = pos.y - 1.7;
                 if (obsTop > floor && feetY >= obsTop - 0.8) floor = obsTop;
             }
         }
     }
 
-    // Check perfectly accurate sloped meshes via vertical Raycast
-    const slopeMeshes = obstacles.filter(o => o.isSlope).map(o => o.mesh);
+    // Check perfectly accurate sloped meshes via Dual Vertical Raycast
+    const slopeMeshes = gameState.slopeMeshes || [];
     if (slopeMeshes.length > 0) {
-        downRaycaster.set(new THREE.Vector3(pos.x, pos.y + 1.5, pos.z), new THREE.Vector3(0, -1, 0));
-        const hits = downRaycaster.intersectObjects(slopeMeshes);
-        if (hits.length > 0) {
-            const hitY = hits[0].point.y;
-            // Only step up onto slopes if we aren't clipping into a sheer massive cliff
-            if (hitY > floor && hitY < pos.y + 1.5) floor = hitY;
+        // 1. Cast from high up down to find any potential floors
+        downRaycaster.set(new THREE.Vector3(pos.x, 200, pos.z), new THREE.Vector3(0, -1, 0));
+        const downHits = downRaycaster.intersectObjects(slopeMeshes);
+        
+        // 2. Cast from feet up to find if there is a ceiling above us
+        upRaycaster.set(new THREE.Vector3(pos.x, feetY + 0.1, pos.z), new THREE.Vector3(0, 1, 0));
+        const upHits = upRaycaster.intersectObjects(slopeMeshes);
+        const ceilingY = upHits.length > 0 ? upHits[0].point.y : Infinity;
+
+        if (downHits.length > 0) {
+            // Pick the highest floor that is NOT above our head or blocked by a ceiling
+            for (const hit of downHits) {
+                const hitY = hit.point.y;
+                // A surface is only a floor if:
+                // - It's below any ceiling we just hit
+                // - It's within a reasonable 'anti-phasing' range above our feet (e.g. 5m) OR below our feet
+                if (hitY < ceilingY) {
+                    if (hitY > floor) floor = hitY;
+                }
+            }
         }
     }
 
