@@ -1,1 +1,4 @@
-make it so that i can't phase thru slopes in mountains map
+Survival gamemode. Limited ammo. Bigger map. Need food and water
+Also random weapon spawn
+And more zombie
+Not round based tho
