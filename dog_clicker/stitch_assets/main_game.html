@@ -6,6 +6,7 @@
   <meta charset="utf-8" />
   <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport" />
   <title>Paws &amp; Barks</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <!-- Tailwind CSS v3 with plugins -->
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <!-- Material Symbols for Bone/Paw Icons -->
@@ -195,6 +196,16 @@
     document.getElementById('shop-btn').addEventListener('click', () => {
       window.location.href = 'puppy_pro_shop.html';
     });
+
+    // Auto-Petter: if owned, auto-click every second (or faster with squeaky toy)
+    if (localStorage.getItem('autoPetterOwned') === 'true') {
+      const speed = parseInt(localStorage.getItem('autoPetterSpeed') || '1000');
+      setInterval(() => {
+        score += Math.floor(1 * multiplier);
+        scoreElement.innerText = score.toLocaleString();
+        localStorage.setItem('dogScore', score.toString());
+      }, speed);
+    }
   </script>
   <!-- END: GameLogic -->
 </body>

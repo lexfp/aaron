@@ -4,6 +4,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
 <title>Goodest Boy - Level Up</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <!-- Tailwind CSS CDN with Plugins -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <!-- Material Symbols for Dog/Paw icons -->
@@ -222,5 +223,27 @@
         window.location.href = 'main_game.html';
       }, 200);
     }
+
+    // Load real stats from localStorage
+    (function loadStats() {
+      const score = parseInt(localStorage.getItem('dogScore') || '0');
+      const mult = parseFloat(localStorage.getItem('wagMultiplier') || '1');
+      document.getElementById('clickCount').textContent = score.toLocaleString();
+      // Update bark power display
+      const barkPower = document.querySelector('[data-purpose="stats-card"] .grid span.text-xl');
+      if (barkPower) barkPower.innerHTML = 'x' + mult.toFixed(1) + ' <span class="material-symbols-outlined text-sm">trending_up</span>';
+      // Update breed rank based on score
+      const rankEl = document.querySelectorAll('[data-purpose="stats-card"] .grid > div')[1];
+      if (rankEl) {
+        const rankLabel = rankEl.querySelector('.text-xl');
+        if (rankLabel) {
+          if (score >= 1000000) rankLabel.textContent = 'Golden Alpha';
+          else if (score >= 100000) rankLabel.textContent = 'Top Dog';
+          else if (score >= 10000) rankLabel.textContent = 'Good Boy';
+          else if (score >= 1000) rankLabel.textContent = 'Pupper';
+          else rankLabel.textContent = 'Newborn Pup';
+        }
+      }
+    })();
   </script>
 </body></html>

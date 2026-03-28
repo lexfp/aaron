@@ -4,6 +4,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Pup Upgrade Shop</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <!-- Tailwind CSS CDN with plugins -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <!-- Material Symbols for dog-themed icons -->
@@ -158,4 +159,126 @@
 </button>
 </footer>
 <!-- END: Bottom Tab Navigation -->
+<script data-purpose="shop-logic">
+  // ── State from localStorage ──
+  let score = parseInt(localStorage.getItem('dogScore') || '0');
+  let multiplier = parseFloat(localStorage.getItem('wagMultiplier') || '1');
+  let autoPetterOwned = localStorage.getItem('autoPetterOwned') === 'true';
+  let kibbleOwned = localStorage.getItem('kibbleOwned') === 'true';
+  let squeakyOwned = localStorage.getItem('squeakyOwned') === 'true';
+  let kennelOwned = localStorage.getItem('kennelOwned') === 'true';
+  let autoPetterInterval = null;
+
+  const balanceEl = document.getElementById('player-balance');
+
+  // ── Shop items config ──
+  const ITEMS = [
+    { id: 'auto-petter',   cost: 500,    ownedKey: 'autoPetterOwned' },
+    { id: 'gourmet-kibble', cost: 1000,  ownedKey: 'kibbleOwned' },
+    { id: 'squeaky-toy',    cost: 5000,  ownedKey: 'squeakyOwned' },
+    { id: 'luxury-kennel',  cost: 25000, ownedKey: 'kennelOwned' },
+  ];
+
+  function updateBalanceDisplay() {
+    balanceEl.textContent = score.toLocaleString() + ' Barks';
+  }
+
+  function refreshShopUI() {
+    const cards = document.querySelectorAll('[data-purpose="upgrade-card"], [data-purpose="upgrade-card-locked"]');
+    cards.forEach((card, i) => {
+      const item = ITEMS[i];
+      if (!item) return;
+      const isOwned = localStorage.getItem(item.ownedKey) === 'true';
+      const canAfford = score >= item.cost;
+      const btn = card.querySelector('button');
+
+      if (isOwned) {
+        btn.textContent = 'OWNED';
+        btn.disabled = true;
+        btn.className = 'bg-green-500 text-white font-black px-6 py-2 rounded-full cursor-default';
+        card.className = card.className.replace('opacity-80', '').replace('bg-gray-50/80', 'bg-green-50');
+      } else if (canAfford) {
+        btn.textContent = 'BUY';
+        btn.disabled = false;
+        btn.className = 'buy-button bg-game-primary text-white font-black px-6 py-2 rounded-full shadow-lg shadow-game-primary/30 transition-all hover:brightness-105 active:scale-95';
+        card.setAttribute('data-purpose', 'upgrade-card');
+        // Un-lock visual style
+        card.className = 'bg-game-panel rounded-game-xl p-4 flex items-center shadow-sm border border-orange-50';
+        const iconWrap = card.querySelector('div > div:first-child');
+        if (iconWrap) iconWrap.classList.remove('grayscale');
+      } else {
+        btn.textContent = 'BUY';
+        btn.disabled = true;
+        btn.className = 'bg-gray-300 text-gray-500 font-black px-6 py-2 rounded-full cursor-not-allowed';
+      }
+    });
+  }
+
+  function buyItem(index) {
+    const item = ITEMS[index];
+    if (score < item.cost) return;
+    if (localStorage.getItem(item.ownedKey) === 'true') return;
+
+    score -= item.cost;
+    localStorage.setItem('dogScore', score.toString());
+    localStorage.setItem(item.ownedKey, 'true');
+
+    // Apply item effect
+    switch(index) {
+      case 0: // Auto-Petter: auto-click once per second
+        startAutoPetter();
+        break;
+      case 1: // Gourmet Kibble: 2x multiplier
+        multiplier *= 2;
+        localStorage.setItem('wagMultiplier', multiplier.toString());
+        break;
+      case 2: // Squeaky Toy: faster auto-petter (0.8s instead of 1s)
+        localStorage.setItem('autoPetterSpeed', '800');
+        // Restart auto-petter with new speed if active
+        if (localStorage.getItem('autoPetterOwned') === 'true') {
+          startAutoPetter();
+        }
+        break;
+      case 3: // Luxury Kennel: 5x multiplier
+        multiplier *= 5;
+        localStorage.setItem('wagMultiplier', multiplier.toString());
+        break;
+    }
+
+    updateBalanceDisplay();
+    refreshShopUI();
+  }
+
+  function startAutoPetter() {
+    if (autoPetterInterval) clearInterval(autoPetterInterval);
+    const speed = parseInt(localStorage.getItem('autoPetterSpeed') || '1000');
+    autoPetterInterval = setInterval(() => {
+      score += Math.floor(1 * multiplier);
+      localStorage.setItem('dogScore', score.toString());
+      updateBalanceDisplay();
+      refreshShopUI();
+    }, speed);
+  }
+
+  // ── Attach click handlers to buy buttons ──
+  function attachBuyHandlers() {
+    const cards = document.querySelectorAll('[data-purpose="upgrade-card"], [data-purpose="upgrade-card-locked"]');
+    cards.forEach((card, i) => {
+      const btn = card.querySelector('button');
+      if (btn) {
+        btn.addEventListener('click', () => buyItem(i));
+      }
+    });
+  }
+
+  // ── Init ──
+  updateBalanceDisplay();
+  attachBuyHandlers();
+  refreshShopUI();
+
+  // Start auto-petter if already owned
+  if (localStorage.getItem('autoPetterOwned') === 'true') {
+    startAutoPetter();
+  }
+</script>
 </body></html>

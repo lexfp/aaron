@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f0f23"/>
+      <stop offset="100%" stop-color="#1a1a35"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <!-- Grid lines -->
+  <line x1="26" y1="12" x2="26" y2="52" stroke="#334" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="40" y1="12" x2="40" y2="52" stroke="#334" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="12" y1="26" x2="52" y2="26" stroke="#334" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="12" y1="40" x2="52" y2="40" stroke="#334" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- X in top-left -->
+  <line x1="15" y1="15" x2="23" y2="23" stroke="#e74c3c" stroke-width="3" stroke-linecap="round"/>
+  <line x1="23" y1="15" x2="15" y2="23" stroke="#e74c3c" stroke-width="3" stroke-linecap="round"/>
+  <!-- O in center -->
+  <circle cx="33" cy="33" r="4.5" fill="none" stroke="#3498db" stroke-width="3"/>
+  <!-- X in bottom-right -->
+  <line x1="43" y1="43" x2="51" y2="51" stroke="#e74c3c" stroke-width="3" stroke-linecap="round"/>
+  <line x1="51" y1="43" x2="43" y2="51" stroke="#e74c3c" stroke-width="3" stroke-linecap="round"/>
+  <!-- O in top-right -->
+  <circle cx="47" cy="19" r="4.5" fill="none" stroke="#3498db" stroke-width="3"/>
+</svg>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2d1b4e"/>
+      <stop offset="100%" stop-color="#1a0f30"/>
+    </linearGradient>
+    <linearGradient id="paw" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f4a460"/>
+      <stop offset="100%" stop-color="#d2691e"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <!-- Main paw pad -->
+  <ellipse cx="32" cy="38" rx="12" ry="10" fill="url(#paw)"/>
+  <!-- Toe pads -->
+  <ellipse cx="20" cy="24" rx="5" ry="6" fill="url(#paw)" transform="rotate(-15, 20, 24)"/>
+  <ellipse cx="32" cy="20" rx="5" ry="6" fill="url(#paw)"/>
+  <ellipse cx="44" cy="24" rx="5" ry="6" fill="url(#paw)" transform="rotate(15, 44, 24)"/>
+  <!-- Shine/highlight -->
+  <ellipse cx="30" cy="35" rx="5" ry="4" fill="#fff" opacity="0.15"/>
+</svg>

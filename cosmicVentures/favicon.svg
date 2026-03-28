@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#02040f"/>
+      <stop offset="100%" stop-color="#0c1530"/>
+    </linearGradient>
+    <linearGradient id="rocket" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#00d4ff"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="flame" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff6b35"/>
+      <stop offset="100%" stop-color="#ffd700"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <!-- Stars -->
+  <circle cx="10" cy="12" r="1" fill="#fff" opacity="0.6"/>
+  <circle cx="52" cy="8" r="1.2" fill="#00d4ff" opacity="0.5"/>
+  <circle cx="8" cy="48" r="0.8" fill="#fff" opacity="0.4"/>
+  <circle cx="55" cy="52" r="1" fill="#7c3aed" opacity="0.5"/>
+  <circle cx="48" cy="28" r="0.8" fill="#fff" opacity="0.3"/>
+  <!-- Rocket body -->
+  <g transform="translate(32,32) rotate(-45) translate(-32,-32)">
+    <ellipse cx="32" cy="28" rx="7" ry="16" fill="url(#rocket)"/>
+    <!-- Nose cone -->
+    <path d="M32 12 L27 22 Q32 18 37 22 Z" fill="#00d4ff"/>
+    <!-- Fins -->
+    <path d="M25 36 L20 44 L25 40 Z" fill="#ff6b35"/>
+    <path d="M39 36 L44 44 L39 40 Z" fill="#ff6b35"/>
+    <!-- Window -->
+    <circle cx="32" cy="26" r="3" fill="#02040f"/>
+    <circle cx="32" cy="26" r="2" fill="#00d4ff" opacity="0.3"/>
+    <!-- Flame -->
+    <path d="M28 42 Q30 50 32 54 Q34 50 36 42 Z" fill="url(#flame)" opacity="0.9"/>
+    <path d="M30 42 Q31 48 32 51 Q33 48 34 42 Z" fill="#ffd700"/>
+  </g>
+</svg>

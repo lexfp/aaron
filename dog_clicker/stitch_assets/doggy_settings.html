@@ -4,6 +4,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Dog Game Settings</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <!-- Tailwind CSS v3 with plugins -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
@@ -90,12 +91,12 @@
 <!-- END: AudioControls -->
 <!-- BEGIN: InformationLinks -->
 <section class="grid grid-cols-2 gap-4 mb-10" data-purpose="navigation-links">
-<a class="btn-bounce cartoon-shadow bg-amber-500 text-white text-center py-4 rounded-2xl font-bold border-2 border-amber-600 block" href="#">
+<button class="btn-bounce cartoon-shadow bg-amber-500 text-white text-center py-4 rounded-2xl font-bold border-2 border-amber-600 block w-full" onclick="alert('🐾 Fetch Guide:\n\n• Tap the golden paw to earn Barks!\n• Visit the Treat Shop to buy upgrades.\n• Auto-Petter clicks for you every second.\n• Gourmet Kibble doubles your click power.\n• Reach milestones to prestige for bonuses!\n\nKeep tapping, good dog! 🐕')">
         Fetch Guide
-      </a>
-<a class="btn-bounce cartoon-shadow bg-orange-400 text-white text-center py-4 rounded-2xl font-bold border-2 border-orange-500 block" href="#">
+      </button>
+<button class="btn-bounce cartoon-shadow bg-orange-400 text-white text-center py-4 rounded-2xl font-bold border-2 border-orange-500 block w-full" onclick="alert('🐶 About Paws &amp; Barks\n\nA tail-wagging clicker adventure!\n\nTap, upgrade, and become the Top Dog.\nCollect Barks, buy treats, and prestige\nto earn permanent bonuses.\n\nMade with ❤️ and lots of belly rubs.')">
         About Pack
-      </a>
+      </button>
 </section>
 <!-- END: InformationLinks -->
 <!-- BEGIN: DangerZone -->
@@ -147,6 +148,11 @@
       console.log('Progress Resetting...');
       localStorage.removeItem('dogScore');
       localStorage.removeItem('wagMultiplier');
+      localStorage.removeItem('autoPetterOwned');
+      localStorage.removeItem('kibbleOwned');
+      localStorage.removeItem('squeakyOwned');
+      localStorage.removeItem('kennelOwned');
+      localStorage.removeItem('autoPetterSpeed');
       modal.classList.add('hidden');
       alert('Your progress has been buried!');
       window.location.href = 'main_game.html';
