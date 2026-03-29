@@ -178,7 +178,11 @@ export function buildMap(mapId) {
             addObstacle(obs, debrisMat, 0.8 + rng() * 1.2, 0.4 + rng() * 0.5, 0.8 + rng(), dx, 0.3, dz);
         }
     } else if (mapId === 'city') {
-        const buildingColors = [0xaaaaaa, 0x884444, 0x445588, 0x888855, 0x55aa66, 0x776655, 0xaa8866];
+        // Ruined city atmosphere — smoky orange haze
+        scene.fog = new THREE.Fog(0x3a2510, size * 0.15, size * 0.65);
+        scene.background = new THREE.Color(0x1a1008);
+
+        const buildingColors = [0x887766, 0x6a4040, 0x3a4a60, 0x706050, 0x446050, 0x604030, 0x806040];
         const winMat = new THREE.MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.35 });
         const roofMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.9 });
         const metalMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.6 });
@@ -197,10 +201,32 @@ export function buildMap(mapId) {
             // Jumpable window gap: bottom at 1.5m, top at 3.8m
             const winBottom = 1.5, winTop = 3.8, winGapW = 2.2;
 
-            // Front wall with door
-            addObstacle(obs, bMat, (w - doorW) / 2, h, thickness, bx - w / 2 + (w - doorW) / 4, h / 2, bz + d / 2);
-            addObstacle(obs, bMat, (w - doorW) / 2, h, thickness, bx + w / 2 - (w - doorW) / 4, h / 2, bz + d / 2);
-            addObstacle(obs, bMat, doorW, h - doorH, thickness, bx, h - (h - doorH) / 2, bz + d / 2);
+            // Front wall with door — side panels sometimes breached
+            const fPanelW = (w - doorW) / 2;
+            const fPanelXL = bx - w / 2 + fPanelW / 2;
+            const fPanelXR = bx + w / 2 - fPanelW / 2;
+            const fWallZ = bz + d / 2;
+            if (fPanelW > 3 && rng() < 0.5) {
+                // Breach in left front panel
+                const fbH = 1.5 + rng() * 2.0;
+                const fbBot = fbH * 0.3;
+                addObstacle(obs, bMat, fPanelW, fbBot, thickness, fPanelXL, fbBot / 2, fWallZ);
+                const fbTop = h - fbH;
+                if (fbTop > 0.3) addObstacle(obs, bMat, fPanelW, fbTop, thickness, fPanelXL, fbH + fbTop / 2, fWallZ);
+            } else {
+                addObstacle(obs, bMat, fPanelW, h, thickness, fPanelXL, h / 2, fWallZ);
+            }
+            if (fPanelW > 3 && rng() < 0.5) {
+                // Breach in right front panel
+                const fbH2 = 1.5 + rng() * 2.0;
+                const fbBot2 = fbH2 * 0.3;
+                addObstacle(obs, bMat, fPanelW, fbBot2, thickness, fPanelXR, fbBot2 / 2, fWallZ);
+                const fbTop2 = h - fbH2;
+                if (fbTop2 > 0.3) addObstacle(obs, bMat, fPanelW, fbTop2, thickness, fPanelXR, fbH2 + fbTop2 / 2, fWallZ);
+            } else {
+                addObstacle(obs, bMat, fPanelW, h, thickness, fPanelXR, h / 2, fWallZ);
+            }
+            addObstacle(obs, bMat, doorW, h - doorH, thickness, bx, h - (h - doorH) / 2, fWallZ);
             // Front windows (decorative)
             for (let fw = -1; fw <= 1; fw += 2) {
                 const wm = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.8), winMat);
@@ -230,12 +256,39 @@ export function buildMap(mapId) {
                 if (d > winGapW + 3) {
                     // Bottom sill
                     addObstacle(obs, bMat, thickness, winBottom, d, swx, winBottom / 2, bz);
-                    // Top lintel
+                    // Top lintel — sometimes blown out
                     if (h > winTop) {
-                        addObstacle(obs, bMat, thickness, h - winTop, d, swx, winTop + (h - winTop) / 2, bz);
+                        const lintelH = h - winTop;
+                        if (lintelH > 1.5 && rng() < 0.65) {
+                            const brW3 = 1.5 + rng() * 2.5;
+                            const brZ3 = bz + (rng() - 0.5) * (d - brW3 - 1.0);
+                            const ljD3 = (brZ3 - brW3 / 2) - (bz - d / 2);
+                            const rjD3 = (bz + d / 2) - (brZ3 + brW3 / 2);
+                            if (ljD3 > 0.3) addObstacle(obs, bMat, thickness, lintelH, ljD3, swx, winTop + lintelH / 2, bz - d / 2 + ljD3 / 2);
+                            if (rjD3 > 0.3) addObstacle(obs, bMat, thickness, lintelH, rjD3, swx, winTop + lintelH / 2, bz + d / 2 - rjD3 / 2);
+                            for (let r = 0; r < 3; r++) {
+                                const rc = new THREE.Mesh(new THREE.BoxGeometry(0.4 + rng() * 0.8, 0.3 + rng() * 0.5, 0.4 + rng() * 0.7), bMat);
+                                rc.position.set(swx + sideSign[sw] * (0.3 + rng() * 1.5), winTop + 0.3 + rng() * 0.5, brZ3 + (rng() - 0.5) * brW3 * 0.8);
+                                rc.rotation.y = rng() * Math.PI; rc.rotation.x = (rng() - 0.5) * 0.6;
+                                scene.add(rc);
+                            }
+                        } else {
+                            addObstacle(obs, bMat, thickness, lintelH, d, swx, winTop + lintelH / 2, bz);
+                        }
                     }
-                    // Left jamb
-                    addObstacle(obs, bMat, thickness, winTop - winBottom, (d - winGapW) / 2, swx, winBottom + (winTop - winBottom) / 2, bz - winGapW / 2 - (d - winGapW) / 4);
+                    // Left jamb — sometimes breached
+                    const lJambD = (d - winGapW) / 2;
+                    const lJambZ = bz - winGapW / 2 - lJambD / 2;
+                    if (lJambD > 2.0 && rng() < 0.5) {
+                        const brD4 = 0.8 + rng() * (lJambD * 0.6);
+                        const brZ4 = lJambZ + (rng() - 0.5) * (lJambD - brD4) * 0.6;
+                        const b4L = (brZ4 - brD4 / 2) - (lJambZ - lJambD / 2);
+                        const b4R = (lJambZ + lJambD / 2) - (brZ4 + brD4 / 2);
+                        if (b4L > 0.2) addObstacle(obs, bMat, thickness, winTop - winBottom, b4L, swx, winBottom + (winTop - winBottom) / 2, lJambZ - lJambD / 2 + b4L / 2);
+                        if (b4R > 0.2) addObstacle(obs, bMat, thickness, winTop - winBottom, b4R, swx, winBottom + (winTop - winBottom) / 2, lJambZ + lJambD / 2 - b4R / 2);
+                    } else {
+                        addObstacle(obs, bMat, thickness, winTop - winBottom, lJambD, swx, winBottom + (winTop - winBottom) / 2, lJambZ);
+                    }
                     // Right jamb
                     addObstacle(obs, bMat, thickness, winTop - winBottom, (d - winGapW) / 2, swx, winBottom + (winTop - winBottom) / 2, bz + winGapW / 2 + (d - winGapW) / 4);
                     // Glass pane (visual, no collision)
@@ -243,13 +296,64 @@ export function buildMap(mapId) {
                     sideGlass.rotation.y = Math.PI / 2 * (sw === 0 ? -1 : 1);
                     sideGlass.position.set(swx, winBottom + (winTop - winBottom) / 2, bz);
                     scene.add(sideGlass);
+                } else if (rng() < 0.8) {
+                    // Breach: blown-out hole in wall
+                    const brH = 1.8 + rng() * 2.2;
+                    const brD = 1.8 + rng() * 2.5;
+                    const brZ = bz + (rng() - 0.5) * d * 0.4;
+                    // Bottom sill
+                    addObstacle(obs, bMat, thickness, brH * 0.35, d, swx, brH * 0.175, bz);
+                    // Top section
+                    const topH = h - brH;
+                    if (topH > 0.4) addObstacle(obs, bMat, thickness, topH, d, swx, brH + topH / 2, bz);
+                    // Left jamb
+                    const lJambD = (brZ - brD / 2) - (bz - d / 2);
+                    if (lJambD > 0.3) addObstacle(obs, bMat, thickness, brH, lJambD, swx, brH / 2, bz - d / 2 + lJambD / 2);
+                    // Right jamb
+                    const rJambD = (bz + d / 2) - (brZ + brD / 2);
+                    if (rJambD > 0.3) addObstacle(obs, bMat, thickness, brH, rJambD, swx, brH / 2, bz + d / 2 - rJambD / 2);
+                    // Rubble spilled through breach
+                    for (let r = 0; r < 4; r++) {
+                        const rChunk = new THREE.Mesh(new THREE.BoxGeometry(0.4 + rng() * 0.8, 0.25 + rng() * 0.5, 0.4 + rng() * 0.7), bMat);
+                        rChunk.position.set(swx + sideSign[sw] * (0.3 + rng() * 2.0), 0.2 + rng() * 0.2, brZ + (rng() - 0.5) * brD);
+                        rChunk.rotation.y = rng() * Math.PI;
+                        rChunk.rotation.x = (rng() - 0.5) * 0.6;
+                        scene.add(rChunk);
+                    }
                 } else {
                     addObstacle(obs, bMat, thickness, h, d, swx, h / 2, bz);
                 }
             }
 
-            // Roof
-            addObstacle(obs, roofMat, w, thickness, d, bx, h + thickness / 2, bz);
+            // Roof — sometimes damaged with holes
+            if (rng() < 0.6) {
+                addObstacle(obs, roofMat, w, thickness, d, bx, h + thickness / 2, bz);
+            } else {
+                const hx = bx + (rng() - 0.5) * w * 0.4;
+                const hz = bz + (rng() - 0.5) * d * 0.4;
+                const holeW = 2.5 + rng() * 3.5;
+                const holeD = 2.5 + rng() * 3.5;
+                const lw = (hx - holeW / 2) - (bx - w / 2);
+                if (lw > 0.4) addObstacle(obs, roofMat, lw, thickness, d, bx - w / 2 + lw / 2, h + thickness / 2, bz);
+                const rw2 = (bx + w / 2) - (hx + holeW / 2);
+                if (rw2 > 0.4) addObstacle(obs, roofMat, rw2, thickness, d, bx + w / 2 - rw2 / 2, h + thickness / 2, bz);
+                const fd = (hz - holeD / 2) - (bz - d / 2);
+                if (fd > 0.4) addObstacle(obs, roofMat, holeW, thickness, fd, hx, h + thickness / 2, bz - d / 2 + fd / 2);
+                const bd = (bz + d / 2) - (hz + holeD / 2);
+                if (bd > 0.4) addObstacle(obs, roofMat, holeW, thickness, bd, hx, h + thickness / 2, bz + d / 2 - bd / 2);
+                // Jagged chunks around the hole edge
+                for (let e = 0; e < 6; e++) {
+                    const angle = (e / 6) * Math.PI * 2;
+                    const ex = hx + Math.cos(angle) * (holeW / 2 + rng() * 0.6);
+                    const ez = hz + Math.sin(angle) * (holeD / 2 + rng() * 0.6);
+                    const ew = 0.3 + rng() * 0.8;
+                    const chunk = new THREE.Mesh(new THREE.BoxGeometry(ew, thickness + rng() * 0.5, ew), roofMat);
+                    chunk.position.set(ex, h + thickness * 0.7, ez);
+                    chunk.rotation.y = rng() * Math.PI;
+                    chunk.rotation.z = (rng() - 0.5) * 0.9;
+                    scene.add(chunk);
+                }
+            }
             // Roof details: AC unit
             if (rng() > 0.5) {
                 addObstacle(obs, new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.4 }), 2, 1.2, 1.5, bx + (rng() - 0.5) * (w - 3), h + thickness + 0.6, bz + (rng() - 0.5) * (d - 3));
@@ -341,6 +445,51 @@ export function buildMap(mapId) {
                 new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0x443300 }));
             lampMesh.position.set(lx, 5.7, lz);
             scene.add(lampMesh);
+        }
+
+        // Scattered rubble piles
+        const rubbleMat = new THREE.MeshStandardMaterial({ color: 0x665544, roughness: 1.0 });
+        const concChunkMat = new THREE.MeshStandardMaterial({ color: 0x887766, roughness: 0.95 });
+        for (let i = 0; i < 80; i++) {
+            const rx = (rng() - 0.5) * size * 1.5;
+            const rz = (rng() - 0.5) * size * 1.5;
+            if (Math.abs(rx) < 8 && Math.abs(rz) < 8) continue;
+            const rw = 0.3 + rng() * 1.8, rh = 0.15 + rng() * 0.7, rd = 0.3 + rng() * 1.4;
+            const chunk = new THREE.Mesh(new THREE.BoxGeometry(rw, rh, rd), rng() < 0.5 ? rubbleMat : concChunkMat);
+            chunk.position.set(rx, rh / 2, rz);
+            chunk.rotation.y = rng() * Math.PI * 2;
+            chunk.rotation.x = (rng() - 0.5) * 0.45;
+            chunk.rotation.z = (rng() - 0.5) * 0.45;
+            chunk.castShadow = true;
+            scene.add(chunk);
+            if (rw > 1.0 || rh > 0.45) obs.push({ mesh: chunk, box: new THREE.Box3().setFromObject(chunk) });
+        }
+
+        // Impact craters
+        const craterGroundMat = new THREE.MeshStandardMaterial({ color: 0x111008, roughness: 1.0 });
+        const craterRimMat = new THREE.MeshStandardMaterial({ color: 0x554433, roughness: 1.0 });
+        for (let i = 0; i < 12; i++) {
+            const cx = (rng() - 0.5) * size * 1.3;
+            const cz = (rng() - 0.5) * size * 1.3;
+            if (Math.abs(cx) < 10 && Math.abs(cz) < 10) continue;
+            const craterR = 1.8 + rng() * 3.5;
+            // Scorched disc on ground
+            const disc = new THREE.Mesh(new THREE.CylinderGeometry(craterR, craterR * 1.15, 0.04, 10), craterGroundMat);
+            disc.position.set(cx, 0.02, cz);
+            scene.add(disc);
+            // Rubble ring around crater edge
+            const numChunks = 5 + Math.floor(rng() * 5);
+            for (let c = 0; c < numChunks; c++) {
+                const angle = (c / numChunks) * Math.PI * 2 + rng() * 0.6;
+                const dist = craterR * (0.85 + rng() * 0.55);
+                const cw = 0.3 + rng() * 1.1, ch = 0.2 + rng() * 0.6, cd = 0.3 + rng() * 0.9;
+                const rim = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), craterRimMat);
+                rim.position.set(cx + Math.cos(angle) * dist, ch / 2, cz + Math.sin(angle) * dist);
+                rim.rotation.y = rng() * Math.PI * 2;
+                rim.rotation.x = (rng() - 0.5) * 0.7;
+                rim.castShadow = true;
+                scene.add(rim);
+            }
         }
     } else if (mapId === 'mountain') {
         const rockMat = new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.95 });

@@ -157,9 +157,13 @@ function startGame(mode, mapId) {
         }
     }
 
+    const bonusHp = (playerData.stats?.health || 0) * 5;
     resetPlayerState({
         weapons: initialWeapons,
-        maxSlots
+        maxSlots,
+        hp: 100 + bonusHp,
+        maxHp: 100 + bonusHp,
+        speedMult: 1 + (playerData.stats?.speed || 0) * 0.02
     });
 
     for (const wid of playerState.weapons) {

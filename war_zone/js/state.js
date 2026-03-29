@@ -14,7 +14,11 @@ function defaultPlayerData() {
         equippedPants: null,
         equippedBoots: null,
         reserveAmmo: {},
-        airstrikes: 0
+        airstrikes: 0,
+        level: 1,
+        xp: 0,
+        statPoints: 0,
+        stats: { health: 0, speed: 0, damage: 0 }
     };
 }
 
@@ -30,7 +34,8 @@ function loadPlayerData() {
                 weaponAttachments: (typeof d.weaponAttachments === 'object' && d.weaponAttachments !== null) ? d.weaponAttachments : def.weaponAttachments,
                 weaponUsage: (typeof d.weaponUsage === 'object' && d.weaponUsage !== null) ? d.weaponUsage : def.weaponUsage,
                 equippedLoadout: Array.isArray(d.equippedLoadout) ? d.equippedLoadout : def.equippedLoadout,
-                reserveAmmo: (typeof d.reserveAmmo === 'object' && d.reserveAmmo !== null) ? d.reserveAmmo : def.reserveAmmo
+                reserveAmmo: (typeof d.reserveAmmo === 'object' && d.reserveAmmo !== null) ? d.reserveAmmo : def.reserveAmmo,
+                stats: (typeof d.stats === 'object' && d.stats !== null) ? { ...def.stats, ...d.stats } : def.stats
             };
         }
     } catch (e) { }
@@ -86,3 +91,26 @@ export const gameState = {
     airstrikeLastUsed: null,
     slopeMeshes: []
 };
+
+// --- Leveling ---
+
+export function xpToNextLevel(level) {
+    return level * 100;
+}
+
+// awardXP is set via callback to avoid circular dep (ui imports state, state would import ui)
+let _awardXPImpl = null;
+export function setAwardXPImpl(fn) { _awardXPImpl = fn; }
+
+export function awardXP(amount) {
+    playerData.xp += amount;
+    let didLevelUp = false;
+    while (playerData.xp >= xpToNextLevel(playerData.level)) {
+        playerData.xp -= xpToNextLevel(playerData.level);
+        playerData.level++;
+        playerData.statPoints += 5;
+        didLevelUp = true;
+    }
+    savePlayerData();
+    if (_awardXPImpl) _awardXPImpl(didLevelUp);
+}

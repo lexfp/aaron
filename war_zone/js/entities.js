@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { WEAPONS, MAPS } from './data.js';
-import { playerData, playerState, savePlayerData, gameState } from './state.js';
+import { playerData, playerState, savePlayerData, gameState, awardXP } from './state.js';
 import { scene, camera, obstacles } from './engine.js';
 import { playGunshot } from './audio.js';
 import { addKillFeed, updateHUD, showRoundOverlay } from './ui.js';
@@ -241,6 +241,8 @@ export function killZombie(z, idx) {
     }
 
     addKillFeed(z.isGiga ? 'GIGA ZOMBIE SLAIN!' : (z.isBoss ? 'Boss Zombie' : 'Zombie'), z.isGiga ? '#ff00ff' : '#fff');
+    const xp = z.isGiga ? 200 : z.isBoss ? 50 : (gameState.mode === 'rescue' ? 15 : 10);
+    awardXP(xp);
     savePlayerData();
 }
 
