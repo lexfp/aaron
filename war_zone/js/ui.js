@@ -119,7 +119,7 @@ function renderAttachmentShop() {
         const weaponBtns = eligible.length > 0 && canAfford
             ? eligible.map(wid => `<button class="buy-btn" style="font-size:11px;margin:2px" onclick="attachToWeapon('${id}','${wid}')">Attach to ${WEAPONS[wid].name}</button>`).join('')
             : eligible.length === 0 ? '<div style="color:#888;font-size:11px">No eligible weapons</div>'
-            : '<div style="color:#f88;font-size:11px">Not enough money</div>';
+                : '<div style="color:#f88;font-size:11px">Not enough money</div>';
         item.innerHTML = `
             <h3>${a.name}</h3><div class="price">$${a.cost}</div>
             <div class="stats">${a.description}</div>
@@ -456,7 +456,7 @@ const TUTORIAL_STEPS = [
     { title: 'Combat', body: '<b>Left Click</b> to shoot &bull; <b>Right Click</b> or <b>Z</b> to zoom<br><b>G</b> to reload &bull; Aim for the head for bonus damage!' },
     { title: 'Weapons', body: '<b>1&ndash;9</b> or <b>mouse wheel</b> to switch weapons &bull; <b>C</b> switches forward<br><b>R</b> drops your current weapon &bull; <b>E</b> picks up dropped weapons.' },
     { title: 'Consumables', body: '<b>Q</b> &ndash; Use Med Kit (restores 50 HP)<br><b>Y</b> &ndash; Use Adrenaline (temp HP boost)<br><b>F</b> &ndash; Call Airstrike (once per 5 min)<br><b>E</b> &ndash; View your consumables list' },
-    { title: 'Armor & Shop', body: 'Buy weapons, armor (helmet, breastplate, pants, boots), and consumables in the <b>Shop</b>.<br>Equip your gear before a mission in <b>Loadout</b>.' },
+    { title: 'Armor & Shop', body: 'Buy weapons, armor (helmet, breastplate, pants, boots), and consumables in the <b>Shop</b> for an up to 90% damage reduction.<br>Equip your gear before a mission in <b>Loadout</b>.' },
     { title: 'Game Modes', body: '<b>Zombie Apocalypse</b> &ndash; Survive waves of zombies. Bosses & Giga Zombies spawn later.<br><b>Rescue Mission</b> &ndash; Find and extract the hostage.<br><b>PvP Arena</b> &ndash; Fight an AI opponent.' },
     { title: "You're Ready!", body: "Kill zombies to earn money. Spend it in the shop between matches. Good luck!" }
 ];

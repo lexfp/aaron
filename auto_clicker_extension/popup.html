@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto Clicker Pro</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 19V5M5 12l7-7 7 7" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </div>
+    <div class="header-text">
+      <h1>AUTO CLICKER</h1>
+      <span class="subtitle">PRO</span>
+    </div>
+    <div class="status-dot" id="statusDot" title="Inactive"></div>
+  </header>
+
+  <!-- Interval Setting -->
+  <section class="card">
+    <label class="card-label">Click Interval</label>
+    <div class="input-row">
+      <input type="number" id="interval" class="input" min="0.1" step="0.1" value="100" placeholder="100">
+      <span class="unit">ms</span>
+    </div>
+    <div class="slider-row">
+      <button class="preset" data-val="0.1">0.1ms</button>
+      <button class="preset" data-val="1">1ms</button>
+      <button class="preset" data-val="10">10ms</button>
+      <button class="preset" data-val="50">50ms</button>
+      <button class="preset" data-val="100">100ms</button>
+      <button class="preset" data-val="500">500ms</button>
+    </div>
+    <p class="note" id="speedNote"></p>
+  </section>
+
+  <!-- Click Mode -->
+  <section class="card">
+    <label class="card-label">Click Mode</label>
+    <div class="toggle-row">
+      <button class="toggle-btn active" id="modeUnlimited" data-mode="unlimited">∞ Until Stopped</button>
+      <button class="toggle-btn" id="modeCount" data-mode="count">⊞ Set Count</button>
+    </div>
+    <div class="count-row hidden" id="countRow">
+      <input type="number" id="clickCount" class="input" min="1" step="1" value="100" placeholder="100">
+      <span class="unit">clicks</span>
+    </div>
+  </section>
+
+  <!-- Keybinds -->
+  <section class="card">
+    <label class="card-label">Keybinds</label>
+    <div class="keybind-row">
+      <span class="keybind-label">▶ Start</span>
+      <button class="keybind-btn" id="startKeyBtn" title="Click to record">F6</button>
+    </div>
+    <div class="keybind-row">
+      <span class="keybind-label">■ Stop</span>
+      <button class="keybind-btn" id="stopKeyBtn" title="Click to record">F7</button>
+    </div>
+    <p class="note">Click a button then press your desired key combo</p>
+  </section>
+
+  <!-- Click Type -->
+  <section class="card">
+    <label class="card-label">Click Button</label>
+    <div class="toggle-row">
+      <button class="toggle-btn active" id="btnLeft" data-click="left">Left</button>
+      <button class="toggle-btn" id="btnMiddle" data-click="middle">Middle</button>
+      <button class="toggle-btn" id="btnRight" data-click="right">Right</button>
+    </div>
+  </section>
+
+  <!-- Status & Controls -->
+  <section class="card status-card">
+    <div class="stats-row">
+      <div class="stat">
+        <span class="stat-label">Status</span>
+        <span class="stat-value" id="statusText">Idle</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Clicks</span>
+        <span class="stat-value" id="clicksDone">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">CPS</span>
+        <span class="stat-value" id="cpsDisplay">0</span>
+      </div>
+    </div>
+  </section>
+
+
+
+  <script src="popup.js"></script>
+</body>
+
+</html>
