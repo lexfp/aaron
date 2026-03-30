@@ -346,7 +346,29 @@ function animate() {
         camera.position.z += moveVec.z;
         if (checkCollision(camera.position)) camera.position.z = origZ;
 
+        const prevCamY = camera.position.y;
         camera.position.y += velocity.y * dt;
+
+        // CCD: if falling on mountain map, sweep the vertical path for slope surfaces
+        // so the player can't phase through them when moving fast
+        if (gameState.currentMap === 'mountain' && velocity.y < 0) {
+            const prevFeetY = prevCamY - 1.7;
+            const newFeetY  = camera.position.y - 1.7;
+            downRaycaster.set(
+                new THREE.Vector3(camera.position.x, prevFeetY + 0.05, camera.position.z),
+                new THREE.Vector3(0, -1, 0)
+            );
+            const sweepHits = downRaycaster.intersectObjects(gameState.slopeMeshes || []);
+            for (const hit of sweepHits) {
+                // Surface was crossed: it was above new feet but below old feet
+                if (hit.point.y >= newFeetY && hit.point.y < prevFeetY) {
+                    camera.position.y = hit.point.y + 1.7;
+                    velocity.y = 0;
+                    setCanJump(true);
+                    break;
+                }
+            }
+        }
 
         let targetFloorY = getFloorHeight(camera.position) + 1.7;
 
