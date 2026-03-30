@@ -88,7 +88,12 @@ const downRaycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3
 const upRaycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
 
 function getFloorHeight(pos) {
+    // Default ground is y=0. Inside a crater pit the ground is lower.
     let floor = 0;
+    for (const pit of (gameState.craterPits || [])) {
+        const dx = pos.x - pit.cx, dz = pos.z - pit.cz;
+        if (dx * dx + dz * dz < pit.r * pit.r) { floor = -pit.depth; break; }
+    }
     const feetY = pos.y - 1.7;
 
     // Check AABB boxes first
@@ -220,7 +225,7 @@ function startGame(mode, mapId) {
     if (mode === 'zombie') {
         gameState.wave = 1;
         gameState.zombiesAlive = 0;
-        gameState.zombiesToSpawn = 90;
+        gameState.zombiesToSpawn = 450;
         gameState.zombieSpawnTimer = 0;
         document.getElementById('wave-hud').style.display = 'block';
         document.getElementById('wave-hud').textContent = 'Wave 1';
@@ -262,6 +267,7 @@ function quitToMenu() {
     gameState.fireZones = [];
     gameState.ammoPickups = [];
     gameState.pvpEnemy = null;
+    gameState.craterPits = [];
     showScreen('homepage');
 }
 window.quitToMenu = quitToMenu;

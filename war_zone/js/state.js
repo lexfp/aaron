@@ -89,7 +89,8 @@ export const gameState = {
     pvpEnemy: null,
     // Airstrike cooldown: timestamp (ms) of last use, resets on new game
     airstrikeLastUsed: null,
-    slopeMeshes: []
+    slopeMeshes: [],
+    craterPits: []   // { cx, cz, r, depth } — registered by buildMap, read by getFloorHeight
 };
 
 // --- Leveling ---

@@ -465,7 +465,8 @@ export function buildCheats() {
         'kill': () => { cb.killAllEnemies(); showCheatMsg('All enemies killed'); },
         'heal': () => { playerState.hp = playerState.maxHp; showCheatMsg('Healed'); },
         'speed': () => { playerState.speedMult = playerState.speedMult === 1 ? 2 : 1; showCheatMsg('Speed x' + playerState.speedMult); },
-        'levelup': () => { playerData.level++; playerData.statPoints += 5; savePlayerData(); showCheatMsg(`Level Up! Now LVL ${playerData.level} (+5 pts)`); }
+        'levelup': () => { playerData.level++; playerData.statPoints += 5; savePlayerData(); showCheatMsg(`Level Up! Now LVL ${playerData.level} (+5 pts)`); },
+        'reset': () => { window.startGame(gameState.mode, gameState.currentMap); showCheatMsg('Game Reset!'); }
     };
 }
 

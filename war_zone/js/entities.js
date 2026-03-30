@@ -338,7 +338,7 @@ export function updateZombies(dt) {
     // Wave complete (zombie invasion only — rescue uses a fixed horde count)
     if (gameState.mode === 'zombie' && gameState.zombiesAlive <= 0 && gameState.zombiesToSpawn <= 0) {
         gameState.wave++;
-        gameState.zombiesToSpawn = (70 + gameState.wave * 45) * 3;
+        gameState.zombiesToSpawn = (70 + gameState.wave * 45) * 15;
         document.getElementById('wave-hud').textContent = 'Wave ' + gameState.wave;
         showRoundOverlay('Wave ' + gameState.wave, 'Incoming!', 2000);
     }

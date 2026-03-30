@@ -30,6 +30,7 @@ export function buildMap(mapId) {
     setObstacles(obs);
     setWallBounds([]);
     gameState.slopeMeshes = [];
+    gameState.craterPits = [];
 
     const map = MAPS[mapId];
     const size = map.size;
@@ -189,14 +190,123 @@ export function buildMap(mapId) {
         const crateMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.8 });
         const graffitiColors = [0xff2222, 0x22ff22, 0x2222ff, 0xffff22, 0xff22ff];
 
-        for (let i = 0; i < 80; i++) {
-            const w = 12 + rng() * 10, h = 8 + rng() * 8, d = 12 + rng() * 10;
-            const bx = (rng() - 0.5) * size * 1.5;
-            const bz = (rng() - 0.5) * size * 1.5;
-            if (Math.abs(bx) < 15 && Math.abs(bz) < 15) continue;
+        // === CITY GRID LAYOUT ===
+        const blockPitch = 50;      // center-to-center spacing between city block rows/cols
+        const roadSurfW = 10;       // asphalt road width
+        const swalkW = 2.5;         // sidewalk width on each side of road
+        const mapR = size * 0.95;   // how far roads extend (near boundary)
+        // Roads at x,z = {-50, 0, +50}; Block centers at x,z = {-75, -25, +25, +75}
 
-            const bMat = new THREE.MeshStandardMaterial({ color: buildingColors[Math.floor(rng() * buildingColors.length)], roughness: 0.8 });
-            const thickness = 0.5;
+        // --- Road & sidewalk materials ---
+        const asphaltMat = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.95 });
+        const curbMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.85 });
+        const markingMat = new THREE.MeshBasicMaterial({ color: 0xddcc00 });
+
+        // N-S roads (parallel to Z axis, at x = -50, 0, +50)
+        const nsDashPos = [];
+        for (let rxi = -1; rxi <= 1; rxi++) {
+            const rx = rxi * blockPitch;
+            const rMesh = new THREE.Mesh(new THREE.PlaneGeometry(roadSurfW, mapR * 2), asphaltMat);
+            rMesh.rotation.x = -Math.PI / 2;
+            rMesh.position.set(rx, 0.01, 0);
+            scene.add(rMesh);
+            // Collect dash positions (drawn later as one InstancedMesh)
+            for (let dz = -mapR + 3; dz < mapR; dz += 7) nsDashPos.push(rx, dz);
+            // Sidewalks + curb strips on each side
+            for (const side of [-1, 1]) {
+                const swx = rx + side * (roadSurfW / 2 + swalkW / 2);
+                const sw = new THREE.Mesh(new THREE.PlaneGeometry(swalkW, mapR * 2), curbMat);
+                sw.rotation.x = -Math.PI / 2;
+                sw.position.set(swx, 0.05, 0);
+                scene.add(sw);
+                const curb = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.12, mapR * 2), curbMat);
+                curb.position.set(rx + side * (roadSurfW / 2), 0.06, 0);
+                scene.add(curb);
+            }
+        }
+
+        // E-W roads (parallel to X axis, at z = -50, 0, +50)
+        const ewDashPos = [];
+        for (let rzi = -1; rzi <= 1; rzi++) {
+            const rz = rzi * blockPitch;
+            const rMesh = new THREE.Mesh(new THREE.PlaneGeometry(mapR * 2, roadSurfW), asphaltMat);
+            rMesh.rotation.x = -Math.PI / 2;
+            rMesh.position.set(0, 0.01, rz);
+            scene.add(rMesh);
+            // Collect dash positions
+            for (let dx = -mapR + 3; dx < mapR; dx += 7) ewDashPos.push(dx, rz);
+            // Sidewalks + curb strips
+            for (const side of [-1, 1]) {
+                const swz = rz + side * (roadSurfW / 2 + swalkW / 2);
+                const sw = new THREE.Mesh(new THREE.PlaneGeometry(mapR * 2, swalkW), curbMat);
+                sw.rotation.x = -Math.PI / 2;
+                sw.position.set(0, 0.05, swz);
+                scene.add(sw);
+                const curb = new THREE.Mesh(new THREE.BoxGeometry(mapR * 2, 0.12, 0.15), curbMat);
+                curb.position.set(0, 0.06, rz + side * (roadSurfW / 2));
+                scene.add(curb);
+            }
+        }
+
+        // Draw all road dashes as two InstancedMeshes (one per orientation) — big draw-call saving
+        const _dashDummy = new THREE.Object3D();
+        _dashDummy.rotation.x = -Math.PI / 2;
+        const nsDashGeo = new THREE.PlaneGeometry(0.2, 3);
+        const nsDashInst = new THREE.InstancedMesh(nsDashGeo, markingMat, nsDashPos.length / 2);
+        for (let i = 0; i < nsDashPos.length / 2; i++) {
+            _dashDummy.position.set(nsDashPos[i * 2], 0.015, nsDashPos[i * 2 + 1]);
+            _dashDummy.updateMatrix();
+            nsDashInst.setMatrixAt(i, _dashDummy.matrix);
+        }
+        nsDashInst.instanceMatrix.needsUpdate = true;
+        scene.add(nsDashInst);
+
+        const ewDashGeo = new THREE.PlaneGeometry(3, 0.2);
+        const ewDashInst = new THREE.InstancedMesh(ewDashGeo, markingMat, ewDashPos.length / 2);
+        for (let i = 0; i < ewDashPos.length / 2; i++) {
+            _dashDummy.position.set(ewDashPos[i * 2], 0.015, ewDashPos[i * 2 + 1]);
+            _dashDummy.updateMatrix();
+            ewDashInst.setMatrixAt(i, _dashDummy.matrix);
+        }
+        ewDashInst.instanceMatrix.needsUpdate = true;
+        scene.add(ewDashInst);
+
+        // Helper: returns true if point (px, pz) falls within any road or sidewalk corridor
+        const halfCorridor = roadSurfW / 2 + swalkW + 1.5;
+        const onRoad = (px, pz) => {
+            for (const rc of [-blockPitch, 0, blockPitch]) {
+                if (Math.abs(px - rc) < halfCorridor) return true;
+                if (Math.abs(pz - rc) < halfCorridor) return true;
+            }
+            return false;
+        };
+
+        // Pre-create one shared material per building colour (avoids 64 new allocations)
+        const bMats = buildingColors.map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 }));
+
+        // === BUILDING GRID ===
+        // 4 × 4 city blocks, each block has 2 rows × 2 columns of buildings
+        const blockCenters = [
+            -blockPitch * 1.5,  // -75
+            -blockPitch * 0.5,  // -25
+             blockPitch * 0.5,  //  25
+             blockPitch * 1.5,  //  75
+        ];
+
+        for (const bcx of blockCenters) {
+            for (const bcz of blockCenters) {
+                // 2 rows (±7 from block centre Z) × 2 columns (±9 from block centre X)
+                for (const rowOff of [-7, 7]) {
+                    for (const colOff of [-9, 9]) {
+                        const bx = bcx + colOff;
+                        const bz = bcz + rowOff;
+
+                        if (Math.abs(bx) < 14 && Math.abs(bz) < 14) continue;
+
+                        const w = 12 + rng() * 5, h = 8 + rng() * 8, d = 10 + rng() * 3;
+
+                        const bMat = bMats[Math.floor(rng() * bMats.length)];
+                        const thickness = 0.5;
             const doorW = 2.5, doorH = 3.5;
             // Jumpable window gap: bottom at 1.5m, top at 3.8m
             const winBottom = 1.5, winTop = 3.8, winGapW = 2.2;
@@ -432,67 +542,161 @@ export function buildMap(mapId) {
             const grafMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.5 + rng() * 2, 0.8 + rng() * 1.2), grafMat);
             grafMesh.position.set(bx + (rng() - 0.5) * (w - 2), 1.5 + rng() * 2, bz + d / 2 + 0.03);
             scene.add(grafMesh);
-        }
+                    }   // end colOff loop
+                }   // end rowOff loop
+            }   // end bcz loop
+        }   // end bcx loop
 
-        // Street lights
+        // Street lights — placed along roads on the sidewalks
         const lightPoleMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.6 });
-        for (let l = 0; l < 20; l++) {
-            const lx = (rng() - 0.5) * size * 1.4;
-            const lz = (rng() - 0.5) * size * 1.4;
-            addObstacle(obs, lightPoleMat, 0.15, 5.5, 0.15, lx, 2.75, lz);
-            // Lamp head
-            const lampMesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 0.3),
-                new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0x443300 }));
-            lampMesh.position.set(lx, 5.7, lz);
-            scene.add(lampMesh);
+        const lampGlowMat = new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0x443300 });
+        // Along each N-S road
+        for (const rx of [-blockPitch, 0, blockPitch]) {
+            for (let lz = -mapR + 10; lz < mapR; lz += 22) {
+                const lx = rx + roadSurfW / 2 + swalkW * 0.5;
+                addObstacle(obs, lightPoleMat, 0.15, 5.5, 0.15, lx, 2.75, lz);
+                const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 0.3), lampGlowMat);
+                lamp.position.set(lx, 5.7, lz);
+                scene.add(lamp);
+            }
+        }
+        // Along each E-W road
+        for (const rz of [-blockPitch, 0, blockPitch]) {
+            for (let lx = -mapR + 10; lx < mapR; lx += 22) {
+                const lz = rz + roadSurfW / 2 + swalkW * 0.5;
+                addObstacle(obs, lightPoleMat, 0.15, 5.5, 0.15, lx, 2.75, lz);
+                const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 1.2), lampGlowMat);
+                lamp.position.set(lx, 5.7, lz);
+                scene.add(lamp);
+            }
         }
 
-        // Scattered rubble piles
+        // Rubble everywhere — small visual pieces use InstancedMesh (1 draw call each material),
+        // larger collision pieces are individual meshes kept off roads.
         const rubbleMat = new THREE.MeshStandardMaterial({ color: 0x665544, roughness: 1.0 });
         const concChunkMat = new THREE.MeshStandardMaterial({ color: 0x887766, roughness: 0.95 });
-        for (let i = 0; i < 80; i++) {
+
+        // Small decorative rubble: InstancedMesh, appears everywhere including roads (realistic)
+        const SMALL_COUNT = 400;
+        const _rDummy = new THREE.Object3D();
+        const smallRubbleInst = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), rubbleMat, SMALL_COUNT);
+        const smallConcInst   = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), concChunkMat, SMALL_COUNT);
+        for (let i = 0; i < SMALL_COUNT; i++) {
+            for (const inst of [smallRubbleInst, smallConcInst]) {
+                let px = (rng() - 0.5) * size * 1.5;
+                let pz = (rng() - 0.5) * size * 1.5;
+                // Push away from the exact spawn point but keep everywhere else
+                if (Math.abs(px) < 6 && Math.abs(pz) < 6) { px += 10; pz += 10; }
+                _rDummy.position.set(px, rng() * 0.15, pz);
+                _rDummy.scale.set(0.2 + rng() * 1.2, 0.08 + rng() * 0.3, 0.2 + rng() * 0.9);
+                _rDummy.rotation.set((rng() - 0.5) * 0.5, rng() * Math.PI * 2, (rng() - 0.5) * 0.5);
+                _rDummy.updateMatrix();
+                inst.setMatrixAt(i, _rDummy.matrix);
+            }
+        }
+        smallRubbleInst.instanceMatrix.needsUpdate = true;
+        smallConcInst.instanceMatrix.needsUpdate = true;
+        scene.add(smallRubbleInst);
+        scene.add(smallConcInst);
+
+        // Medium collision rubble: off-road only, individual meshes for AABB collision
+        for (let i = 0; i < 35; i++) {
             const rx = (rng() - 0.5) * size * 1.5;
             const rz = (rng() - 0.5) * size * 1.5;
             if (Math.abs(rx) < 8 && Math.abs(rz) < 8) continue;
-            const rw = 0.3 + rng() * 1.8, rh = 0.15 + rng() * 0.7, rd = 0.3 + rng() * 1.4;
+            if (onRoad(rx, rz)) continue;
+            const rw = 1.1 + rng() * 0.9, rh = 0.35 + rng() * 0.45, rd = 0.9 + rng() * 0.7;
             const chunk = new THREE.Mesh(new THREE.BoxGeometry(rw, rh, rd), rng() < 0.5 ? rubbleMat : concChunkMat);
             chunk.position.set(rx, rh / 2, rz);
             chunk.rotation.y = rng() * Math.PI * 2;
-            chunk.rotation.x = (rng() - 0.5) * 0.45;
-            chunk.rotation.z = (rng() - 0.5) * 0.45;
             chunk.castShadow = true;
             scene.add(chunk);
-            if (rw > 1.0 || rh > 0.45) obs.push({ mesh: chunk, box: new THREE.Box3().setFromObject(chunk) });
+            obs.push({ mesh: chunk, box: new THREE.Box3().setFromObject(chunk) });
         }
 
-        // Impact craters
-        const craterGroundMat = new THREE.MeshStandardMaterial({ color: 0x111008, roughness: 1.0 });
-        const craterRimMat = new THREE.MeshStandardMaterial({ color: 0x554433, roughness: 1.0 });
+        // Impact craters — actual traversable pits the player can fall into
+        const craterFloorMat = new THREE.MeshStandardMaterial({ color: 0x0d0b06, roughness: 1.0 });
+        const craterWallMat  = new THREE.MeshStandardMaterial({ color: 0x1e1208, roughness: 1.0, side: THREE.DoubleSide });
+        const craterRimMat   = new THREE.MeshStandardMaterial({ color: 0x554433, roughness: 1.0 });
+
         for (let i = 0; i < 12; i++) {
             const cx = (rng() - 0.5) * size * 1.3;
             const cz = (rng() - 0.5) * size * 1.3;
             if (Math.abs(cx) < 10 && Math.abs(cz) < 10) continue;
+
             const craterR = 1.8 + rng() * 3.5;
-            // Scorched disc on ground
-            const disc = new THREE.Mesh(new THREE.CylinderGeometry(craterR, craterR * 1.15, 0.04, 10), craterGroundMat);
-            disc.position.set(cx, 0.02, cz);
-            scene.add(disc);
-            // Rubble ring around crater edge
-            const numChunks = 5 + Math.floor(rng() * 5);
-            for (let c = 0; c < numChunks; c++) {
-                const angle = (c / numChunks) * Math.PI * 2 + rng() * 0.6;
-                const dist = craterR * (0.85 + rng() * 0.55);
-                const cw = 0.3 + rng() * 1.1, ch = 0.2 + rng() * 0.6, cd = 0.3 + rng() * 0.9;
-                const rim = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), craterRimMat);
-                rim.position.set(cx + Math.cos(angle) * dist, ch / 2, cz + Math.sin(angle) * dist);
-                rim.rotation.y = rng() * Math.PI * 2;
-                rim.rotation.x = (rng() - 0.5) * 0.7;
-                rim.castShadow = true;
-                scene.add(rim);
+            // Depth scales with radius: ~2.2m for small craters, ~3.5m for large ones.
+            // jumpForce=12, gravity=30 → max jump height ≈ 2.4m.
+            // Small craters (depth<2.4m): player can jump out. Large: player is trapped.
+            const depth = 1.6 + craterR * 0.35;
+
+            // Register pit so getFloorHeight lowers the ground inside the crater
+            gameState.craterPits.push({ cx, cz, r: craterR, depth });
+
+            // Pit walls — cylinder extends rimLip metres ABOVE ground so it's visible from far away,
+            // and down to -depth for the hole walls (DoubleSide so both inside & outside render).
+            const rimLip = 0.45;
+            const wallTotalH = depth + rimLip;
+            const wallGeo = new THREE.CylinderGeometry(craterR * 0.88, craterR * 1.1, wallTotalH, 16, 1, true);
+            const wall = new THREE.Mesh(wallGeo, craterWallMat);
+            wall.position.set(cx, -(depth - rimLip) / 2, cz);
+            scene.add(wall);
+
+            // Dark scorched ring on the ground surface — shows crater boundary clearly from ground level
+            const ringGeo = new THREE.RingGeometry(craterR * 0.9, craterR * 1.7, 24);
+            const ring = new THREE.Mesh(ringGeo, craterFloorMat);
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.set(cx, 0.012, cz);
+            scene.add(ring);
+
+            // Scorched floor disc at the bottom of the pit
+            const floorDisc = new THREE.Mesh(
+                new THREE.CylinderGeometry(craterR * 0.82, craterR * 1.0, 0.06, 16),
+                craterFloorMat
+            );
+            floorDisc.position.set(cx, -depth + 0.04, cz);
+            scene.add(floorDisc);
+
+            // Rim rubble — collision obstacles that require jumping to clear,
+            // blocking casual walk-through while still letting the player fall in from above
+            const numRimChunks = 8 + Math.floor(rng() * 5);
+            for (let c = 0; c < numRimChunks; c++) {
+                const angle = (c / numRimChunks) * Math.PI * 2 + rng() * 0.4;
+                const dist  = craterR * (0.88 + rng() * 0.28);
+                const cw = 0.5 + rng() * 0.8, ch = 0.45 + rng() * 0.55, cd = 0.5 + rng() * 0.7;
+                addObstacle(obs, craterRimMat, cw, ch, cd,
+                    cx + Math.cos(angle) * dist, ch / 2,
+                    cz + Math.sin(angle) * dist
+                );
             }
         }
     } else if (mapId === 'mountain') {
-        const rockMat = new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.95 });
+        const rockMat  = new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.95 });
+        const rockMat2 = new THREE.MeshStandardMaterial({ color: 0x3d3d3d, roughness: 0.98 });
+
+        // Dense terrain grid — sloped tiles cover the entire map so there is NO flat ground.
+        // Each tile is a thick slab tilted 12–28 degrees in a random direction.
+        const tileStep = 44;
+        const tileW = 48, tileThick = 5, tileD = 48;
+        const halfSpan = Math.ceil(size * 1.05 / tileStep) * tileStep;
+        for (let tx = -halfSpan; tx <= halfSpan; tx += tileStep) {
+            for (let tz = -halfSpan; tz <= halfSpan; tz += tileStep) {
+                if (Math.abs(tx) < 22 && Math.abs(tz) < 22) continue; // keep spawn flat
+                const ty   = rng() * 3.5;                        // 0–3.5 m elevation
+                const rotX = (rng() - 0.5) * 0.65;              // ±0.32 rad ≈ ±18°
+                const rotZ = (rng() - 0.5) * 0.65;
+                const mat  = rng() < 0.5 ? rockMat : rockMat2;
+                const tile = new THREE.Mesh(new THREE.BoxGeometry(tileW, tileThick, tileD), mat);
+                tile.rotation.x = rotX;
+                tile.rotation.z = rotZ;
+                tile.position.set(tx, ty, tz);
+                tile.receiveShadow = true;
+                scene.add(tile);
+                gameState.slopeMeshes.push(tile);
+            }
+        }
+
+        // Large rock formations on top of the sloped terrain
         for (let i = 0; i < 240; i++) {
             const w = 10 + rng() * 20, h = 10 + rng() * 25, d = 10 + rng() * 20;
             const bx = (rng() - 0.5) * size * 1.8;
