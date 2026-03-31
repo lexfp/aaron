@@ -126,8 +126,8 @@ function getFloorHeight(pos) {
                 const hitY = hit.point.y;
                 // A surface is only a floor if:
                 // - It's below any ceiling we just hit
-                // - It's within a reasonable 'anti-phasing' range above our feet (e.g. 5m) OR below our feet
-                if (hitY < ceilingY) {
+                // - It's within 1m above our feet (prevents distant rock overhangs from being treated as floor)
+                if (hitY < ceilingY && hitY <= feetY + 1.0) {
                     if (hitY > floor) floor = hitY;
                 }
             }
@@ -349,13 +349,14 @@ function animate() {
         const prevCamY = camera.position.y;
         camera.position.y += velocity.y * dt;
 
-        // CCD: if falling on mountain map, sweep the vertical path for slope surfaces
+        // CCD: if falling on mountain map, sweep the full vertical path for slope surfaces
         // so the player can't phase through them when moving fast
         if (gameState.currentMap === 'mountain' && velocity.y < 0) {
             const prevFeetY = prevCamY - 1.7;
             const newFeetY  = camera.position.y - 1.7;
+            // Cast from previous camera Y (not feet) to cover the full swept path
             downRaycaster.set(
-                new THREE.Vector3(camera.position.x, prevFeetY + 0.05, camera.position.z),
+                new THREE.Vector3(camera.position.x, prevCamY, camera.position.z),
                 new THREE.Vector3(0, -1, 0)
             );
             const sweepHits = downRaycaster.intersectObjects(gameState.slopeMeshes || []);
