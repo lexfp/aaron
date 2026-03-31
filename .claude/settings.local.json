@@ -5,7 +5,8 @@
       "Bash(sort -k2)",
       "Bash(wc:*)",
       "Bash(head:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(node:*)"
     ]
   }
 }

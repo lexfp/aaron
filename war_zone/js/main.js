@@ -81,6 +81,21 @@ function checkCollision(newPos) {
         if (floorAtNew > pMinY + 0.6) return true;
     }
 
+    // Crater pit inner walls: prevent walking out of pits by pressing against the walls.
+    // Only applies when the player is below surface level (inside a pit). Once they jump
+    // high enough to reach feetY >= 0 the check is skipped and they can step out.
+    for (const pit of (gameState.craterPits || [])) {
+        if (pMinY >= -0.05) continue; // at/above surface — not inside a pit, skip
+        const dx = newPos.x - pit.cx;
+        const dz = newPos.z - pit.cz;
+        const distSq = dx * dx + dz * dz;
+        if (distSq > pit.r * pit.r) continue; // outside this pit entirely
+        // Inner wall starts at ~0.88r; subtract player radius so the cylinder of the player
+        // can just touch the visible wall without phasing through.
+        const wallR = pit.r * 0.88 - playerCylRadius;
+        if (distSq > wallR * wallR) return true; // player cylinder is pressing against the wall
+    }
+
     return false;
 }
 
@@ -100,8 +115,12 @@ function getFloorHeight(pos) {
     for (const obs of obstacles) {
         if (obs.passThrough) continue;
         if (obs.box) {
-            if (pos.x >= obs.box.min.x - 0.3 && pos.x <= obs.box.max.x + 0.3 &&
-                pos.z >= obs.box.min.z - 0.3 && pos.z <= obs.box.max.z + 0.3) {
+            // No lateral tolerance: only snap up to a box top when the player center is
+            // actually inside its XZ footprint. A tolerance here combined with the vertical
+            // snap would teleport the player on top of any obstacle they walk into from the
+            // side whose top is below feetY + 0.8 (anything ~0.4–0.8 m tall).
+            if (pos.x > obs.box.min.x && pos.x < obs.box.max.x &&
+                pos.z > obs.box.min.z && pos.z < obs.box.max.z) {
                 const obsTop = obs.box.max.y;
                 if (obsTop > floor && feetY >= obsTop - 0.8) floor = obsTop;
             }
