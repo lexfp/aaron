@@ -78,7 +78,8 @@ function checkCollision(newPos) {
     if (gameState.currentMap === 'mountain') {
         const floorAtNew = getFloorHeight(newPos);
         // If floor at new position is > 0.6m above our current feet position, it's too steep to walk up
-        if (floorAtNew > pMinY + 0.6) return true;
+        const currentFeetY = camera.position.y - 1.7;
+        if (floorAtNew > currentFeetY + 0.6) return true;
     }
 
     return false;
@@ -109,7 +110,7 @@ function getFloorHeight(pos) {
         // 1. Cast from high up down to find any potential floors
         downRaycaster.set(new THREE.Vector3(pos.x, 200, pos.z), new THREE.Vector3(0, -1, 0));
         const downHits = downRaycaster.intersectObjects(slopeMeshes);
-        
+
         // 2. Cast from feet up to find if there is a ceiling above us
         upRaycaster.set(new THREE.Vector3(pos.x, feetY + 0.1, pos.z), new THREE.Vector3(0, 1, 0));
         const upHits = upRaycaster.intersectObjects(slopeMeshes);
@@ -122,7 +123,7 @@ function getFloorHeight(pos) {
                 // A surface is only a floor if:
                 // - It's below any ceiling we just hit
                 // - It's within a reasonable 'anti-phasing' range above our feet (e.g. 5m) OR below our feet
-                if (hitY < ceilingY) {
+                if (hitY < ceilingY && hitY <= feetY + 0.8) {
                     if (hitY > floor) floor = hitY;
                 }
             }

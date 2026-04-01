@@ -355,7 +355,8 @@ export function buildMap(mapId) {
             slope.rotation.x = (rng() - 0.5); slope.rotation.z = (rng() - 0.5);
             slope.position.set(bx, h / 4, bz);
             scene.add(slope);
-            obs.push({ mesh: slope, isSlope: true });
+            slope.updateMatrixWorld(true);
+            obs.push({ mesh: slope, isSlope: true, box: new THREE.Box3().setFromObject(slope) });
             gameState.slopeMeshes.push(slope);
         }
     } else if (mapId === 'forest') {
