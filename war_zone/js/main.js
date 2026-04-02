@@ -82,6 +82,36 @@ function checkCollision(newPos) {
         if (floorAtNew > currentFeetY + 0.6) return true;
     }
 
+    // Crater pit inner walls: prevent walking out of pits by pressing against the walls.
+    // Only applies when the player is below surface level (inside a pit). Once they jump
+    // high enough to reach feetY >= 0 the check is skipped and they can step out.
+    for (const pit of (gameState.craterPits || [])) {
+        if (pMinY >= -0.05) continue; // at/above surface — not inside a pit, skip
+        const dx = newPos.x - pit.cx;
+        const dz = newPos.z - pit.cz;
+        const distSq = dx * dx + dz * dz;
+        if (distSq > pit.r * pit.r) continue; // outside this pit entirely
+        // Inner wall starts at ~0.88r; subtract player radius so the cylinder of the player
+        // can just touch the visible wall without phasing through.
+        const wallR = pit.r * 0.88 - playerCylRadius;
+        if (distSq > wallR * wallR) return true; // player cylinder is pressing against the wall
+    }
+
+    // Crater pit inner walls: prevent walking out of pits by pressing against the walls.
+    // Only applies when the player is below surface level (inside a pit). Once they jump
+    // high enough to reach feetY >= 0 the check is skipped and they can step out.
+    for (const pit of (gameState.craterPits || [])) {
+        if (pMinY >= -0.05) continue; // at/above surface — not inside a pit, skip
+        const dx = newPos.x - pit.cx;
+        const dz = newPos.z - pit.cz;
+        const distSq = dx * dx + dz * dz;
+        if (distSq > pit.r * pit.r) continue; // outside this pit entirely
+        // Inner wall starts at ~0.88r; subtract player radius so the cylinder of the player
+        // can just touch the visible wall without phasing through.
+        const wallR = pit.r * 0.88 - playerCylRadius;
+        if (distSq > wallR * wallR) return true; // player cylinder is pressing against the wall
+    }
+
     return false;
 }
 
@@ -89,15 +119,24 @@ const downRaycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3
 const upRaycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
 
 function getFloorHeight(pos) {
+    // Default ground is y=0. Inside a crater pit the ground is lower.
     let floor = 0;
+    for (const pit of (gameState.craterPits || [])) {
+        const dx = pos.x - pit.cx, dz = pos.z - pit.cz;
+        if (dx * dx + dz * dz < pit.r * pit.r) { floor = -pit.depth; break; }
+    }
     const feetY = pos.y - 1.7;
 
     // Check AABB boxes first
     for (const obs of obstacles) {
         if (obs.passThrough) continue;
         if (obs.box) {
-            if (pos.x >= obs.box.min.x - 0.3 && pos.x <= obs.box.max.x + 0.3 &&
-                pos.z >= obs.box.min.z - 0.3 && pos.z <= obs.box.max.z + 0.3) {
+            // No lateral tolerance: only snap up to a box top when the player center is
+            // actually inside its XZ footprint. A tolerance here combined with the vertical
+            // snap would teleport the player on top of any obstacle they walk into from the
+            // side whose top is below feetY + 0.8 (anything ~0.4–0.8 m tall).
+            if (pos.x > obs.box.min.x && pos.x < obs.box.max.x &&
+                pos.z > obs.box.min.z && pos.z < obs.box.max.z) {
                 const obsTop = obs.box.max.y;
                 if (obsTop > floor && feetY >= obsTop - 0.8) floor = obsTop;
             }
@@ -124,6 +163,8 @@ function getFloorHeight(pos) {
                 // - It's below any ceiling we just hit
                 // - It's within a reasonable 'anti-phasing' range above our feet (e.g. 5m) OR below our feet
                 if (hitY < ceilingY && hitY <= feetY + 0.8) {
+                // - It's within 1m above our feet (prevents distant rock overhangs from being treated as floor)
+                if (hitY < ceilingY && hitY <= feetY + 1.0) {
                     if (hitY > floor) floor = hitY;
                 }
             }
@@ -158,9 +199,13 @@ function startGame(mode, mapId) {
         }
     }
 
+    const bonusHp = (playerData.stats?.health || 0) * 5;
     resetPlayerState({
         weapons: initialWeapons,
-        maxSlots
+        maxSlots,
+        hp: 100 + bonusHp,
+        maxHp: 100 + bonusHp,
+        speedMult: 1 + (playerData.stats?.speed || 0) * 0.02
     });
 
     for (const wid of playerState.weapons) {
@@ -217,7 +262,7 @@ function startGame(mode, mapId) {
     if (mode === 'zombie') {
         gameState.wave = 1;
         gameState.zombiesAlive = 0;
-        gameState.zombiesToSpawn = 90;
+        gameState.zombiesToSpawn = 450;
         gameState.zombieSpawnTimer = 0;
         document.getElementById('wave-hud').style.display = 'block';
         document.getElementById('wave-hud').textContent = 'Wave 1';
@@ -259,6 +304,7 @@ function quitToMenu() {
     gameState.fireZones = [];
     gameState.ammoPickups = [];
     gameState.pvpEnemy = null;
+    gameState.craterPits = [];
     showScreen('homepage');
 }
 window.quitToMenu = quitToMenu;
@@ -337,7 +383,30 @@ function animate() {
         camera.position.z += moveVec.z;
         if (checkCollision(camera.position)) camera.position.z = origZ;
 
+        const prevCamY = camera.position.y;
         camera.position.y += velocity.y * dt;
+
+        // CCD: if falling on mountain map, sweep the full vertical path for slope surfaces
+        // so the player can't phase through them when moving fast
+        if (gameState.currentMap === 'mountain' && velocity.y < 0) {
+            const prevFeetY = prevCamY - 1.7;
+            const newFeetY  = camera.position.y - 1.7;
+            // Cast from previous camera Y (not feet) to cover the full swept path
+            downRaycaster.set(
+                new THREE.Vector3(camera.position.x, prevCamY, camera.position.z),
+                new THREE.Vector3(0, -1, 0)
+            );
+            const sweepHits = downRaycaster.intersectObjects(gameState.slopeMeshes || []);
+            for (const hit of sweepHits) {
+                // Surface was crossed: it was above new feet but below old feet
+                if (hit.point.y >= newFeetY && hit.point.y < prevFeetY) {
+                    camera.position.y = hit.point.y + 1.7;
+                    velocity.y = 0;
+                    setCanJump(true);
+                    break;
+                }
+            }
+        }
 
         let targetFloorY = getFloorHeight(camera.position) + 1.7;
 

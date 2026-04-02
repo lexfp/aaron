@@ -476,6 +476,19 @@ canvas {
     font-weight: 700;
 }
 
+#xp-hud {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffdd00;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 5px 12px;
+    border-radius: 6px;
+    letter-spacing: 0.5px;
+}
+
 #money-hud {
     position: absolute;
     top: 20px;

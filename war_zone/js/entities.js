@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { WEAPONS, MAPS } from './data.js';
-import { playerData, playerState, savePlayerData, gameState } from './state.js';
+import { playerData, playerState, savePlayerData, gameState, awardXP } from './state.js';
 import { scene, camera, obstacles } from './engine.js';
 import { playGunshot } from './audio.js';
 import { addKillFeed, updateHUD, showRoundOverlay } from './ui.js';
@@ -241,6 +241,8 @@ export function killZombie(z, idx) {
     }
 
     addKillFeed(z.isGiga ? 'GIGA ZOMBIE SLAIN!' : (z.isBoss ? 'Boss Zombie' : 'Zombie'), z.isGiga ? '#ff00ff' : '#fff');
+    const xp = z.isGiga ? 200 : z.isBoss ? 50 : (gameState.mode === 'rescue' ? 15 : 10);
+    awardXP(xp);
     savePlayerData();
 }
 
@@ -336,7 +338,7 @@ export function updateZombies(dt) {
     // Wave complete (zombie invasion only — rescue uses a fixed horde count)
     if (gameState.mode === 'zombie' && gameState.zombiesAlive <= 0 && gameState.zombiesToSpawn <= 0) {
         gameState.wave++;
-        gameState.zombiesToSpawn = (70 + gameState.wave * 45) * 3;
+        gameState.zombiesToSpawn = (70 + gameState.wave * 45) * 15;
         document.getElementById('wave-hud').textContent = 'Wave ' + gameState.wave;
         showRoundOverlay('Wave ' + gameState.wave, 'Incoming!', 2000);
     }

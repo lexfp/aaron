@@ -1,8 +1,14 @@
 // Screen management, shop, loadout, HUD, overlays, cheats
 
 import { WEAPONS, EQUIPMENT, ATTACHMENTS, MAPS } from './data.js';
-import { playerData, playerState, savePlayerData, gameState } from './state.js';
+import { playerData, playerState, savePlayerData, gameState, xpToNextLevel, setAwardXPImpl } from './state.js';
 import { cb } from './callbacks.js';
+
+// Wire up level-up notification (avoids circular dep: state -> ui)
+setAwardXPImpl((didLevelUp) => {
+    if (didLevelUp) addKillFeed(`LEVEL UP! Now LVL ${playerData.level} (+5 stat pts)`, '#ffdd00');
+    updateHUD();
+});
 
 // --- Screen Management ---
 
@@ -22,6 +28,7 @@ window.showScreen = showScreen;
 export function updateHomeStats() {
     document.getElementById('home-money').textContent = '$' + playerData.money;
     document.getElementById('home-missions').textContent = playerData.missions;
+    document.getElementById('home-level').textContent = playerData.level;
     if (playerData.airstrikes > 0) {
         document.getElementById('home-missions').innerHTML += `<br>Airstrikes: <span style="color:#ff4444">${playerData.airstrikes}</span>`;
     }
@@ -278,6 +285,58 @@ export function showLoadout() {
     const loadoutScreen = document.getElementById('loadout-screen');
     const backBtn = loadoutScreen.querySelector('.back-btn');
     loadoutScreen.insertBefore(armorSection, backBtn);
+
+    // --- Stats section ---
+    document.getElementById('loadout-stats-section')?.remove();
+    const statsSection = document.createElement('div');
+    statsSection.id = 'loadout-stats-section';
+    statsSection.style.cssText = 'max-width:700px;margin:30px auto 0;';
+
+    const needed = xpToNextLevel(playerData.level);
+    const xpPct = Math.floor((playerData.xp / needed) * 10);
+    const xpBar = '█'.repeat(xpPct) + '░'.repeat(10 - xpPct);
+    statsSection.innerHTML = `
+        <h3 style="color:#ffdd00;font-size:22px;text-align:center;margin-bottom:6px">Stats</h3>
+        <div style="text-align:center;color:#aaa;font-size:13px;margin-bottom:14px">
+            LVL ${playerData.level} &nbsp; ${xpBar} &nbsp; ${playerData.xp}/${needed} XP
+            ${playerData.statPoints > 0 ? `<span style="color:#ffdd00;margin-left:10px">${playerData.statPoints} point${playerData.statPoints !== 1 ? 's' : ''} to spend</span>` : ''}
+        </div>`;
+
+    const statDefs = [
+        { key: 'health', label: 'Health', color: '#00ff88', desc: '+5 max HP per point' },
+        { key: 'speed',  label: 'Speed',  color: '#00aaff', desc: '+2% move speed per point' },
+        { key: 'damage', label: 'Damage', color: '#ff4444', desc: '+2% damage per point' }
+    ];
+
+    const statGrid = document.createElement('div');
+    statGrid.style.cssText = 'display:flex;gap:16px;justify-content:center;flex-wrap:wrap;';
+
+    for (const { key, label, color, desc } of statDefs) {
+        const pts = playerData.stats[key];
+        const card = document.createElement('div');
+        card.style.cssText = `background:rgba(0,0,0,0.5);border:2px solid ${color};border-radius:10px;padding:18px 28px;text-align:center;min-width:170px;`;
+        card.innerHTML = `
+            <div style="font-size:11px;color:#888;letter-spacing:1px;margin-bottom:6px">${label.toUpperCase()}</div>
+            <div style="font-size:28px;font-weight:700;color:${color}">${pts}</div>
+            <div style="font-size:11px;color:#666;margin:4px 0 10px">${desc}</div>
+            <button data-stat="${key}" ${playerData.statPoints < 1 ? 'disabled' : ''}
+                style="background:${playerData.statPoints > 0 ? color : '#333'};color:${playerData.statPoints > 0 ? '#000' : '#555'};border:none;border-radius:5px;padding:6px 18px;font-size:14px;font-weight:700;cursor:${playerData.statPoints > 0 ? 'pointer' : 'default'}">
+                + Add Point
+            </button>`;
+        const btn = card.querySelector('[data-stat]');
+        if (btn && playerData.statPoints > 0) {
+            btn.onclick = () => {
+                playerData.statPoints--;
+                playerData.stats[key]++;
+                savePlayerData();
+                showLoadout();
+            };
+        }
+        statGrid.appendChild(card);
+    }
+
+    statsSection.appendChild(statGrid);
+    loadoutScreen.insertBefore(statsSection, backBtn);
 }
 window.showLoadout = showLoadout;
 
@@ -345,6 +404,17 @@ export function updateHUD() {
         document.querySelector('#weapon-hud .ammo-display .reserve').textContent = state.reserveAmmo;
     }
     document.getElementById('money-hud').textContent = '$' + playerData.money;
+
+    const xpEl = document.getElementById('xp-hud');
+    if (xpEl) {
+        const needed = xpToNextLevel(playerData.level);
+        const pct = Math.floor((playerData.xp / needed) * 10);
+        const bar = '█'.repeat(pct) + '░'.repeat(10 - pct);
+        xpEl.textContent = `LVL ${playerData.level}  ${bar}  ${playerData.xp}/${needed} XP`;
+        if (playerData.statPoints > 0) {
+            xpEl.textContent += `  (${playerData.statPoints} pts available)`;
+        }
+    }
 }
 
 export function renderWeaponSlots() {
@@ -394,7 +464,9 @@ export function buildCheats() {
         'noclip': () => { playerState.noClip = !playerState.noClip; showCheatMsg('NoClip ' + (playerState.noClip ? 'ON' : 'OFF')); },
         'kill': () => { cb.killAllEnemies(); showCheatMsg('All enemies killed'); },
         'heal': () => { playerState.hp = playerState.maxHp; showCheatMsg('Healed'); },
-        'speed': () => { playerState.speedMult = playerState.speedMult === 1 ? 2 : 1; showCheatMsg('Speed x' + playerState.speedMult); }
+        'speed': () => { playerState.speedMult = playerState.speedMult === 1 ? 2 : 1; showCheatMsg('Speed x' + playerState.speedMult); },
+        'levelup': () => { playerData.level++; playerData.statPoints += 5; savePlayerData(); showCheatMsg(`Level Up! Now LVL ${playerData.level} (+5 pts)`); },
+        'reset': () => { window.startGame(gameState.mode, gameState.currentMap); showCheatMsg('Game Reset!'); }
     };
 }
 

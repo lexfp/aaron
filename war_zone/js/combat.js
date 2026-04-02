@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { WEAPONS, EQUIPMENT } from './data.js';
-import { playerData, playerState, savePlayerData, gameState } from './state.js';
+import { playerData, playerState, savePlayerData, gameState, awardXP } from './state.js';
 import { scene, camera, controls, raycaster, setWeaponSwingTime, obstacles } from './engine.js';
 import { playSound, playGunshot, playHit, playExplosion, playPickup } from './audio.js';
 import { updateHUD, addKillFeed, showRoundOverlay, updateConsumablesPanel } from './ui.js';
@@ -101,7 +101,7 @@ function getEnemyMeshes() {
 }
 
 function calculateDamage(def, hit) {
-    let dmg = def.damage;
+    let dmg = def.damage * (1 + (playerData.stats?.damage || 0) * 0.02);
     const isZoomed = playerState.isZoomed;
     if (isZoomed && def.zoomedDamage) dmg = def.zoomedDamage;
 
@@ -155,6 +155,7 @@ function applyDamageToEnemy(hit, dmg) {
             addKillFeed('Enemy eliminated!', '#00ff88');
             document.getElementById('wave-hud').textContent =
                 `Round ${gameState.pvpRound} | ${gameState.pvpPlayerScore}-${gameState.pvpEnemyScore}`;
+            awardXP(30);
             checkPvPEnd();
         }
     }
