@@ -251,6 +251,7 @@ function checkZombieCollision(pos, radius) {
     const pMaxY = pos.y + 1.8;
 
     for (const obs of obstacles) {
+        if (obs.isSlope) continue; // slopes handled by floor snap
         if (obs.box) {
             const b = obs.box;
             if (pos.x + radius > b.min.x && pos.x - radius < b.max.x &&
@@ -383,8 +384,10 @@ export function updateZombies(dt) {
         if (playerState.weapons[playerState.currentWeaponIndex] === 'shield') stopDist = Math.max(stopDist, 2.5);
 
         // Gravity & Raycast Floor Tracking
+        const zRayMeshes = obstacles.filter(o => o.mesh).map(o => o.mesh)
+            .concat(gameState.slopeMeshes || []);
         const zRay = new THREE.Raycaster(new THREE.Vector3(z.mesh.position.x, z.mesh.position.y + 2, z.mesh.position.z), new THREE.Vector3(0, -1, 0));
-        const zHits = zRay.intersectObjects(obstacles.filter(o => o.mesh).map(o => o.mesh));
+        const zHits = zRay.intersectObjects(zRayMeshes);
         if (zHits.length > 0 && zHits[0].distance < 4) {
             z.mesh.position.y += (zHits[0].point.y - z.mesh.position.y) * dt * 10;
         } else if (zHits.length > 0) {
@@ -614,15 +617,27 @@ export function updatePvPEnemy(dt) {
 
     // Movement
     if (dist > 8) {
-        e.mesh.position.x += (dx / dist) * e.speed * dt;
-        e.mesh.position.z += (dz / dist) * e.speed * dt;
+        const nx = e.mesh.position.x + (dx / dist) * e.speed * dt;
+        const nz = e.mesh.position.z + (dz / dist) * e.speed * dt;
+        if (!checkZombieCollision(new THREE.Vector3(nx, e.mesh.position.y, nz), 0.4)) {
+            e.mesh.position.x = nx;
+            e.mesh.position.z = nz;
+        }
     } else if (dist < 4) {
-        e.mesh.position.x -= (dx / dist) * e.speed * 0.5 * dt;
-        e.mesh.position.z -= (dz / dist) * e.speed * 0.5 * dt;
+        const nx = e.mesh.position.x - (dx / dist) * e.speed * 0.5 * dt;
+        const nz = e.mesh.position.z - (dz / dist) * e.speed * 0.5 * dt;
+        if (!checkZombieCollision(new THREE.Vector3(nx, e.mesh.position.y, nz), 0.4)) {
+            e.mesh.position.x = nx;
+            e.mesh.position.z = nz;
+        }
     }
     const perpX = -dz / dist, perpZ = dx / dist;
-    e.mesh.position.x += perpX * e.strafeDir * e.speed * 0.5 * dt;
-    e.mesh.position.z += perpZ * e.strafeDir * e.speed * 0.5 * dt;
+    const sx = e.mesh.position.x + perpX * e.strafeDir * e.speed * 0.5 * dt;
+    const sz = e.mesh.position.z + perpZ * e.strafeDir * e.speed * 0.5 * dt;
+    if (!checkZombieCollision(new THREE.Vector3(sx, e.mesh.position.y, sz), 0.4)) {
+        e.mesh.position.x = sx;
+        e.mesh.position.z = sz;
+    }
 
     // Clamp to map
     const size = MAPS[gameState.currentMap].size * 0.95;
@@ -630,7 +645,10 @@ export function updatePvPEnemy(dt) {
     e.mesh.position.z = Math.max(-size, Math.min(size, e.mesh.position.z));
 
     const eRay = new THREE.Raycaster(new THREE.Vector3(e.mesh.position.x, e.mesh.position.y + 2, e.mesh.position.z), new THREE.Vector3(0, -1, 0));
-    const eHits = eRay.intersectObjects(obstacles.filter(o => o.mesh).map(o => o.mesh));
+    const eHits = eRay.intersectObjects([
+        ...obstacles.filter(o => o.mesh).map(o => o.mesh),
+        ...(gameState.slopeMeshes || [])
+    ]);
     if (eHits.length > 0 && eHits[0].distance < 4) {
         e.mesh.position.y += (eHits[0].point.y - e.mesh.position.y) * dt * 10;
     } else if (eHits.length > 0) {

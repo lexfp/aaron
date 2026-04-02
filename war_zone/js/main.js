@@ -55,6 +55,7 @@ function checkCollision(newPos) {
 
     for (const obs of obstacles) {
         if (obs.passThrough) continue;
+        if (obs.isSlope) continue; // slopes use steepness guard + floor snap, not AABB
         if (obs.box) {
             const b = obs.box;
             if (newPos.x + playerCylRadius > b.min.x && newPos.x - playerCylRadius < b.max.x &&
@@ -74,42 +75,33 @@ function checkCollision(newPos) {
         }
     }
 
-    // Slope steepness/height check: if the slope in front is too high, block horizontal movement
+    // Slope steepness/height check + side-entry block for mountain map
     if (gameState.currentMap === 'mountain') {
         const floorAtNew = getFloorHeight(newPos);
-        // If floor at new position is > 0.6m above our current feet position, it's too steep to walk up
         const currentFeetY = camera.position.y - 1.7;
         if (floorAtNew > currentFeetY + 0.6) return true;
+
+        for (const obs of obstacles) {
+            if (!obs.isSlope || !obs.box) continue;
+            const b = obs.box;
+            if (newPos.x + playerCylRadius > b.min.x && newPos.x - playerCylRadius < b.max.x &&
+                newPos.z + playerCylRadius > b.min.z && newPos.z - playerCylRadius < b.max.z) {
+                if (pMinY < b.max.y && pMaxY > b.min.y) {
+                    if (pMinY >= b.max.y - 0.8) continue;
+                    return true;
+                }
+            }
+        }
     }
 
-    // Crater pit inner walls: prevent walking out of pits by pressing against the walls.
-    // Only applies when the player is below surface level (inside a pit). Once they jump
-    // high enough to reach feetY >= 0 the check is skipped and they can step out.
     for (const pit of (gameState.craterPits || [])) {
-        if (pMinY >= -0.05) continue; // at/above surface — not inside a pit, skip
+        if (pMinY >= -0.05) continue;
         const dx = newPos.x - pit.cx;
         const dz = newPos.z - pit.cz;
         const distSq = dx * dx + dz * dz;
-        if (distSq > pit.r * pit.r) continue; // outside this pit entirely
-        // Inner wall starts at ~0.88r; subtract player radius so the cylinder of the player
-        // can just touch the visible wall without phasing through.
+        if (distSq > pit.r * pit.r) continue;
         const wallR = pit.r * 0.88 - playerCylRadius;
-        if (distSq > wallR * wallR) return true; // player cylinder is pressing against the wall
-    }
-
-    // Crater pit inner walls: prevent walking out of pits by pressing against the walls.
-    // Only applies when the player is below surface level (inside a pit). Once they jump
-    // high enough to reach feetY >= 0 the check is skipped and they can step out.
-    for (const pit of (gameState.craterPits || [])) {
-        if (pMinY >= -0.05) continue; // at/above surface — not inside a pit, skip
-        const dx = newPos.x - pit.cx;
-        const dz = newPos.z - pit.cz;
-        const distSq = dx * dx + dz * dz;
-        if (distSq > pit.r * pit.r) continue; // outside this pit entirely
-        // Inner wall starts at ~0.88r; subtract player radius so the cylinder of the player
-        // can just touch the visible wall without phasing through.
-        const wallR = pit.r * 0.88 - playerCylRadius;
-        if (distSq > wallR * wallR) return true; // player cylinder is pressing against the wall
+        if (distSq > wallR * wallR) return true;
     }
 
     return false;
@@ -127,9 +119,9 @@ function getFloorHeight(pos) {
     }
     const feetY = pos.y - 1.7;
 
-    // Check AABB boxes first
+    // Check AABB boxes first (skip slope entries — they're handled by raycast below)
     for (const obs of obstacles) {
-        if (obs.passThrough) continue;
+        if (obs.passThrough || obs.isSlope) continue;
         if (obs.box) {
             // No lateral tolerance: only snap up to a box top when the player center is
             // actually inside its XZ footprint. A tolerance here combined with the vertical
@@ -163,8 +155,6 @@ function getFloorHeight(pos) {
                 // - It's below any ceiling we just hit
                 // - It's within a reasonable 'anti-phasing' range above our feet (e.g. 5m) OR below our feet
                 if (hitY < ceilingY && hitY <= feetY + 0.8) {
-                // - It's within 1m above our feet (prevents distant rock overhangs from being treated as floor)
-                if (hitY < ceilingY && hitY <= feetY + 1.0) {
                     if (hitY > floor) floor = hitY;
                 }
             }
@@ -383,6 +373,65 @@ function animate() {
         camera.position.z += moveVec.z;
         if (checkCollision(camera.position)) camera.position.z = origZ;
 
+        // Side-entry slope check: raycast in move direction from game loop where moveVec is known
+        if (gameState.currentMap === 'mountain') {
+            const slopeMeshes = gameState.slopeMeshes || [];
+            const moveDist = Math.sqrt(moveVec.x * moveVec.x + moveVec.z * moveVec.z);
+            if (slopeMeshes.length > 0 && moveDist > 0.0001) {
+                const dirX = moveVec.x / moveDist;
+                const dirZ = moveVec.z / moveDist;
+                const ox = camera.position.x - dirX * 0.5;
+                const oz = camera.position.z - dirZ * 0.5;
+                const checkDist = moveDist + 0.35;
+                const feetY = camera.position.y - 1.7;
+                const floorAhead = getFloorHeight(camera.position); // already moved to new pos
+                // Only block side entry if the floor ahead is NOT a walkable surface
+                // (i.e. the player isn't stepping up onto a slope top)
+                const canStepUp = floorAhead <= feetY + 0.6;
+                if (!canStepUp) {
+                    // Already handled by steepness guard in checkCollision
+                } else {
+                    const heights = [feetY + 0.15, camera.position.y - 0.85, camera.position.y - 0.2];
+                    let blocked = false;
+                    for (const ry of heights) {
+                        if (blocked) break;
+                        const ray = new THREE.Raycaster(
+                            new THREE.Vector3(ox, ry, oz),
+                            new THREE.Vector3(dirX, 0, dirZ)
+                        );
+                        const hits = ray.intersectObjects(slopeMeshes);
+                        for (const hit of hits) {
+                            if (hit.distance > checkDist) break;
+                            if (hit.face) {
+                                const wn = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+                                // Only block on faces that are more vertical than horizontal
+                                // AND where the hit point is above the player's step-up range
+                                if (Math.abs(wn.y) > 0.7) continue;
+                                if (hit.point.y <= feetY + 0.6) continue; // reachable as floor
+                            }
+                            blocked = true;
+                            break;
+                        }
+                    }
+                    if (blocked) {
+                        camera.position.x = origX;
+                        camera.position.z = origZ;
+                    }
+                }
+            }
+        }
+
+        // After horizontal move, check if we've walked into the side of a slope:
+        // if the floor at the new position is more than 0.6m above our feet, push back.
+        if (gameState.currentMap === 'mountain') {
+            const feetY = camera.position.y - 1.7;
+            const floorHere = getFloorHeight(camera.position);
+            if (floorHere > feetY + 0.6) {
+                camera.position.x = origX;
+                camera.position.z = origZ;
+            }
+        }
+
         const prevCamY = camera.position.y;
         camera.position.y += velocity.y * dt;
 
@@ -390,7 +439,7 @@ function animate() {
         // so the player can't phase through them when moving fast
         if (gameState.currentMap === 'mountain' && velocity.y < 0) {
             const prevFeetY = prevCamY - 1.7;
-            const newFeetY  = camera.position.y - 1.7;
+            const newFeetY = camera.position.y - 1.7;
             // Cast from previous camera Y (not feet) to cover the full swept path
             downRaycaster.set(
                 new THREE.Vector3(camera.position.x, prevCamY, camera.position.z),
@@ -417,6 +466,26 @@ function animate() {
             camera.position.y = targetFloorY;
             velocity.y = 0;
             setCanJump(true);
+        }
+
+        // Camera wall clip prevention: cast short rays in 4 horizontal directions
+        // and push camera back if it's too close to any obstacle face.
+        {
+            const PUSH_DIST = 0.3;
+            const camDirs = [
+                new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
+                new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1),
+            ];
+            const camObsMeshes = obstacles.filter(o => o.mesh && !o.passThrough).map(o => o.mesh);
+            for (const dir of camDirs) {
+                const r = new THREE.Raycaster(camera.position, dir, 0, PUSH_DIST);
+                const hits = r.intersectObjects(camObsMeshes);
+                if (hits.length > 0) {
+                    const push = PUSH_DIST - hits[0].distance;
+                    camera.position.x -= dir.x * push;
+                    camera.position.z -= dir.z * push;
+                }
+            }
         }
 
         const { def } = getCurrentWeapon();
