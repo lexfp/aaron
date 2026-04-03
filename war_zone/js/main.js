@@ -61,7 +61,7 @@ function checkCollision(newPos) {
             if (newPos.x + playerCylRadius > b.min.x && newPos.x - playerCylRadius < b.max.x &&
                 newPos.z + playerCylRadius > b.min.z && newPos.z - playerCylRadius < b.max.z) {
                 if (pMinY < b.max.y && pMaxY > b.min.y) {
-                    if (pMinY >= b.max.y - 0.4) continue; // Allow stepping up heights up to 0.4
+                    if (pMinY >= b.max.y - 0.6) continue; // Allow stepping up heights up to 0.6
                     return true;
                 }
             }
@@ -77,21 +77,9 @@ function checkCollision(newPos) {
 
     // Slope steepness/height check + side-entry block for mountain map
     if (gameState.currentMap === 'mountain') {
-        const floorAtNew = getFloorHeight(newPos);
+        const floorAtNew = getFloorHeight(newPos, true);
         const currentFeetY = camera.position.y - 1.7;
         if (floorAtNew > currentFeetY + 0.6) return true;
-
-        for (const obs of obstacles) {
-            if (!obs.isSlope || !obs.box) continue;
-            const b = obs.box;
-            if (newPos.x + playerCylRadius > b.min.x && newPos.x - playerCylRadius < b.max.x &&
-                newPos.z + playerCylRadius > b.min.z && newPos.z - playerCylRadius < b.max.z) {
-                if (pMinY < b.max.y && pMaxY > b.min.y) {
-                    if (pMinY >= b.max.y - 0.8) continue;
-                    return true;
-                }
-            }
-        }
     }
 
     for (const pit of (gameState.craterPits || [])) {
@@ -110,7 +98,7 @@ function checkCollision(newPos) {
 const downRaycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
 const upRaycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
 
-function getFloorHeight(pos) {
+function getFloorHeight(pos, allowUncapped = false) {
     // Default ground is y=0. Inside a crater pit the ground is lower.
     let floor = 0;
     for (const pit of (gameState.craterPits || [])) {
@@ -142,8 +130,8 @@ function getFloorHeight(pos) {
         downRaycaster.set(new THREE.Vector3(pos.x, 200, pos.z), new THREE.Vector3(0, -1, 0));
         const downHits = downRaycaster.intersectObjects(slopeMeshes);
 
-        // 2. Cast from feet up to find if there is a ceiling above us
-        upRaycaster.set(new THREE.Vector3(pos.x, feetY + 0.1, pos.z), new THREE.Vector3(0, 1, 0));
+        // 2. Cast from slightly above step height to find ceilings without rejecting climbable platforms
+        upRaycaster.set(new THREE.Vector3(pos.x, feetY + 0.65, pos.z), new THREE.Vector3(0, 1, 0));
         const upHits = upRaycaster.intersectObjects(slopeMeshes);
         const ceilingY = upHits.length > 0 ? upHits[0].point.y : Infinity;
 
@@ -154,7 +142,7 @@ function getFloorHeight(pos) {
                 // A surface is only a floor if:
                 // - It's below any ceiling we just hit
                 // - It's within a reasonable 'anti-phasing' range above our feet (e.g. 5m) OR below our feet
-                if (hitY < ceilingY && hitY <= feetY + 0.8) {
+                if (hitY < ceilingY && (allowUncapped || hitY <= feetY + 0.8)) {
                     if (hitY > floor) floor = hitY;
                 }
             }
@@ -921,7 +909,7 @@ function animate() {
                 const dirZ = moveVec.z / moveDist;
                 const ox = camera.position.x - dirX * 0.5;
                 const oz = camera.position.z - dirZ * 0.5;
-                const checkDist = moveDist + 0.35;
+                const checkDist = moveDist + 0.85;
                 const feetY = camera.position.y - 1.7;
                 const floorAhead = getFloorHeight(camera.position); // already moved to new pos
                 // Only block side entry if the floor ahead is NOT a walkable surface
@@ -1118,16 +1106,25 @@ function animate() {
 
                 if (targetPos) {
                     const needle = weaponModel.getObjectByName("needle");
-                    if (needle) {
+                    const tpNeedle = tpGunGroup.getObjectByName("tp_needle");
+                    if (needle || tpNeedle) {
                         const dirToTarget = new THREE.Vector3(
                             targetPos.x - camera.position.x,
                             0,
                             targetPos.z - camera.position.z
                         ).normalize();
-                        camera.updateMatrixWorld();
-                        const invMatrix = new THREE.Matrix4().copy(camera.matrixWorld).invert();
-                        const localDir = dirToTarget.transformDirection(invMatrix);
-                        needle.rotation.y = Math.atan2(localDir.x, localDir.z);
+                        if (needle) {
+                            camera.updateMatrixWorld();
+                            const invMatrix = new THREE.Matrix4().copy(camera.matrixWorld).invert();
+                            const localDir = dirToTarget.clone().transformDirection(invMatrix);
+                            needle.rotation.y = Math.atan2(localDir.x, localDir.z);
+                        }
+                        if (tpNeedle) {
+                            tpGunGroup.updateMatrixWorld();
+                            const invMatrix = new THREE.Matrix4().copy(tpGunGroup.matrixWorld).invert();
+                            const localDir = dirToTarget.clone().transformDirection(invMatrix);
+                            tpNeedle.rotation.y = Math.atan2(localDir.x, localDir.z);
+                        }
                     }
                 }
             }
