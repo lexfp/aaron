@@ -1,0 +1,6 @@
+exclude:
+  - war_zone/node_modules
+  - tic-tac-toe-bot/node_modules
+  - "**/.git"
+  - "**/.gitignore"
+  - node_modules
