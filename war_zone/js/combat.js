@@ -15,6 +15,16 @@ import { getCurrentWeapon, hasSilencer, hasScope, reload, toggleZoom } from './w
 import { killZombie, attractZombies, spawnPvPEnemy } from './entities.js';
 import { cb } from './callbacks.js';
 
+function setShootRay() {
+    const ndc = gameState.tpShootNDC;
+    const cam = gameState.tpShootCamera;
+    if (ndc && cam) {
+        raycaster.setFromCamera(ndc, cam);
+    } else {
+        raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    }
+}
+
 export function shoot() {
     const { id, def, state } = getCurrentWeapon();
     const now = performance.now() / 1000;
@@ -25,7 +35,7 @@ export function shoot() {
         state.lastFired = now;
         setWeaponSwingTime(0.2);
         playSound(200, 0.05, 'triangle', 0.1);
-        raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+        setShootRay();
         const hits = raycaster.intersectObjects(getEnemyMeshes(), true);
         if (hits.length > 0 && hits[0].distance < (def.reach || 1.5)) {
             applyDamageToEnemy(hits[0], calculateDamage(def, hits[0]));
@@ -65,7 +75,7 @@ export function shoot() {
     if (hasSilencer(id)) playSound(100, 0.05, 'sine', 0.05);
     else playGunshot();
 
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    setShootRay();
     const colliders = [...getEnemyMeshes(), ...obstacles.filter(o => o.mesh).map(o => o.mesh)];
     const hits = raycaster.intersectObjects(colliders, true);
     const startPoint = camera.position.clone().add(new THREE.Vector3(0.1, -0.2, -0.5).applyQuaternion(camera.quaternion));
@@ -213,7 +223,7 @@ export function useAdrenaline() {
 // --- Throwables & Explosions ---
 
 function throwProjectile(def) {
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    setShootRay();
     const colliders = [...getEnemyMeshes(), ...obstacles.filter(o => o.mesh).map(o => o.mesh)];
     const hits = raycaster.intersectObjects(colliders, true);
 

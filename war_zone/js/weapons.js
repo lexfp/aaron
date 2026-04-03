@@ -328,12 +328,43 @@ function buildGunDetails(group, weaponId, bodyMat, accentMat, metalMat) {
         mag.position.set(0.15, -0.16, -0.35);
         group.add(mag);
     } else if (weaponId === 'minigun') {
-        for (let b = 0; b < 4; b++) {
-            const angle = (b / 4) * Math.PI * 2;
-            const extraBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.2, 6), metalMat);
-            extraBarrel.rotation.x = Math.PI / 2;
-            extraBarrel.position.set(0.15 + Math.cos(angle) * 0.015, -0.11 + Math.sin(angle) * 0.015, -0.68);
-            group.add(extraBarrel);
+        const housingMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.35, metalness: 0.75 });
+        // Cylindrical rotating-barrel housing (replaces the boxy body visually)
+        const housing = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.48, 14), housingMat);
+        housing.rotation.x = Math.PI / 2;
+        housing.position.set(0.15, -0.11, -0.37);
+        group.add(housing);
+        // 6 barrels in hexagonal arrangement
+        for (let b = 0; b < 6; b++) {
+            const angle = (b / 6) * Math.PI * 2;
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.0065, 0.0065, 0.28, 6), metalMat);
+            barrel.rotation.x = Math.PI / 2;
+            barrel.position.set(0.15 + Math.cos(angle) * 0.022, -0.11 + Math.sin(angle) * 0.022, -0.71);
+            group.add(barrel);
+        }
+        // Muzzle cluster plate
+        const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.040, 0.040, 0.016, 12), housingMat);
+        muzzle.rotation.x = Math.PI / 2;
+        muzzle.position.set(0.15, -0.11, -0.858);
+        group.add(muzzle);
+        // Rear sight base + post
+        const sightBase = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.010, 0.04), metalMat);
+        sightBase.position.set(0.15, -0.063, -0.35);
+        group.add(sightBase);
+        const sightPost = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.022, 0.005), metalMat);
+        sightPost.position.set(0.15, -0.046, -0.35);
+        group.add(sightPost);
+        // Front sight
+        const frontSight = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.018, 0.005), metalMat);
+        frontSight.position.set(0.15, -0.050, -0.58);
+        group.add(frontSight);
+        // Ammo belt/chute draping down
+        const beltMat = new THREE.MeshStandardMaterial({ color: 0x888833, metalness: 0.4 });
+        for (let i = 0; i < 8; i++) {
+            const link = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.013, 0.022), beltMat);
+            link.position.set(0.15 + i * 0.005, -0.20 - i * 0.022, -0.30 - i * 0.006);
+            link.rotation.z = i * 0.18;
+            group.add(link);
         }
     } else if (weaponId === 'rpg') {
         const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.025, 0.08, 8), metalMat);
@@ -400,15 +431,26 @@ export function toggleZoom() {
         document.getElementById('scope-overlay').style.display = 'none';
         document.getElementById('crosshair').style.display = 'block';
         camera.updateProjectionMatrix();
+        // Restore 3rd person if we were in it before zooming
+        if (window._wasThirdPersonBeforeZoom) {
+            window._wasThirdPersonBeforeZoom = false;
+            window._toggleThirdPerson?.();
+        }
         return;
     }
     if (!hasScope(id) && !def.hasScope) return;
     playerState.isZoomed = true;
+    // If in 3rd person, temporarily switch to 1st person for the scope view
+    if (window._isThirdPerson?.()) {
+        window._wasThirdPersonBeforeZoom = true;
+        window._toggleThirdPerson?.();
+    }
     camera.fov = 20;
     document.getElementById('scope-overlay').style.display = 'block';
     document.getElementById('crosshair').style.display = 'none';
     camera.updateProjectionMatrix();
 }
+window._toggleZoom = toggleZoom;
 
 export function reload() {
     const { id, def, state } = getCurrentWeapon();
@@ -466,13 +508,196 @@ export function dropCurrentWeapon() {
     switchWeapon(playerState.currentWeaponIndex);
 }
 
+// ── Dropped-weapon model builders ────────────────────────────────────────────
+// Parts are centred at local origin; body runs along the Z axis.
+// The group is placed in world space by dropWeapon with a random Y rotation.
+
+function _buildDroppedGunGroup(group, weaponId) {
+    const cfg         = GUN_CONFIGS[weaponId] || {};
+    const bodyColor   = cfg.bodyColor   || 0x333333;
+    const accentColor = cfg.accentColor || 0x4a3520;
+    const metalColor  = cfg.metalColor  || 0x555555;
+    const bodyLen     = cfg.bodyLen     || 0.30;
+    const bodyH       = cfg.bodyH       || 0.040;
+    const bodyW       = cfg.bodyW       || 0.030;
+    const barrelLen   = cfg.barrelLen   || 0.15;
+    const barrelR     = cfg.barrelRadius || 0.008;
+
+    const bodyMat   = new THREE.MeshStandardMaterial({ color: bodyColor,   roughness: 0.4, metalness: 0.6 });
+    const accentMat = new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.7 });
+    const metalMat  = new THREE.MeshStandardMaterial({ color: metalColor,  roughness: 0.2, metalness: 0.8 });
+
+    // Body
+    const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, bodyLen), bodyMat);
+    group.add(body);
+
+    // Grip
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.08, 0.025), accentMat);
+    grip.position.set(0, -bodyH / 2 - 0.04, bodyLen * 0.1);
+    grip.rotation.x = -0.3;
+    group.add(grip);
+
+    // Main barrel
+    if (weaponId !== 'minigun') {
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(barrelR, barrelR, barrelLen, 8), metalMat);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(0, 0, bodyLen / 2 + barrelLen / 2);
+        group.add(barrel);
+    }
+
+    // Per-weapon extras
+    if (weaponId === 'shotgun') {
+        const pump = new THREE.Mesh(new THREE.BoxGeometry(bodyW * 1.4, bodyH * 0.65, 0.08), accentMat);
+        pump.position.set(0, -bodyH * 0.2, bodyLen * 0.12);
+        group.add(pump);
+    } else if (weaponId === 'assault_rifle') {
+        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.07, 0.025), bodyMat);
+        mag.position.set(0, -bodyH / 2 - 0.035, bodyLen * 0.1);
+        group.add(mag);
+        const stock = new THREE.Mesh(new THREE.BoxGeometry(bodyW * 0.85, bodyH * 1.2, 0.10), accentMat);
+        stock.position.set(0, 0, -bodyLen / 2 - 0.05);
+        group.add(stock);
+    } else if (weaponId === 'sniper') {
+        const stock = new THREE.Mesh(new THREE.BoxGeometry(bodyW * 0.85, bodyH * 1.2, 0.12), accentMat);
+        stock.position.set(0, 0, -bodyLen / 2 - 0.06);
+        group.add(stock);
+        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.05, 0.02), bodyMat);
+        mag.position.set(0, -bodyH / 2 - 0.025, bodyLen * 0.1);
+        group.add(mag);
+        const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.12, 8),
+            new THREE.MeshStandardMaterial({ color: 0x111111 }));
+        scope.position.set(0, bodyH / 2 + 0.012, 0);
+        group.add(scope);
+    } else if (weaponId === 'minigun') {
+        const housingMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.35, metalness: 0.75 });
+        const housing = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, bodyLen * 0.82, 14), housingMat);
+        housing.rotation.x = Math.PI / 2;
+        group.add(housing);
+        for (let b = 0; b < 6; b++) {
+            const angle = (b / 6) * Math.PI * 2;
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.0065, 0.0065, barrelLen, 6), metalMat);
+            barrel.rotation.x = Math.PI / 2;
+            barrel.position.set(Math.cos(angle) * 0.022, Math.sin(angle) * 0.022, bodyLen / 2 + barrelLen / 2);
+            group.add(barrel);
+        }
+        const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.040, 0.040, 0.016, 12), housingMat);
+        muzzle.rotation.x = Math.PI / 2;
+        muzzle.position.set(0, 0, bodyLen / 2 + barrelLen + 0.008);
+        group.add(muzzle);
+        const beltMat = new THREE.MeshStandardMaterial({ color: 0x888833, metalness: 0.4 });
+        for (let i = 0; i < 6; i++) {
+            const link = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.013, 0.022), beltMat);
+            link.position.set(-i * 0.008, -0.06 - i * 0.022, -bodyLen * 0.2 + i * 0.01);
+            link.rotation.z = i * 0.18;
+            group.add(link);
+        }
+    } else if (weaponId === 'rpg') {
+        const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.025, 0.08, 8), metalMat);
+        tube.rotation.x = Math.PI / 2;
+        tube.position.set(0, 0, bodyLen / 2 + barrelLen + 0.04);
+        group.add(tube);
+    } else if (weaponId === 'revolver') {
+        const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.03, 8), metalMat);
+        cyl.position.set(0, 0, 0);
+        group.add(cyl);
+    } else if (weaponId === 'crossbow') {
+        const armMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.5 });
+        [-0.075, 0.075].forEach(xOff => {
+            const arm = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.008, 0.008), armMat);
+            arm.position.set(xOff, 0, bodyLen / 2 - 0.08);
+            arm.rotation.z = xOff < 0 ? 0.2 : -0.2;
+            group.add(arm);
+        });
+    }
+}
+
+function _buildDroppedMeleeGroup(group, weaponId) {
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 0.9, roughness: 0.1 });
+    const woodMat  = new THREE.MeshStandardMaterial({ color: 0x4a3520, roughness: 0.85 });
+    const skinMat  = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 });
+
+    if (weaponId === 'fists') {
+        group.add(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.10, 0.10), skinMat));
+    } else if (weaponId === 'knife') {
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.12, 8),
+            new THREE.MeshStandardMaterial({ color: 0x111111 }));
+        handle.rotation.x = Math.PI / 2; handle.position.z = -0.06; group.add(handle);
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.010, 0.24), metalMat);
+        blade.position.z = 0.12; group.add(blade);
+    } else if (weaponId === 'chainsaw') {
+        const motorMat = new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.5 });
+        const motor = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.09, 0.18), motorMat);
+        motor.position.z = -0.10; group.add(motor);
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.032, 0.40),
+            new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 0.8 }));
+        bar.position.z = 0.20; group.add(bar);
+    } else if (weaponId === 'katana') {
+        const kWood = new THREE.MeshStandardMaterial({ color: 0x2a1a08, roughness: 0.85 });
+        const guardMat = new THREE.MeshStandardMaterial({ color: 0xcc9920, metalness: 0.6 });
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.020, 0.24, 8), kWood);
+        handle.rotation.x = Math.PI / 2; handle.position.z = -0.25; group.add(handle);
+        const guard = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.018, 0.018), guardMat);
+        guard.position.z = -0.10; group.add(guard);
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.011, 0.90),
+            new THREE.MeshStandardMaterial({ color: 0xdcdcdc, metalness: 0.95, roughness: 0.04 }));
+        blade.position.z = 0.35; group.add(blade);
+    } else if (weaponId === 'longsword') {
+        const goldMat = new THREE.MeshStandardMaterial({ color: 0xcc9933, metalness: 0.75 });
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.28, 8), woodMat);
+        handle.rotation.x = Math.PI / 2; handle.position.z = -0.27; group.add(handle);
+        const guard = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.028, 0.028), goldMat);
+        guard.position.z = -0.10; group.add(guard);
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.052, 0.72), metalMat);
+        blade.position.z = 0.27; group.add(blade);
+    } else if (weaponId === 'axe') {
+        const axeMetal = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.82 });
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.028, 0.50, 8), woodMat);
+        handle.rotation.x = Math.PI / 2; group.add(handle);
+        const axeHead = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.24, 0.068), axeMetal);
+        axeHead.position.z = 0.30; group.add(axeHead);
+    } else if (weaponId === 'shield') {
+        const face = new THREE.Mesh(new THREE.BoxGeometry(0.50, 0.60, 0.05),
+            new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5 }));
+        group.add(face);
+        const boss = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.04, 8),
+            new THREE.MeshStandardMaterial({ color: 0xaa8833, metalness: 0.8 }));
+        boss.rotation.x = Math.PI / 2; boss.position.z = 0.05; group.add(boss);
+    } else {
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.30, 8), woodMat);
+        handle.rotation.x = Math.PI / 2; handle.position.z = -0.15; group.add(handle);
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 0.50), metalMat);
+        blade.position.z = 0.25; group.add(blade);
+    }
+}
+
+function _buildDroppedThrowableGroup(group, weaponId) {
+    const col = weaponId === 'molotov' ? 0x884400 : 0x445544;
+    group.add(new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8),
+        new THREE.MeshStandardMaterial({ color: col })));
+}
+
+function buildDroppedWeaponGroup(weaponId) {
+    const w = WEAPONS[weaponId];
+    const group = new THREE.Group();
+    if (!w) return group;
+    if (w.type === 'melee' || weaponId === 'fists') {
+        _buildDroppedMeleeGroup(group, weaponId);
+    } else if (w.type === 'throwable') {
+        _buildDroppedThrowableGroup(group, weaponId);
+    } else {
+        _buildDroppedGunGroup(group, weaponId);
+    }
+    return group;
+}
+
 export function dropWeapon(weaponId, position) {
-    const mat = new THREE.MeshStandardMaterial({ color: 0x888888, emissive: 0x222222 });
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.15, 0.15), mat);
-    mesh.position.copy(position);
-    mesh.position.y = 0.3;
-    scene.add(mesh);
-    gameState.droppedWeapons.push({ mesh, weaponId });
+    const group = buildDroppedWeaponGroup(weaponId);
+    group.position.copy(position);
+    group.position.y = 0.08;                        // float just above ground
+    group.rotation.y = Math.random() * Math.PI * 2; // random facing direction
+    group.rotation.z = (Math.random() - 0.5) * 0.25; // slight tilt as if dropped
+    scene.add(group);
+    gameState.droppedWeapons.push({ mesh: group, weaponId });
 }
 
 export function pickupWeapon(dropped) {

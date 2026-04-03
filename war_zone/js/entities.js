@@ -119,9 +119,9 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
         const wpnMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.6 });
         let wpnMesh;
         if (wDef.type === 'gun') {
-            wpnMesh = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.12, bodySize * 0.12, bodySize * 0.55), wpnMat);
-            wpnMesh.position.set(bodySize * 0.5, bodySize * 0.7, bodySize * 0.25);
-            wpnMesh.rotation.x = -0.3;
+            // Gun body pointing forward (along Z axis)
+            wpnMesh = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.1, bodySize * 0.1, bodySize * 0.55), wpnMat);
+            wpnMesh.position.set(bodySize * 0.5, bodySize * 0.85, bodySize * 0.35);
         } else if (wDef.type === 'melee') {
             wpnMesh = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.06, bodySize * 0.7, bodySize * 0.06),
                 new THREE.MeshStandardMaterial({ color: 0xbbbbbb, metalness: 0.8 }));
@@ -492,27 +492,45 @@ export function updateZombies(dt) {
         const isInCombat = !isWandering && canReachPlayer && dist < attackDist;
 
         if (isInCombat && useWeapon && wDef.type === 'gun') {
-            z.mesh.children[2].rotation.x = -0.4;
-            z.mesh.children[3].rotation.x = -0.5;
-            z.mesh.children[2].rotation.z = 0.1;
+            // Left arm raised, right arm extended forward holding gun
+            z.mesh.children[2].rotation.x = -0.3;
+            z.mesh.children[3].rotation.x = -1.2; // right arm forward
+            z.mesh.children[2].rotation.z = 0.15;
             z.mesh.children[3].rotation.z = -0.1;
-        } else if (isInCombat && z.attackCooldown <= 0) {
-            const punchPhase = (Date.now() * 0.015) % (Math.PI * 2);
-            z.mesh.children[2].rotation.x = -Math.PI * 0.55 * Math.max(0, Math.sin(punchPhase));
-            z.mesh.children[3].rotation.x = -Math.PI * 0.55 * Math.max(0, Math.sin(punchPhase + Math.PI));
-            z.mesh.children[2].rotation.z = 0.1;
-            z.mesh.children[3].rotation.z = -0.1;
+            z.mesh.children[0].rotation.z = 0;
+            z.mesh.children[0].rotation.x = 0;
+            z.mesh.children[1].rotation.x = 0;
+        } else if (isInCombat && (!useWeapon || (wDef && wDef.type === 'melee'))) {
+            const punchPhase = (Date.now() * 0.008) % (Math.PI * 2);
+            const punchA = Math.sin(punchPhase);
+            const punchB = Math.sin(punchPhase + Math.PI);
+            // Arms swing hard forward and back
+            z.mesh.children[2].rotation.x = -Math.PI * 0.85 * Math.max(0, punchA);
+            z.mesh.children[3].rotation.x = -Math.PI * 0.85 * Math.max(0, punchB);
+            // Arms flare out slightly on the backswing
+            z.mesh.children[2].rotation.z = 0.15 + 0.25 * Math.max(0, -punchA);
+            z.mesh.children[3].rotation.z = -0.15 - 0.25 * Math.max(0, -punchB);
+            // Body rocks side to side with each punch
+            z.mesh.children[0].rotation.z = Math.sin(punchPhase) * 0.18;
+            z.mesh.children[0].rotation.x = -0.15 + Math.abs(Math.sin(punchPhase)) * 0.2;
+            // Head bobs forward aggressively
+            z.mesh.children[1].rotation.x = 0.15 + Math.abs(Math.sin(punchPhase)) * 0.25;
         } else {
             z.mesh.children[2].rotation.x = Math.sin(walkPhase) * 0.6;
             z.mesh.children[3].rotation.x = Math.sin(walkPhase + Math.PI) * 0.6;
             z.mesh.children[2].rotation.z = 0.15;
             z.mesh.children[3].rotation.z = -0.15;
+            z.mesh.children[0].rotation.z = Math.sin(walkPhase * 0.5) * 0.05;
+            z.mesh.children[0].rotation.x = 0;
+            z.mesh.children[1].rotation.x = 0;
         }
 
         z.mesh.children[4].rotation.x = Math.sin(walkPhase + Math.PI) * 0.5;
         z.mesh.children[5].rotation.x = Math.sin(walkPhase) * 0.5;
-        z.mesh.children[0].rotation.z = Math.sin(walkPhase * 0.5) * 0.05;
-        z.mesh.children[1].rotation.z = Math.sin(walkPhase * 0.7) * 0.1;
+        if (!isInCombat || (useWeapon && wDef && wDef.type === 'gun')) {
+            z.mesh.children[0].rotation.z = Math.sin(walkPhase * 0.5) * 0.05;
+            z.mesh.children[1].rotation.z = Math.sin(walkPhase * 0.7) * 0.1;
+        }
 
         if (z.hpCtx) {
             z.hpCtx.clearRect(0, 0, 64, 16);

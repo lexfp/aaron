@@ -90,7 +90,9 @@ export const gameState = {
     // Airstrike cooldown: timestamp (ms) of last use, resets on new game
     airstrikeLastUsed: null,
     slopeMeshes: [],
-    craterPits: []   // { cx, cz, r, depth } — registered by buildMap, read by getFloorHeight
+    craterPits: [],
+    tpShootNDC: null,    // THREE.Vector2 set in 3rd person mode
+    tpShootCamera: null  // tpCamera ref set in 3rd person mode
 };
 
 // --- Leveling ---

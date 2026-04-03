@@ -73,6 +73,12 @@ export function setupInput(CHEATS, resumeGameFn) {
             }
         }
         if (key === 'z') toggleZoom();
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            if (gameState.active && (controls.isLocked || window._isThirdPerson?.())) {
+                window._toggleThirdPerson && window._toggleThirdPerson();
+            }
+        }
     });
 
     document.addEventListener('keyup', (e) => {
@@ -96,14 +102,17 @@ export function setupInput(CHEATS, resumeGameFn) {
 
     // Mouse
     document.addEventListener('mousedown', (e) => {
-        if (e.button === 0) { mouseDown = true; if (gameState.active && controls.isLocked) shoot(); }
-        if (e.button === 2) { if (gameState.active && controls.isLocked) toggleZoom(); }
+        const active = gameState.active && (controls.isLocked || window._isThirdPerson?.());
+        if (e.button === 0) { mouseDown = true; if (active) shoot(); }
+        if (e.button === 2 && !window._isThirdPerson?.()) { if (active) toggleZoom(); }
     });
-    document.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = false; });
+    document.addEventListener('mouseup', (e) => {
+        if (e.button === 0) mouseDown = false;
+    });
     document.addEventListener('contextmenu', (e) => e.preventDefault());
 
     document.addEventListener('wheel', (e) => {
-        if (!gameState.active || !controls.isLocked) return;
+        if (!gameState.active || (!controls.isLocked && !window._isThirdPerson?.())) return;
         switchWeapon(playerState.currentWeaponIndex + (e.deltaY > 0 ? 1 : -1));
     });
 
@@ -115,7 +124,7 @@ export function setupInput(CHEATS, resumeGameFn) {
         }
     });
     controls.addEventListener('unlock', () => {
-        if (gameState.active && !gameState.paused) {
+        if (gameState.active && !gameState.paused && !window._isThirdPerson?.()) {
             gameState.paused = true;
             document.getElementById('pause-menu').style.display = 'flex';
         }
