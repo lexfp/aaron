@@ -422,8 +422,12 @@ function _tpClearWeapon() {
 function rebuildTpWeapon(weaponId, wDef) {
     _tpClearWeapon();
     // 2× scale so weapons are clearly visible from the orbit camera distance
-    tpGunGroup.scale.setScalar(!wDef || weaponId === 'compass' ? 1 : 2.0);
-    if (!wDef || weaponId === 'compass') return;
+    tpGunGroup.scale.setScalar(!wDef || weaponId === 'compass' ? 1.0 : 2.0);
+    if (!wDef) return;
+    if (weaponId === 'compass') {
+        _buildTpCompassModel();
+        return;
+    }
     if (wDef.type === 'melee' || weaponId === 'fists') {
         _buildTpMeleeModel(weaponId);
     } else if (wDef.type === 'throwable') {
@@ -435,6 +439,28 @@ function rebuildTpWeapon(weaponId, wDef) {
     } else {
         _buildTpGunModel(weaponId);
     }
+}
+
+function _buildTpCompassModel() {
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.8 });
+    const dialMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    const needleMat = new THREE.MeshStandardMaterial({ color: 0xff2222 });
+
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.02, 16), baseMat);
+    base.position.set(0, 0, 0.05);
+    tpGunGroup.add(base);
+
+    const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.022, 16), dialMat);
+    dial.position.set(0, 0, 0.05);
+    tpGunGroup.add(dial);
+
+    const needleGeo = new THREE.ConeGeometry(0.012, 0.08, 4);
+    needleGeo.rotateX(Math.PI / 2);
+    needleGeo.translate(0, 0, 0.035);
+    const needle = new THREE.Mesh(needleGeo, needleMat);
+    needle.position.set(0, 0.015, 0.05);
+    needle.name = "tp_needle";
+    tpGunGroup.add(needle);
 }
 
 function _buildTpGunModel(weaponId) {

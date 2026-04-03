@@ -547,12 +547,12 @@ export function updateZombies(dt) {
                     const eyePos = new THREE.Vector3(z.mesh.position.x, z.mesh.position.y + 1.5, z.mesh.position.z);
                     const playerTarget = camera.position.clone();
                     if (hasLineOfSight(eyePos, playerTarget)) {
-                        damagePlayer(Math.floor(weaponDamage * (0.8 + Math.random() * 0.4)));
+                        damagePlayer(Math.floor(weaponDamage * (0.8 + Math.random() * 0.4)), z.mesh.position);
                         playGunshot();
                         z.attackCooldown = 1 / (wDef.fireRate || 0.5);
                     }
                 } else {
-                    damagePlayer(weaponDamage);
+                    damagePlayer(weaponDamage, z.mesh.position);
                     z.attackCooldown = useWeapon && wDef.type === 'melee' ? (1 / (wDef.fireRate || 0.5)) : 1;
                 }
             }
@@ -680,7 +680,7 @@ export function updatePvPEnemy(dt) {
     // Shoot
     e.shootCooldown -= dt;
     if (e.shootCooldown <= 0 && dist < 30) {
-        if (Math.random() < 0.3) damagePlayer(e.damage);
+        if (Math.random() < 0.3) damagePlayer(e.damage, e.mesh.position);
         e.shootCooldown = 0.5 + Math.random() * 0.5;
         playGunshot();
     }

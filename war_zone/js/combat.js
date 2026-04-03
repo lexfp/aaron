@@ -171,10 +171,26 @@ function applyDamageToEnemy(hit, dmg) {
     }
 }
 
-export function damagePlayer(amount) {
+export function damagePlayer(amount, attackerPos = null) {
     if (playerState.godMode) return;
     const { def } = getCurrentWeapon();
-    if (def.damageReduction) amount *= (1 - def.damageReduction);
+    
+    let bypassShield = false;
+    if (def.damageReduction && attackerPos) {
+        const playerForward = new THREE.Vector3();
+        camera.getWorldDirection(playerForward);
+        playerForward.y = 0;
+        playerForward.normalize();
+
+        const toAttacker = new THREE.Vector3().subVectors(attackerPos, camera.position);
+        toAttacker.y = 0;
+        toAttacker.normalize();
+
+        const dot = playerForward.dot(toAttacker);
+        if (dot < -0.2) bypassShield = true; // Attacker is behind the player
+    }
+
+    if (def.damageReduction && !bypassShield) amount *= (1 - def.damageReduction);
     amount *= (1 - playerState.damageReduction);
 
     if (playerState.armor > 0) {
@@ -254,7 +270,7 @@ function createExplosion(pos, radius, damage) {
     if (gameState.pvpEnemy?.hp > 0 && gameState.pvpEnemy.mesh.position.distanceTo(pos) < radius) {
         gameState.pvpEnemy.hp -= damage;
     }
-    if (camera.position.distanceTo(pos) < radius) damagePlayer(damage * 0.5);
+    if (camera.position.distanceTo(pos) < radius) damagePlayer(damage * 0.5, pos);
 
     let t = 0;
     const fadeInt = setInterval(() => {
@@ -280,7 +296,7 @@ export function updateFireZones(dt) {
         const fz = gameState.fireZones[i];
         if (now > fz.endTime) { scene.remove(fz.mesh); gameState.fireZones.splice(i, 1); continue; }
         fz.mesh.material.opacity = 0.3 + Math.sin(now * 10) * 0.15;
-        if (camera.position.distanceTo(fz.position) < fz.radius) damagePlayer(fz.dps * dt);
+        if (camera.position.distanceTo(fz.position) < fz.radius) damagePlayer(fz.dps * dt, fz.position);
     }
 }
 
