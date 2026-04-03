@@ -91,6 +91,8 @@ export const gameState = {
     airstrikeLastUsed: null,
     slopeMeshes: [],
     craterPits: [],
+    streetLamps: [],     // { mat, phase } entries for flickering city lamps
+    playerFacingYaw: 0,  // player body/camera yaw for shield direction check
     tpShootNDC: null,    // THREE.Vector2 set in 3rd person mode
     tpShootCamera: null  // tpCamera ref set in 3rd person mode
 };

@@ -31,6 +31,7 @@ export function buildMap(mapId) {
     setWallBounds([]);
     gameState.slopeMeshes = [];
     gameState.craterPits = [];
+    gameState.streetLamps = [];
 
     const map = MAPS[mapId];
     const size = map.size;
@@ -547,17 +548,22 @@ export function buildMap(mapId) {
             }   // end bcz loop
         }   // end bcx loop
 
-        // Street lights — placed along roads on the sidewalks
+        // Street lights — placed along roads on the sidewalks (each gets its own material for independent flicker)
         const lightPoleMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.6 });
-        const lampGlowMat = new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0x443300 });
+        const _lampBase = new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0x443300, emissiveIntensity: 1.0 });
+        const _addLamp = (geo, lx, lz) => {
+            const mat = _lampBase.clone();
+            const lamp = new THREE.Mesh(geo, mat);
+            lamp.position.set(lx, 5.7, lz);
+            scene.add(lamp);
+            gameState.streetLamps.push({ mat, phase: Math.random() * Math.PI * 2 });
+        };
         // Along each N-S road
         for (const rx of [-blockPitch, 0, blockPitch]) {
             for (let lz = -mapR + 10; lz < mapR; lz += 22) {
                 const lx = rx + roadSurfW / 2 + swalkW * 0.5;
                 addObstacle(obs, lightPoleMat, 0.15, 5.5, 0.15, lx, 2.75, lz);
-                const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 0.3), lampGlowMat);
-                lamp.position.set(lx, 5.7, lz);
-                scene.add(lamp);
+                _addLamp(new THREE.BoxGeometry(1.2, 0.3, 0.3), lx, lz);
             }
         }
         // Along each E-W road
@@ -565,9 +571,7 @@ export function buildMap(mapId) {
             for (let lx = -mapR + 10; lx < mapR; lx += 22) {
                 const lz = rz + roadSurfW / 2 + swalkW * 0.5;
                 addObstacle(obs, lightPoleMat, 0.15, 5.5, 0.15, lx, 2.75, lz);
-                const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 1.2), lampGlowMat);
-                lamp.position.set(lx, 5.7, lz);
-                scene.add(lamp);
+                _addLamp(new THREE.BoxGeometry(0.3, 0.3, 1.2), lx, lz);
             }
         }
 
@@ -641,6 +645,15 @@ export function buildMap(mapId) {
             const wall = new THREE.Mesh(wallGeo, craterWallMat);
             wall.position.set(cx, -(depth - rimLip) / 2, cz);
             scene.add(wall);
+
+            // Dark hole cover — sits above the road surface (y=0.01) to hide it inside the crater
+            const holeCover = new THREE.Mesh(
+                new THREE.CircleGeometry(craterR * 0.89, 20),
+                craterFloorMat
+            );
+            holeCover.rotation.x = -Math.PI / 2;
+            holeCover.position.set(cx, 0.022, cz);
+            scene.add(holeCover);
 
             // Dark scorched ring on the ground surface — shows crater boundary clearly from ground level
             const ringGeo = new THREE.RingGeometry(craterR * 0.9, craterR * 1.7, 24);

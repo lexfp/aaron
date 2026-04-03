@@ -869,6 +869,26 @@ function animate() {
     const dt = Math.min((time - prevTime) / 1000, 0.033);
     prevTime = time;
 
+    // Update player facing direction for shield direction check
+    if (gameState.active) {
+        if (thirdPerson) {
+            gameState.playerFacingYaw = tpBodyYaw;
+        } else {
+            const _fwd = new THREE.Vector3();
+            camera.getWorldDirection(_fwd);
+            gameState.playerFacingYaw = Math.atan2(_fwd.x, _fwd.z);
+        }
+    }
+
+    // Animate street lamp flicker
+    if (gameState.streetLamps.length > 0) {
+        const t = time * 0.001;
+        for (const sl of gameState.streetLamps) {
+            const shouldFlicker = Math.sin(t * 0.5 + sl.phase) > 0.82;
+            sl.mat.emissiveIntensity = shouldFlicker ? (Math.sin(t * 28 + sl.phase) > 0 ? 1.0 : 0.0) : 1.0;
+        }
+    }
+
     if (gameState.active && !gameState.paused && (controls.isLocked || thirdPerson)) {
         direction.z = Number(keys.w) - Number(keys.s);
         direction.x = Number(keys.d) - Number(keys.a);
@@ -1289,9 +1309,9 @@ function animate() {
         tpGunGroup.position.set(0, gunPosY, gunPosZ);
         tpTorso.position.y = 1.05 + (isMoving ? Math.abs(Math.sin(phase)) * 0.04 : 0);
 
-        // Visibility: shield gets its own torso-mounted group; compass hides everything
+        // Visibility: shield gets its own torso-mounted group
         tpShieldGroup.visible = isShieldWep;
-        tpGunGroup.visible    = !!(wDef && curWep !== 'compass' && !isShieldWep);
+        tpGunGroup.visible    = !!(wDef && !isShieldWep);
 
         // Store shoot NDC for combat.js
         gameState.tpShootNDC = new THREE.Vector2(tpMouseX * 2 - 1, -(tpMouseY * 2 - 1));

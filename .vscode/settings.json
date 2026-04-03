@@ -1,5 +1,5 @@
 {
-    "liveServer.settings.port": 5502,
+    "liveServer.settings.port": 5503,
     "kiroAgent.configureMCP": "Disabled",
     "python.autoComplete.extraPaths": [
         "c:\\Users\\aaron\\.kiro\\extensions\\continue.continue-0.0.412-win32-x64"

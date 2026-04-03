@@ -177,17 +177,16 @@ export function damagePlayer(amount, attackerPos = null) {
     
     let bypassShield = false;
     if (def.damageReduction && attackerPos) {
-        const playerForward = new THREE.Vector3();
-        camera.getWorldDirection(playerForward);
-        playerForward.y = 0;
-        playerForward.normalize();
+        const facingYaw = gameState.playerFacingYaw ?? 0;
+        const playerForward = new THREE.Vector3(Math.sin(facingYaw), 0, Math.cos(facingYaw));
 
         const toAttacker = new THREE.Vector3().subVectors(attackerPos, camera.position);
         toAttacker.y = 0;
         toAttacker.normalize();
 
         const dot = playerForward.dot(toAttacker);
-        if (dot < -0.2) bypassShield = true; // Attacker is behind the player
+        // Shield only blocks attacks from the front arc (dot > 0.3); side and rear bypass it
+        if (dot <= 0.3) bypassShield = true;
     }
 
     if (def.damageReduction && !bypassShield) amount *= (1 - def.damageReduction);

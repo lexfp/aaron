@@ -207,7 +207,7 @@ export function spawnHostage(mapSize) {
 }
 
 function pickRandomWeapon(range) {
-    const options = Object.entries(WEAPONS).filter(([id, w]) => w.range === range);
+    const options = Object.entries(WEAPONS).filter(([id, w]) => w.range === range && w.type !== 'utility');
     if (options.length === 0) return null;
     return options[Math.floor(Math.random() * options.length)][0];
 }

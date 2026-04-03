@@ -531,7 +531,7 @@ const TUTORIAL_STEPS = [
     { title: 'Consumables', body: '<b>Q</b> &ndash; Use Med Kit (restores 50 HP)<br><b>Y</b> &ndash; Use Adrenaline (temp HP boost)<br><b>F</b> &ndash; Call Airstrike (once per 5 min)<br><b>E</b> &ndash; View your consumables list' },
     { title: 'Armor & Shop', body: 'Buy weapons, armor (helmet, breastplate, pants, boots), and consumables in the <b>Shop</b> for an up to 90% damage reduction.<br>Equip your gear before a mission in <b>Loadout</b>.' },
     { title: 'Game Modes', body: '<b>Zombie Apocalypse</b> &ndash; Survive waves of zombies. Bosses & Giga Zombies spawn later.<br><b>Rescue Mission</b> &ndash; Find and extract the hostage.<br><b>PvP Arena</b> &ndash; Fight an AI opponent.' },
-    { title: 'Other', body: '<b>Tab</b> to switch between first and third person point of view. <br> <b>More coming soon!</b>' },
+    { title: 'Other', body: '<b>Ctrl</b> to switch between first and third person point of view. <br> <b>More coming soon!</b>' },
     { title: "You're Ready!", body: "Kill zombies to earn money. Spend it in the shop between matches. Good luck!" },
 ];
 
