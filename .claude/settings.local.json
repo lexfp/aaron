@@ -6,7 +6,8 @@
       "Bash(wc:*)",
       "Bash(head:*)",
       "Bash(tree:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(powershell.exe:*)"
     ]
   }
 }
