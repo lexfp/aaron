@@ -6,6 +6,11 @@ export const WEAPONS = {
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
         cost: 0, starter: true, reach: 0
     },
+    flashlight: {
+        name: 'Flashlight', type: 'utility', range: 'close', damage: 0, fireRate: 1,
+        ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
+        cost: 0, reach: 0
+    },
     fists: {
         name: 'Fists', type: 'melee', range: 'close', damage: 3, fireRate: 0.5,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
@@ -113,7 +118,7 @@ export const EQUIPMENT = {
     // Consumables
     med_kit: { name: 'Med Kit', type: 'consumable', hpRestore: 50, cost: 100 },
     adrenaline: { name: 'Adrenaline', type: 'consumable', hpBoost: 25, cost: 250, tempHP: true },
-    airstrike: { name: 'Airstrike Targeter', type: 'consumable', airstrikes: 1, cost: 400 }
+    airstrike: { name: 'Airstrike Targeter', type: 'consumable', airstrikes: 1, cost: 5000 }
 };
 
 export const ATTACHMENTS = {
@@ -132,7 +137,7 @@ export const MAPS = {
     },
     city: {
         name: 'City Ruins', description: 'Urban combat with buildings and streets',
-        size: 160, color: 0x666666, wallColor: 0x888888, ambientLight: 0.5
+        size: 160, color: 0x666666, wallColor: 0x888888, ambientLight: 0.05
     },
     forest: {
         name: 'Dark Forest', description: 'Dense forest with limited visibility',

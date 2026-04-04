@@ -41,9 +41,10 @@ export function buildMap(mapId) {
 
     // Lighting
     scene.add(new THREE.AmbientLight(0xffffff, map.ambientLight));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    const dirLight = new THREE.DirectionalLight(0xffffff, mapId === 'city' ? 0.1 : 0.6);
     dirLight.position.set(size / 2, size, size / 3);
-    dirLight.castShadow = true;
+    // City uses dynamic flashlights; skip expensive shadow map there
+    dirLight.castShadow = mapId !== 'city';
     dirLight.shadow.mapSize.set(1024, 1024);
     dirLight.shadow.camera.left = -size;
     dirLight.shadow.camera.right = size;
@@ -180,9 +181,9 @@ export function buildMap(mapId) {
             addObstacle(obs, debrisMat, 0.8 + rng() * 1.2, 0.4 + rng() * 0.5, 0.8 + rng(), dx, 0.3, dz);
         }
     } else if (mapId === 'city') {
-        // Ruined city atmosphere — smoky orange haze
-        scene.fog = new THREE.Fog(0x3a2510, size * 0.15, size * 0.65);
-        scene.background = new THREE.Color(0x1a1008);
+        // Ruined city atmosphere — pitch black with faint ash haze
+        scene.fog = new THREE.Fog(0x060402, size * 0.08, size * 0.38);
+        scene.background = new THREE.Color(0x030201);
 
         const buildingColors = [0x887766, 0x6a4040, 0x3a4a60, 0x706050, 0x446050, 0x604030, 0x806040];
         const winMat = new THREE.MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.35 });
@@ -551,6 +552,8 @@ export function buildMap(mapId) {
         // Street lights — placed along roads on the sidewalks (each gets its own material for independent flicker)
         const lightPoleMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.6 });
         const _lampBase = new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0x443300, emissiveIntensity: 1.0 });
+        // Lamp meshes are emissive-only — no per-lamp PointLight (45+ lights = severe lag).
+        // Instead, one PointLight per road intersection (9 total) gives atmospheric pools of light.
         const _addLamp = (geo, lx, lz) => {
             const mat = _lampBase.clone();
             const lamp = new THREE.Mesh(geo, mat);
@@ -572,6 +575,14 @@ export function buildMap(mapId) {
                 const lz = rz + roadSurfW / 2 + swalkW * 0.5;
                 addObstacle(obs, lightPoleMat, 0.15, 5.5, 0.15, lx, 2.75, lz);
                 _addLamp(new THREE.BoxGeometry(0.3, 0.3, 1.2), lx, lz);
+            }
+        }
+        // One PointLight per intersection (9 crossings) — pools of amber light on the asphalt
+        for (const ix of [-blockPitch, 0, blockPitch]) {
+            for (const iz of [-blockPitch, 0, blockPitch]) {
+                const iLight = new THREE.PointLight(0xffaa44, 6, 22, 2);
+                iLight.position.set(ix, 5.5, iz);
+                scene.add(iLight);
             }
         }
 
@@ -717,7 +728,29 @@ export function buildMap(mapId) {
             const bz = (rng() - 0.5) * size * 1.8;
             if (Math.abs(bx) < 20 && Math.abs(bz) < 20) continue;
 
-            addObstacle(obs, rockMat, w, h, d, bx, h / 2, bz);
+            // ~40% of rocks have a passage cut through them so no area is fully sealed off
+            const hasGap = rng() < 0.40;
+            if (hasGap && w > 8 && d > 8) {
+                const gapSize = 3.0 + rng() * 1.5; // 3–4.5 m passage
+                // Alternate gap orientation per rock
+                if (rng() < 0.5) {
+                    // Gap along X — split into front and back slabs
+                    const halfD = (d - gapSize) / 2;
+                    if (halfD > 1) {
+                        addObstacle(obs, rockMat, w, h, halfD, bx, h / 2, bz - gapSize / 2 - halfD / 2);
+                        addObstacle(obs, rockMat, w, h, halfD, bx, h / 2, bz + gapSize / 2 + halfD / 2);
+                    } else { addObstacle(obs, rockMat, w, h, d, bx, h / 2, bz); }
+                } else {
+                    // Gap along Z — split into left and right slabs
+                    const halfW = (w - gapSize) / 2;
+                    if (halfW > 1) {
+                        addObstacle(obs, rockMat, halfW, h, d, bx - gapSize / 2 - halfW / 2, h / 2, bz);
+                        addObstacle(obs, rockMat, halfW, h, d, bx + gapSize / 2 + halfW / 2, h / 2, bz);
+                    } else { addObstacle(obs, rockMat, w, h, d, bx, h / 2, bz); }
+                }
+            } else {
+                addObstacle(obs, rockMat, w, h, d, bx, h / 2, bz);
+            }
             const slope = new THREE.Mesh(new THREE.BoxGeometry(w * 1.5, h * 0.5, d * 1.5), rockMat);
             slope.rotation.x = (rng() - 0.5); slope.rotation.z = (rng() - 0.5);
             slope.position.set(bx, h / 4, bz);
@@ -817,8 +850,8 @@ export function buildMap(mapId) {
 
     setObstacles(obs);
     gameState.ammoPickups = [];
-    // Start with only 1 ammo crate and 0 medkits; more spawn in over time
-    spawnSinglePickup(size, false);
+    // Start with 5 ammo crates; more spawn in over time
+    for (let _ai = 0; _ai < 5; _ai++) spawnSinglePickup(size, false);
 }
 
 export function spawnSinglePickup(mapSize, forceMedkit = null) {

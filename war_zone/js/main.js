@@ -770,8 +770,29 @@ function startGame(mode, mapId) {
     createWeaponModel(playerState.weapons[0]);
     renderWeaponSlots();
 
+    // Set up player flashlight spot light (attached to camera, active when flashlight is equipped)
+    if (gameState.playerFlashlight) {
+        camera.remove(gameState.playerFlashlight);
+        camera.remove(gameState.playerFlashlight.target);
+    }
+    const _flashlightSpot = new THREE.SpotLight(0xffeedd, 100, 900, Math.PI / 6, 0.35, 0);
+    _flashlightSpot.target.position.set(0, 0, -1);
+    _flashlightSpot.visible = false;
+    camera.add(_flashlightSpot);
+    camera.add(_flashlightSpot.target);
+    gameState.playerFlashlight = _flashlightSpot;
+
     gameState.zombieEntities = [];
     gameState.droppedWeapons = [];
+    // Spawn flashlight as a world pickup near spawn
+    {
+        const _flMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, emissive: 0xffaa00, emissiveIntensity: 0.6 });
+        const _flMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.45, 8), _flMat);
+        _flMesh.rotation.z = Math.PI / 2;
+        _flMesh.position.set(4, 0.5, 2);
+        scene.add(_flMesh);
+        gameState.droppedWeapons.push({ mesh: _flMesh, weaponId: 'flashlight' });
+    }
     gameState.fireZones = [];
     gameState.pickupSpawnTimer = 0;
     gameState.medkitSpawnTimer = 180;
@@ -781,10 +802,12 @@ function startGame(mode, mapId) {
     if (mode === 'zombie') {
         gameState.wave = 1;
         gameState.zombiesAlive = 0;
-        gameState.zombiesToSpawn = 450;
+        gameState.zombiesToSpawn = 20;
         gameState.zombieSpawnTimer = 0;
+        gameState.zombieKillCredit = 0;
+        gameState.zombieTotalKills = 0;
         document.getElementById('wave-hud').style.display = 'block';
-        document.getElementById('wave-hud').textContent = 'Wave 1';
+        document.getElementById('wave-hud').textContent = 'Kills: 0';
     } else if (mode === 'rescue') {
         spawnHostage(MAPS[mapId].size);
         gameState.zombiesAlive = 0;
@@ -880,7 +903,7 @@ function animate() {
         }
     }
 
-    // Animate street lamp flicker
+    // Animate street lamp flicker (emissive only — PointLights are at intersections, not per-lamp)
     if (gameState.streetLamps.length > 0) {
         const t = time * 0.001;
         for (const sl of gameState.streetLamps) {
@@ -1097,7 +1120,7 @@ function animate() {
         }
 
         gameState.pickupSpawnTimer = (gameState.pickupSpawnTimer || 0) + dt;
-        if (gameState.pickupSpawnTimer > 90) {
+        if (gameState.pickupSpawnTimer > 20) {
             const size = MAPS[gameState.currentMap].size;
             // Ammo crates spawn regularly; medkits much less often (separate slower timer)
             spawnSinglePickup(size, false);
@@ -1145,6 +1168,29 @@ function animate() {
         if (weaponModel) {
             weaponModel.visible = !thirdPerson;
             const currentWep = playerState.weapons[playerState.currentWeaponIndex];
+            if (gameState.playerFlashlight) {
+                gameState.playerFlashlight.visible = (currentWep === 'flashlight');
+                // Push fog far out while flashlight is on so the beam actually shows distant geometry
+                if (scene.fog) {
+                    const mapSize = MAPS[gameState.currentMap]?.size ?? 160;
+                    scene.fog.far = (currentWep === 'flashlight')
+                        ? mapSize * 6
+                        : mapSize * 0.38;
+                }
+                if (currentWep === 'flashlight' && gameState.zombieEntities.length > 0) {
+                    const _flDir = new THREE.Vector3();
+                    camera.getWorldDirection(_flDir);
+                    const _flCos = Math.cos(Math.PI / 6);
+                    const _flCamPos = camera.position;
+                    for (const z of gameState.zombieEntities) {
+                        if (z.dead) continue;
+                        const _toZ = new THREE.Vector3().subVectors(z.mesh.position, _flCamPos);
+                        const dist = _toZ.length();
+                        if (dist > 900) continue;
+                        if (_toZ.divideScalar(dist).dot(_flDir) > _flCos) z.attracted = true;
+                    }
+                }
+            }
             if (currentWep === 'compass') {
                 const targetPos = (gameState.hostage && !gameState.hostage.rescued) ?
                     gameState.hostage.mesh.position :

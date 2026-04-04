@@ -184,14 +184,41 @@ export function spawnHostage(mapSize) {
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), headMat);
     head.position.y = 1.5; group.add(head);
 
-    let spawnX = (Math.random() - 0.5) * mapSize * 0.8;
-    let spawnZ = (Math.random() - 0.5) * mapSize * 0.8;
-    for (let attempts = 0; attempts < 25; attempts++) {
-        if (!checkZombieCollision(new THREE.Vector3(spawnX, 1, spawnZ), 0.5)) break;
-        spawnX = (Math.random() - 0.5) * mapSize * 0.8;
-        spawnZ = (Math.random() - 0.5) * mapSize * 0.8;
+    // Legs
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x1a237e });
+    const legL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.5, 0.2), legMat);
+    legL.position.set(-0.14, 0.25, 0); group.add(legL);
+    const legR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.5, 0.2), legMat);
+    legR.position.set(0.14, 0.25, 0); group.add(legR);
+
+    // Facial features
+    const eyeMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), eyeMat);
+    eyeL.position.set(-0.09, 1.53, 0.23); group.add(eyeL);
+    const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), eyeMat);
+    eyeR.position.set(0.09, 1.53, 0.23); group.add(eyeR);
+    const mouthMat = new THREE.MeshStandardMaterial({ color: 0x882222 });
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.03, 0.02), mouthMat);
+    mouth.position.set(0, 1.4, 0.24); group.add(mouth);
+
+    // On mountain map keep hostage within the navigable flat-ish zone; elsewhere use full range.
+    const isMountain = gameState.currentMap === 'mountain';
+    const spawnRange = isMountain ? mapSize * 0.25 : mapSize * 0.8;
+    // Use a 3 m clear radius so the player can physically walk up to the hostage.
+    const clearRadius = 3.0;
+    let spawnX = (Math.random() - 0.5) * spawnRange * 2;
+    let spawnZ = (Math.random() - 0.5) * spawnRange * 2;
+    for (let attempts = 0; attempts < 100; attempts++) {
+        if (!checkZombieCollision(new THREE.Vector3(spawnX, 1, spawnZ), clearRadius)) break;
+        spawnX = (Math.random() - 0.5) * spawnRange * 2;
+        spawnZ = (Math.random() - 0.5) * spawnRange * 2;
     }
-    group.position.set(spawnX, 0, spawnZ);
+    // Snap Y to actual terrain surface so the hostage isn't buried in a slope.
+    const _hRay = new THREE.Raycaster(new THREE.Vector3(spawnX, 200, spawnZ), new THREE.Vector3(0, -1, 0));
+    const _hMeshes = obstacles.filter(o => o.mesh).map(o => o.mesh).concat(gameState.slopeMeshes || []);
+    const _hHits = _hRay.intersectObjects(_hMeshes);
+    const spawnY = _hHits.length > 0 ? _hHits[0].point.y : 0;
+    group.position.set(spawnX, spawnY, spawnZ);
 
     const canvas = document.createElement('canvas');
     canvas.width = 128; canvas.height = 32;
@@ -233,6 +260,15 @@ function hasLineOfSight(from, to) {
 export function killZombie(z, idx) {
     if (z.dead) return;
     z.dead = true; z.hp = 0;
+    if (gameState.mode === 'zombie') {
+        gameState.zombieTotalKills = (gameState.zombieTotalKills || 0) + 1;
+        gameState.zombieKillCredit = (gameState.zombieKillCredit || 0) + 1;
+        if (gameState.zombieKillCredit >= 2) {
+            gameState.zombieKillCredit -= 2;
+            gameState.zombiesToSpawn += 3;
+        }
+        document.getElementById('wave-hud').textContent = `Kills: ${gameState.zombieTotalKills}`;
+    }
     playerData.money += z.dropMoney;
     if (z.hpSprite) { z.mesh.remove(z.hpSprite); z.hpSprite = null; }
     if (z.weaponId) dropWeapon(z.weaponId, z.mesh.position.clone());
@@ -333,22 +369,23 @@ export function updateZombies(dt) {
     if (gameState.zombiesToSpawn > 0) {
         gameState.zombieSpawnTimer -= dt;
         if (gameState.zombieSpawnTimer <= 0) {
-            const gigaChance = gameState.mode === 'zombie' ? (gameState.wave - 1) * 0.01 : 0;
-            const isGiga = Math.random() < gigaChance;
-            const isBoss = !isGiga && gameState.wave >= 3 && Math.random() < 0.15 + gameState.wave * 0.02;
-            spawnZombie(isBoss, isGiga);
+            const kills = gameState.zombieTotalKills || 0;
+            const rawGigaChance = gameState.mode === 'zombie' ? Math.floor(kills / 20) * 0.01 : 0;
+            const guaranteedGigas = Math.floor(rawGigaChance);
+            const extraGigaChance = rawGigaChance - guaranteedGigas;
+            const gigaCount = guaranteedGigas + (Math.random() < extraGigaChance ? 1 : 0);
+            if (gigaCount > 0) {
+                for (let g = 0; g < gigaCount; g++) spawnZombie(false, true);
+            } else {
+                const isBoss = kills >= 20 && Math.random() < Math.min(0.3, 0.08 + kills * 0.003);
+                spawnZombie(isBoss, false);
+            }
             gameState.zombiesToSpawn--;
             gameState.zombieSpawnTimer = gameState.mode === 'rescue' ? 0.15 : (gameState.mode === 'zombie' ? 0.32 : 0.5);
         }
     }
 
-    // Wave complete (zombie invasion only — rescue uses a fixed horde count)
-    if (gameState.mode === 'zombie' && gameState.zombiesAlive <= 0 && gameState.zombiesToSpawn <= 0) {
-        gameState.wave++;
-        gameState.zombiesToSpawn = (70 + gameState.wave * 45) * 15;
-        document.getElementById('wave-hud').textContent = 'Wave ' + gameState.wave;
-        showRoundOverlay('Wave ' + gameState.wave, 'Incoming!', 2000);
-    }
+    // No wave system in zombie mode — 3 new zombies spawn per 2 kills (handled in killZombie)
 
     // Cache obstacle meshes once per frame (not once per zombie)
     const zRayMeshes = obstacles.filter(o => o.mesh).map(o => o.mesh)

@@ -32,6 +32,20 @@ export function createWeaponModel(weaponId) {
         needle.position.set(0.15, -0.135, -0.3);
         needle.name = "needle";
         group.add(needle);
+    } else if (weaponId === 'flashlight') {
+        const _flBodyMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.3 });
+        const _flLensMat = new THREE.MeshStandardMaterial({ color: 0xffffcc, emissive: 0xffff88, emissiveIntensity: 3.0 });
+        const _flBody = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.03, 0.2, 8), _flBodyMat);
+        _flBody.rotation.x = Math.PI / 2;
+        _flBody.position.set(0.15, -0.15, -0.35);
+        group.add(_flBody);
+        const _flLens = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.024, 0.018, 8), _flLensMat);
+        _flLens.rotation.x = Math.PI / 2;
+        _flLens.position.set(0.15, -0.15, -0.46);
+        group.add(_flLens);
+        const _flHand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 }));
+        _flHand.position.set(0.15, -0.15, -0.27);
+        group.add(_flHand);
     } else if (w.type === 'melee') {
         buildMeleeModel(group, weaponId, w);
     } else if (w.type === 'throwable') {
