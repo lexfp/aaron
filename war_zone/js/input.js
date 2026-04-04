@@ -28,6 +28,7 @@ export function setupInput(CHEATS, resumeGameFn) {
         if (key in keys) keys[key] = true;
         if (key === 'shift') keys.shift = true;
         if (key === ' ') { keys.space = true; e.preventDefault(); }
+        if (e.key === 'Tab') e.preventDefault();
         if (!gameState.active) return;
 
         if (key >= '1' && key <= '9') switchWeapon(parseInt(key) - 1);
@@ -73,7 +74,7 @@ export function setupInput(CHEATS, resumeGameFn) {
             }
         }
         if (key === 'z') toggleZoom();
-        if (e.key === 'Control') {
+        if (e.key === 'Control' || e.key === 'Tab') {
             e.preventDefault();
             if (gameState.active && (controls.isLocked || window._isThirdPerson?.())) {
                 window._toggleThirdPerson && window._toggleThirdPerson();
