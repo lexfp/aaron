@@ -16,6 +16,7 @@ A collection of independent browser games and tools, each in its own directory. 
 
 ### war_zone/ — 3D Tactical Shooter (Three.js)
 No build step. Open `war_zone/war_zone.html` directly in a browser. Three.js is loaded from CDN. All game logic lives in `js/`.
+Don't rely on console debug statements. The cursor is locked, so use alerts instead.
 
 ### tic-tac-toe-bot/ — Bot with Minimax AI (Vanilla JS + Jest)
 ```bash

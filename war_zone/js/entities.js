@@ -246,6 +246,7 @@ const _losRay = new THREE.Raycaster();
 const _losDir = new THREE.Vector3();
 const _floorRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
 const _floorOrigin = new THREE.Vector3();
+const _collPos = new THREE.Vector3(); // reusable for checkZombieCollision calls
 
 function hasLineOfSight(from, to) {
     _losDir.subVectors(to, from).normalize();
@@ -293,9 +294,16 @@ function checkZombieCollision(pos, radius) {
     const pMaxY = pos.y + 1.8;
 
     for (const obs of obstacles) {
-        if (obs.isSlope) continue; // slopes handled by floor snap
+        if (obs.isSlope) continue;
         if (obs.box) {
             const b = obs.box;
+            // Quick XZ distance cull before full AABB test
+            const cx = (b.min.x + b.max.x) * 0.5;
+            const cz = (b.min.z + b.max.z) * 0.5;
+            const dx = pos.x - cx, dz = pos.z - cz;
+            const hw = (b.max.x - b.min.x) * 0.5 + radius + 1;
+            const hd = (b.max.z - b.min.z) * 0.5 + radius + 1;
+            if (dx * dx > hw * hw || dz * dz > hd * hd) continue;
             if (pos.x + radius > b.min.x && pos.x - radius < b.max.x &&
                 pos.z + radius > b.min.z && pos.z - radius < b.max.z) {
                 if (pMinY < b.max.y && pMaxY > b.min.y) return true;
@@ -387,9 +395,13 @@ export function updateZombies(dt) {
 
     // No wave system in zombie mode — 3 new zombies spawn per 2 kills (handled in killZombie)
 
-    // Cache obstacle meshes once per frame (not once per zombie)
-    const zRayMeshes = obstacles.filter(o => o.mesh).map(o => o.mesh)
-        .concat(gameState.slopeMeshes || []);
+    // Cache obstacle meshes across frames — only rebuild when obstacle count changes
+    if (!updateZombies._rayMeshes || updateZombies._rayMeshLen !== obstacles.length) {
+        updateZombies._rayMeshes = obstacles.filter(o => o.mesh).map(o => o.mesh)
+            .concat(gameState.slopeMeshes || []);
+        updateZombies._rayMeshLen = obstacles.length;
+    }
+    const zRayMeshes = updateZombies._rayMeshes;
 
     for (let i = gameState.zombieEntities.length - 1; i >= 0; i--) {
         const z = gameState.zombieEntities[i];
@@ -430,18 +442,28 @@ export function updateZombies(dt) {
         }
         if (playerState.weapons[playerState.currentWeaponIndex] === 'shield') stopDist = Math.max(stopDist, 2.5);
 
-        // Gravity & Raycast Floor Tracking (reuse module-level raycaster)
-        _floorOrigin.set(z.mesh.position.x, z.mesh.position.y + 2, z.mesh.position.z);
-        _floorRay.set(_floorOrigin, _floorRay.ray.direction);
-        const zHits = _floorRay.intersectObjects(zRayMeshes);
-        if (zHits.length > 0 && zHits[0].distance < 4) {
-            z.mesh.position.y += (zHits[0].point.y - z.mesh.position.y) * dt * 10;
-        } else if (zHits.length > 0) {
+        // Gravity & Raycast Floor Tracking — throttled: each zombie updates every 3 frames
+        if (!z._floorFrame) z._floorFrame = i % 3;
+        z._floorFrame = (z._floorFrame + 1) % 3;
+        if (z._floorFrame === 0) {
+            _floorOrigin.set(z.mesh.position.x, z.mesh.position.y + 2, z.mesh.position.z);
+            _floorRay.set(_floorOrigin, _floorRay.ray.direction);
+            const zHits = _floorRay.intersectObjects(zRayMeshes);
+            if (zHits.length > 0 && zHits[0].distance < 4) {
+                z._cachedFloorY = zHits[0].point.y;
+            } else if (zHits.length > 0) {
+                z._cachedFloorY = zHits[0].point.y;
+            } else {
+                z._cachedFloorY = 0;
+            }
+        }
+        // Apply floor snap every frame using cached value
+        const cachedFloor = z._cachedFloorY ?? 0;
+        if (z.mesh.position.y > cachedFloor + 0.05) {
             z.mesh.position.y -= 15 * dt;
-            if (z.mesh.position.y < zHits[0].point.y) z.mesh.position.y = zHits[0].point.y;
+            if (z.mesh.position.y < cachedFloor) z.mesh.position.y = cachedFloor;
         } else {
-            z.mesh.position.y -= 15 * dt;
-            if (z.mesh.position.y < 0) z.mesh.position.y = 0;
+            z.mesh.position.y += (cachedFloor - z.mesh.position.y) * Math.min(1, dt * 10);
         }
 
         // AI state — always player-focused (no "cover" toward buildings)
@@ -461,16 +483,20 @@ export function updateZombies(dt) {
             z.prevHp = z.hp;
         }
 
-        // Auto-attract if player is very close or in line of sight
+        // Auto-attract if player is very close or in line of sight (throttled)
         if (gameState.mode === 'zombie' && !z.attracted) {
             if (dist < 4) {
                 z.attracted = true;
                 z.speed *= 1.5;
             } else if (dist < 20) {
-                const eyePos = new THREE.Vector3(z.mesh.position.x, z.mesh.position.y + 1.5, z.mesh.position.z);
-                if (hasLineOfSight(eyePos, playerPos)) {
-                    z.attracted = true;
-                    z.speed *= 1.5;
+                z._losTimer = (z._losTimer || 0) + 1;
+                if (z._losTimer >= 10) {
+                    z._losTimer = 0;
+                    const eyePos = new THREE.Vector3(z.mesh.position.x, z.mesh.position.y + 1.5, z.mesh.position.z);
+                    if (hasLineOfSight(eyePos, playerPos)) {
+                        z.attracted = true;
+                        z.speed *= 1.5;
+                    }
                 }
             }
         }
@@ -487,7 +513,7 @@ export function updateZombies(dt) {
             const wanderZR = z.zombieRadius || (z.isBoss ? 0.7 : 0.5);
             const nx = z.mesh.position.x + Math.sin(z.wanderAngle) * wanderSpeed * dt;
             const nz = z.mesh.position.z + Math.cos(z.wanderAngle) * wanderSpeed * dt;
-            if (!checkZombieCollision(new THREE.Vector3(nx, z.mesh.position.y, nz), wanderZR)) {
+            if (!checkZombieCollision(_collPos.set(nx, z.mesh.position.y, nz), wanderZR)) {
                 z.mesh.position.x = nx;
                 z.mesh.position.z = nz;
             } else {
@@ -684,14 +710,14 @@ export function updatePvPEnemy(dt) {
     if (dist > 8) {
         const nx = e.mesh.position.x + (dx / dist) * e.speed * dt;
         const nz = e.mesh.position.z + (dz / dist) * e.speed * dt;
-        if (!checkZombieCollision(new THREE.Vector3(nx, e.mesh.position.y, nz), 0.4)) {
+        if (!checkZombieCollision(_collPos.set(nx, e.mesh.position.y, nz), 0.4)) {
             e.mesh.position.x = nx;
             e.mesh.position.z = nz;
         }
     } else if (dist < 4) {
         const nx = e.mesh.position.x - (dx / dist) * e.speed * 0.5 * dt;
         const nz = e.mesh.position.z - (dz / dist) * e.speed * 0.5 * dt;
-        if (!checkZombieCollision(new THREE.Vector3(nx, e.mesh.position.y, nz), 0.4)) {
+        if (!checkZombieCollision(_collPos.set(nx, e.mesh.position.y, nz), 0.4)) {
             e.mesh.position.x = nx;
             e.mesh.position.z = nz;
         }
@@ -699,7 +725,7 @@ export function updatePvPEnemy(dt) {
     const perpX = -dz / dist, perpZ = dx / dist;
     const sx = e.mesh.position.x + perpX * e.strafeDir * e.speed * 0.5 * dt;
     const sz = e.mesh.position.z + perpZ * e.strafeDir * e.speed * 0.5 * dt;
-    if (!checkZombieCollision(new THREE.Vector3(sx, e.mesh.position.y, sz), 0.4)) {
+    if (!checkZombieCollision(_collPos.set(sx, e.mesh.position.y, sz), 0.4)) {
         e.mesh.position.x = sx;
         e.mesh.position.z = sz;
     }

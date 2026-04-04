@@ -194,6 +194,7 @@ export function showLoadout() {
     grid.innerHTML = '';
     for (const id of playerData.ownedWeapons) {
         const w = WEAPONS[id];
+        if (w.starter) continue; // hide starter/utility items from loadout
         const equipped = playerData.equippedLoadout.includes(id);
         const needsRepair = (playerData.weaponUsage[id] || 0) >= 5;
         const attachments = (playerData.weaponAttachments[id] || []).map(a => ATTACHMENTS[a].name).join(', ');

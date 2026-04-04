@@ -182,7 +182,7 @@ export function buildMap(mapId) {
         }
     } else if (mapId === 'city') {
         // Ruined city atmosphere — pitch black with faint ash haze
-        scene.fog = new THREE.Fog(0x060402, size * 0.08, size * 0.38);
+        scene.fog = new THREE.Fog(0x060402, size * 0.25, size * 0.65);
         scene.background = new THREE.Color(0x030201);
 
         const buildingColors = [0x887766, 0x6a4040, 0x3a4a60, 0x706050, 0x446050, 0x604030, 0x806040];
@@ -633,6 +633,7 @@ export function buildMap(mapId) {
         const craterFloorMat = new THREE.MeshStandardMaterial({ color: 0x0d0b06, roughness: 1.0 });
         const craterWallMat = new THREE.MeshStandardMaterial({ color: 0x1e1208, roughness: 1.0, side: THREE.DoubleSide });
         const craterRimMat = new THREE.MeshStandardMaterial({ color: 0x554433, roughness: 1.0 });
+        const craterWarnMat = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0x441100, roughness: 0.8 });
 
         for (let i = 0; i < 12; i++) {
             const cx = (rng() - 0.5) * size * 1.3;
@@ -657,7 +658,7 @@ export function buildMap(mapId) {
             wall.position.set(cx, -(depth - rimLip) / 2, cz);
             scene.add(wall);
 
-            // Dark hole cover — sits above the road surface (y=0.01) to hide it inside the crater
+            // Black hole opening — clearly visible dark disc
             const holeCover = new THREE.Mesh(
                 new THREE.CircleGeometry(craterR * 0.89, 20),
                 craterFloorMat
@@ -666,12 +667,19 @@ export function buildMap(mapId) {
             holeCover.position.set(cx, 0.022, cz);
             scene.add(holeCover);
 
-            // Dark scorched ring on the ground surface — shows crater boundary clearly from ground level
-            const ringGeo = new THREE.RingGeometry(craterR * 0.9, craterR * 1.7, 24);
-            const ring = new THREE.Mesh(ringGeo, craterFloorMat);
+            // Orange warning ring around the pit edge — clearly visible
+            const ringGeo = new THREE.RingGeometry(craterR * 0.88, craterR * 1.3, 24);
+            const ring = new THREE.Mesh(ringGeo, craterWarnMat);
             ring.rotation.x = -Math.PI / 2;
-            ring.position.set(cx, 0.012, cz);
+            ring.position.set(cx, 0.025, cz);
             scene.add(ring);
+
+            // Outer scorch ring
+            const outerRingGeo = new THREE.RingGeometry(craterR * 1.3, craterR * 1.9, 24);
+            const outerRing = new THREE.Mesh(outerRingGeo, craterFloorMat);
+            outerRing.rotation.x = -Math.PI / 2;
+            outerRing.position.set(cx, 0.015, cz);
+            scene.add(outerRing);
 
             // Scorched floor disc at the bottom of the pit
             const floorDisc = new THREE.Mesh(
@@ -764,7 +772,7 @@ export function buildMap(mapId) {
         const leafColors = [0x113a11, 0x0d3010, 0x1a4a1a, 0x0a2a0a];
         const mossColors = [0x2a4a1a, 0x3a5a2a];
 
-        scene.fog = new THREE.Fog(0x051105, size * 0.08, size * 0.38);
+        scene.fog = new THREE.Fog(0x051105, size * 0.15, size * 0.55);
         scene.background = new THREE.Color(0x020802);
 
         // Dense Poisson-disk-style tree placement — min 2.5m apart

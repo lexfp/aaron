@@ -17,7 +17,7 @@ import {
 } from './ui.js';
 import { createWeaponModel, getCurrentWeapon, switchWeapon, updateReload, refillAllAmmo } from './weapons.js';
 import { spawnPvPEnemy, updatePvPEnemy, killZombie, spawnZombie, updateZombies, spawnHostage } from './entities.js';
-import { shoot, updateFireZones, checkPvPEnd, damagePlayer } from './combat.js';
+import { shoot, updateFireZones, checkPvPEnd, damagePlayer, updateTracers } from './combat.js';
 import { setupInput, checkInteractionPrompt, isMouseDown } from './input.js';
 import { register } from './callbacks.js';
 
@@ -89,6 +89,8 @@ function checkCollision(newPos) {
         const distSq = dx * dx + dz * dz;
         if (distSq > pit.r * pit.r) continue;
         const wallR = pit.r * 0.88 - playerCylRadius;
+        // Allow escape if player is jumping upward with enough velocity
+        if (velocity.y > 3) continue;
         if (distSq > wallR * wallR) return true;
     }
 
@@ -97,6 +99,15 @@ function checkCollision(newPos) {
 
 const downRaycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
 const upRaycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
+// Cached raycaster + directions for camera clip prevention
+const _clipRay = new THREE.Raycaster();
+const _camDirs = [
+    new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1),
+];
+// Reusable vectors to avoid per-frame allocations
+const _v3a = new THREE.Vector3();
+const _v3b = new THREE.Vector3();
 
 function getFloorHeight(pos, allowUncapped = false) {
     // Default ground is y=0. Inside a crater pit the ground is lower.
@@ -126,12 +137,10 @@ function getFloorHeight(pos, allowUncapped = false) {
     // Check perfectly accurate sloped meshes via Dual Vertical Raycast
     const slopeMeshes = gameState.slopeMeshes || [];
     if (slopeMeshes.length > 0) {
-        // 1. Cast from high up down to find any potential floors
-        downRaycaster.set(new THREE.Vector3(pos.x, 200, pos.z), new THREE.Vector3(0, -1, 0));
+        downRaycaster.set(_v3a.set(pos.x, 200, pos.z), _v3b.set(0, -1, 0));
         const downHits = downRaycaster.intersectObjects(slopeMeshes);
 
-        // 2. Cast from slightly above step height to find ceilings without rejecting climbable platforms
-        upRaycaster.set(new THREE.Vector3(pos.x, feetY + 0.65, pos.z), new THREE.Vector3(0, 1, 0));
+        upRaycaster.set(_v3a.set(pos.x, feetY + 0.65, pos.z), _v3b.set(0, 1, 0));
         const upHits = upRaycaster.intersectObjects(slopeMeshes);
         const ceilingY = upHits.length > 0 ? upHits[0].point.y : Infinity;
 
@@ -238,9 +247,9 @@ const tpShieldGroup = new THREE.Group();
 tpShieldGroup.visible = false;
 tpTorso.add(tpShieldGroup);
 (function () {
-    const faceMat  = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5, roughness: 0.5 });
-    const rimMat   = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.6, roughness: 0.4 });
-    const bossMat  = new THREE.MeshStandardMaterial({ color: 0xaa8833, metalness: 0.8, roughness: 0.2 });
+    const faceMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5, roughness: 0.5 });
+    const rimMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.6, roughness: 0.4 });
+    const bossMat = new THREE.MeshStandardMaterial({ color: 0xaa8833, metalness: 0.8, roughness: 0.2 });
     // Main face — wider and taller than the torso to cover the entire front
     const face = new THREE.Mesh(new THREE.BoxGeometry(0.74, 1.00, 0.055), faceMat);
     face.position.set(0, -0.06, 0.22);
@@ -253,9 +262,9 @@ tpTorso.add(tpShieldGroup);
     // Rim — four border strips
     const rims = [
         { w: 0.04, h: 1.00, x: -0.37, y: -0.06 },
-        { w: 0.04, h: 1.00, x:  0.37, y: -0.06 },
-        { w: 0.74, h: 0.04, x:  0.00, y:  0.44 },
-        { w: 0.74, h: 0.04, x:  0.00, y: -0.56 },
+        { w: 0.04, h: 1.00, x: 0.37, y: -0.06 },
+        { w: 0.74, h: 0.04, x: 0.00, y: 0.44 },
+        { w: 0.74, h: 0.04, x: 0.00, y: -0.56 },
     ];
     rims.forEach(r => {
         const rim = new THREE.Mesh(new THREE.BoxGeometry(r.w, r.h, 0.065), rimMat);
@@ -405,14 +414,14 @@ window._updateTpArmor = updateTpArmor;
 
 // Dimensions match 1st-person GUN_CONFIGS in weapons.js; group is scaled 2× at runtime
 const TP_GUN_CFGS = {
-    glock:         { bodyColor: 0x2a2a2a, accentColor: 0x1a1a1a, bodyLen: 0.20, bodyH: 0.035, bodyW: 0.030, barrelLen: 0.15, barrelR: 0.008 },
-    revolver:      { bodyColor: 0x6B6B6B, accentColor: 0x3a2010, bodyLen: 0.22, bodyH: 0.045, bodyW: 0.030, barrelLen: 0.14, barrelR: 0.012, hasCylinder: true },
-    shotgun:       { bodyColor: 0x2a2a2a, accentColor: 0x5a3520, bodyLen: 0.45, bodyH: 0.040, bodyW: 0.030, barrelLen: 0.20, barrelR: 0.012, woodStock: true, hasPump: true },
+    glock: { bodyColor: 0x2a2a2a, accentColor: 0x1a1a1a, bodyLen: 0.20, bodyH: 0.035, bodyW: 0.030, barrelLen: 0.15, barrelR: 0.008 },
+    revolver: { bodyColor: 0x6B6B6B, accentColor: 0x3a2010, bodyLen: 0.22, bodyH: 0.045, bodyW: 0.030, barrelLen: 0.14, barrelR: 0.012, hasCylinder: true },
+    shotgun: { bodyColor: 0x2a2a2a, accentColor: 0x5a3520, bodyLen: 0.45, bodyH: 0.040, bodyW: 0.030, barrelLen: 0.20, barrelR: 0.012, woodStock: true, hasPump: true },
     assault_rifle: { bodyColor: 0x2d2d2d, accentColor: 0x3a3a3a, bodyLen: 0.50, bodyH: 0.040, bodyW: 0.035, barrelLen: 0.18, barrelR: 0.008, hasMag: true, woodStock: true },
-    sniper:        { bodyColor: 0x1a2a1a, accentColor: 0x2a1a10, bodyLen: 0.55, bodyH: 0.035, bodyW: 0.030, barrelLen: 0.25, barrelR: 0.006, woodStock: true, hasMag: true, hasScope: true },
-    minigun:       { bodyColor: 0x3a3a3a, accentColor: 0x2a2a2a, bodyLen: 0.55, bodyH: 0.060, bodyW: 0.050, barrelLen: 0.20, barrelR: 0.015, multiBarrel: true },
-    rpg:           { bodyColor: 0x4a5a3a, accentColor: 0x3a3a2a, bodyLen: 0.50, bodyH: 0.060, bodyW: 0.050, barrelLen: 0.15, barrelR: 0.025, hasWarhead: true },
-    crossbow:      { bodyColor: 0x3a2a1a, accentColor: 0x2a1a0a, bodyLen: 0.30, bodyH: 0.030, bodyW: 0.030, barrelLen: 0.10, barrelR: 0.008, hasBow: true },
+    sniper: { bodyColor: 0x1a2a1a, accentColor: 0x2a1a10, bodyLen: 0.55, bodyH: 0.035, bodyW: 0.030, barrelLen: 0.25, barrelR: 0.006, woodStock: true, hasMag: true, hasScope: true },
+    minigun: { bodyColor: 0x3a3a3a, accentColor: 0x2a2a2a, bodyLen: 0.55, bodyH: 0.060, bodyW: 0.050, barrelLen: 0.20, barrelR: 0.015, multiBarrel: true },
+    rpg: { bodyColor: 0x4a5a3a, accentColor: 0x3a3a2a, bodyLen: 0.50, bodyH: 0.060, bodyW: 0.050, barrelLen: 0.15, barrelR: 0.025, hasWarhead: true },
+    crossbow: { bodyColor: 0x3a2a1a, accentColor: 0x2a1a0a, bodyLen: 0.30, bodyH: 0.030, bodyW: 0.030, barrelLen: 0.10, barrelR: 0.008, hasBow: true },
 };
 
 function _tpClearWeapon() {
@@ -464,18 +473,18 @@ function _buildTpCompassModel() {
 }
 
 function _buildTpGunModel(weaponId) {
-    const cfg        = TP_GUN_CFGS[weaponId] || {};
-    const bodyLen    = cfg.bodyLen    || 0.30;
-    const bodyH      = cfg.bodyH      || 0.040;
-    const bodyW      = cfg.bodyW      || 0.030;
-    const bodyColor  = cfg.bodyColor  || 0x333333;
+    const cfg = TP_GUN_CFGS[weaponId] || {};
+    const bodyLen = cfg.bodyLen || 0.30;
+    const bodyH = cfg.bodyH || 0.040;
+    const bodyW = cfg.bodyW || 0.030;
+    const bodyColor = cfg.bodyColor || 0x333333;
     const accentColor = cfg.accentColor || 0x4a3520;
-    const barrelLen  = cfg.barrelLen  || 0.15;
-    const barrelR    = cfg.barrelR    || 0.008;
+    const barrelLen = cfg.barrelLen || 0.15;
+    const barrelR = cfg.barrelR || 0.008;
 
-    const bodyMat   = new THREE.MeshStandardMaterial({ color: bodyColor,   roughness: 0.4, metalness: 0.6 });
+    const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.4, metalness: 0.6 });
     const accentMat = new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.7 });
-    const metalMat  = new THREE.MeshStandardMaterial({ color: 0x555555,    roughness: 0.2, metalness: 0.8 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.2, metalness: 0.8 });
 
     // Body
     const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, bodyLen), bodyMat);
@@ -602,10 +611,10 @@ function _buildTpGunModel(weaponId) {
 }
 
 function _buildTpMeleeModel(weaponId) {
-    const skinMat   = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 });
-    const metalMat  = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 0.9, roughness: 0.1 });
-    const woodMat   = new THREE.MeshStandardMaterial({ color: 0x4a3520, roughness: 0.85 });
-    const darkMat   = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 0.9, roughness: 0.1 });
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a3520, roughness: 0.85 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 });
 
     if (weaponId === 'fists') {
         const fist = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.10, 0.10), skinMat);
@@ -623,7 +632,7 @@ function _buildTpMeleeModel(weaponId) {
 
     } else if (weaponId === 'chainsaw') {
         const motorMat = new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.5 });
-        const barMat   = new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 0.8 });
+        const barMat = new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 0.8 });
         const motor = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.09, 0.18), motorMat);
         motor.position.set(0, 0, 0.02);
         tpGunGroup.add(motor);
@@ -634,7 +643,7 @@ function _buildTpMeleeModel(weaponId) {
     } else if (weaponId === 'katana') {
         const bladeMat = new THREE.MeshStandardMaterial({ color: 0xdcdcdc, metalness: 0.95, roughness: 0.04 });
         const guardMat = new THREE.MeshStandardMaterial({ color: 0xcc9920, metalness: 0.6 });
-        const kWood    = new THREE.MeshStandardMaterial({ color: 0x2a1a08, roughness: 0.85 });
+        const kWood = new THREE.MeshStandardMaterial({ color: 0x2a1a08, roughness: 0.85 });
         const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.020, 0.24, 8), kWood);
         handle.rotation.x = Math.PI / 2;
         handle.position.set(0, 0.02, -0.05);
@@ -648,7 +657,7 @@ function _buildTpMeleeModel(weaponId) {
 
     } else if (weaponId === 'longsword') {
         const bladeMat = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 0.88, roughness: 0.12 });
-        const goldMat  = new THREE.MeshStandardMaterial({ color: 0xcc9933, metalness: 0.75 });
+        const goldMat = new THREE.MeshStandardMaterial({ color: 0xcc9933, metalness: 0.75 });
         const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.28, 8), woodMat);
         handle.rotation.x = Math.PI / 2;
         handle.position.set(0, 0, -0.05);
@@ -672,7 +681,7 @@ function _buildTpMeleeModel(weaponId) {
 
     } else if (weaponId === 'shield') {
         const shieldMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5 });
-        const goldMat   = new THREE.MeshStandardMaterial({ color: 0xaa8833, metalness: 0.8 });
+        const goldMat = new THREE.MeshStandardMaterial({ color: 0xaa8833, metalness: 0.8 });
         const shield = new THREE.Mesh(new THREE.BoxGeometry(0.50, 0.60, 0.05), shieldMat);
         shield.position.set(0, 0, 0.15);
         tpGunGroup.add(shield);
@@ -708,8 +717,9 @@ function startGame(mode, mapId) {
     tpBody.visible = false;
     updateTpArmor();
 
-    const maxSlots = mode === 'rescue' ? 5 : (mode === 'pvp' ? 3 : 4);
-    let initialWeapons = playerData.equippedLoadout.slice(0, maxSlots);
+    const loadoutSlots = mode === 'rescue' ? 5 : (mode === 'pvp' ? 3 : 4);
+    const inGameSlots = mode === 'pvp' ? 3 : 9; // allow picking up to 9 weapons in-game
+    let initialWeapons = playerData.equippedLoadout.slice(0, loadoutSlots);
     if (mode === 'rescue') {
         initialWeapons = initialWeapons.filter(w => w !== 'shield');
         if (!initialWeapons.includes('compass')) {
@@ -721,7 +731,7 @@ function startGame(mode, mapId) {
     const bonusHp = (playerData.stats?.health || 0) * 5;
     resetPlayerState({
         weapons: initialWeapons,
-        maxSlots,
+        maxSlots: inGameSlots,
         hp: 100 + bonusHp,
         maxHp: 100 + bonusHp,
         speedMult: 1 + (playerData.stats?.speed || 0) * 0.02
@@ -766,7 +776,11 @@ function startGame(mode, mapId) {
     // Med kits and adrenaline are used in-game via Q/Y; don't consume at match start
 
     camera.position.set(0, 1.7, 0);
-    scene.add(camera);
+    camera.rotation.set(0, 0, 0); // reset look direction
+    velocity.set(0, 0, 0);
+    const spawnFloor = getFloorHeight(camera.position);
+    camera.position.y = spawnFloor + 1.7;
+    scene.add(controls.getObject());
     createWeaponModel(playerState.weapons[0]);
     renderWeaponSlots();
 
@@ -775,8 +789,9 @@ function startGame(mode, mapId) {
         camera.remove(gameState.playerFlashlight);
         camera.remove(gameState.playerFlashlight.target);
     }
-    const _flashlightSpot = new THREE.SpotLight(0xffeedd, 100, 900, Math.PI / 6, 0.35, 0);
-    _flashlightSpot.target.position.set(0, 0, -1);
+    const _flashlightSpot = new THREE.SpotLight(0xffeedd, 18, 120, Math.PI / 7, 0.4, 1);
+    _flashlightSpot.position.set(0, -0.1, -0.3);
+    _flashlightSpot.target.position.set(0, -0.1, -20);
     _flashlightSpot.visible = false;
     camera.add(_flashlightSpot);
     camera.add(_flashlightSpot.target);
@@ -912,334 +927,360 @@ function animate() {
         }
     }
 
-    if (gameState.active && !gameState.paused && (controls.isLocked || thirdPerson)) {
-        direction.z = Number(keys.w) - Number(keys.s);
-        direction.x = Number(keys.d) - Number(keys.a);
-        direction.normalize();
+    if (gameState.active && !gameState.paused) {
+        try {
+            direction.z = Number(keys.w) - Number(keys.s);
+            direction.x = Number(keys.d) - Number(keys.a);
+            direction.normalize();
 
-        let isSprinting = false;
-        if (keys.shift && playerState.stamina > 0 && (direction.x !== 0 || direction.z !== 0)) {
-            isSprinting = true;
-            playerState.stamina -= dt * 20;
-            if (playerState.stamina < 0) playerState.stamina = 0;
-        } else if (!keys.shift) {
-            playerState.stamina += dt * 10;
-            if (playerState.stamina > playerState.maxStamina) playerState.stamina = playerState.maxStamina;
-        }
-
-        const speed = moveSpeed * (isSprinting ? sprintMult : 1) * playerState.speedMult;
-        velocity.x -= velocity.x * 10.0 * dt;
-        velocity.z -= velocity.z * 10.0 * dt;
-        velocity.y -= gravity * dt;
-        if (direction.z !== 0) velocity.z -= direction.z * speed * dt * 15;
-        if (direction.x !== 0) velocity.x -= direction.x * speed * dt * 15;
-        if (keys.space) {
-            if (canJump) {
-                velocity.y = jumpForce;
-                setCanJump(false);
-            } else if (gameState.currentMap === 'forest') {
-                // Tree scaling: holding Space near a trunk climbs it
-                const nearTrunk = obstacles.some(o => o.isTrunk &&
-                    Math.abs(o.mesh.position.x - camera.position.x) < 1.1 &&
-                    Math.abs(o.mesh.position.z - camera.position.z) < 1.1);
-                if (nearTrunk) velocity.y = 5;
+            let isSprinting = false;
+            if (keys.shift && playerState.stamina > 0 && (direction.x !== 0 || direction.z !== 0)) {
+                isSprinting = true;
+                playerState.stamina -= dt * 20;
+                if (playerState.stamina < 0) playerState.stamina = 0;
+            } else if (!keys.shift) {
+                playerState.stamina += dt * 10;
+                if (playerState.stamina > playerState.maxStamina) playerState.stamina = playerState.maxStamina;
             }
-        }
 
-        const rightDir = new THREE.Vector3();
-        const forwardDir = new THREE.Vector3();
-        if (thirdPerson) {
-            // In 3rd person, forward = direction the orbit camera is looking (toward player)
-            forwardDir.set(-Math.sin(tpYaw), 0, -Math.cos(tpYaw)).normalize();
-        } else {
-            camera.getWorldDirection(forwardDir);
-            forwardDir.y = 0; forwardDir.normalize();
-        }
-        rightDir.crossVectors(forwardDir, camera.up).normalize();
+            const speed = moveSpeed * (isSprinting ? sprintMult : 1) * playerState.speedMult;
+            velocity.x -= velocity.x * 10.0 * dt;
+            velocity.z -= velocity.z * 10.0 * dt;
+            velocity.y -= gravity * dt;
+            if (direction.z !== 0) velocity.z -= direction.z * speed * dt * 15;
+            if (direction.x !== 0) velocity.x -= direction.x * speed * dt * 15;
+            if (keys.space) {
+                if (canJump) {
+                    velocity.y = jumpForce;
+                    setCanJump(false);
+                } else if (gameState.currentMap === 'forest') {
+                    // Tree scaling: holding Space near a trunk climbs it
+                    const nearTrunk = obstacles.some(o => o.isTrunk &&
+                        Math.abs(o.mesh.position.x - camera.position.x) < 1.1 &&
+                        Math.abs(o.mesh.position.z - camera.position.z) < 1.1);
+                    if (nearTrunk) velocity.y = 5;
+                }
+            }
 
-        const moveVec = new THREE.Vector3();
-        moveVec.addScaledVector(rightDir, -velocity.x * dt);
-        moveVec.addScaledVector(forwardDir, -velocity.z * dt);
+            const rightDir = new THREE.Vector3();
+            const forwardDir = new THREE.Vector3();
+            if (thirdPerson) {
+                // In 3rd person, forward = direction the orbit camera is looking (toward player)
+                forwardDir.set(-Math.sin(tpYaw), 0, -Math.cos(tpYaw)).normalize();
+            } else {
+                camera.getWorldDirection(forwardDir);
+                forwardDir.y = 0; forwardDir.normalize();
+            }
+            rightDir.crossVectors(forwardDir, camera.up).normalize();
 
-        const origX = camera.position.x;
-        camera.position.x += moveVec.x;
-        if (checkCollision(camera.position)) camera.position.x = origX;
+            const moveVec = new THREE.Vector3();
+            moveVec.addScaledVector(rightDir, -velocity.x * dt);
+            moveVec.addScaledVector(forwardDir, -velocity.z * dt);
 
-        const origZ = camera.position.z;
-        camera.position.z += moveVec.z;
-        if (checkCollision(camera.position)) camera.position.z = origZ;
+            const origX = camera.position.x;
+            camera.position.x += moveVec.x;
+            if (checkCollision(camera.position)) camera.position.x = origX;
 
-        // Side-entry slope check: raycast in move direction from game loop where moveVec is known
-        if (gameState.currentMap === 'mountain') {
-            const slopeMeshes = gameState.slopeMeshes || [];
-            const moveDist = Math.sqrt(moveVec.x * moveVec.x + moveVec.z * moveVec.z);
-            if (slopeMeshes.length > 0 && moveDist > 0.0001) {
-                const dirX = moveVec.x / moveDist;
-                const dirZ = moveVec.z / moveDist;
-                const ox = camera.position.x - dirX * 0.5;
-                const oz = camera.position.z - dirZ * 0.5;
-                const checkDist = moveDist + 0.85;
-                const feetY = camera.position.y - 1.7;
-                const floorAhead = getFloorHeight(camera.position); // already moved to new pos
-                // Only block side entry if the floor ahead is NOT a walkable surface
-                // (i.e. the player isn't stepping up onto a slope top)
-                const canStepUp = floorAhead <= feetY + 0.6;
-                if (!canStepUp) {
-                    // Already handled by steepness guard in checkCollision
-                } else {
-                    const heights = [feetY + 0.15, camera.position.y - 0.85, camera.position.y - 0.2];
-                    let blocked = false;
-                    for (const ry of heights) {
-                        if (blocked) break;
-                        const ray = new THREE.Raycaster(
-                            new THREE.Vector3(ox, ry, oz),
-                            new THREE.Vector3(dirX, 0, dirZ)
+            const origZ = camera.position.z;
+            camera.position.z += moveVec.z;
+            if (checkCollision(camera.position)) camera.position.z = origZ;
+
+            // Side-entry slope check: raycast in move direction (only when actually moving)
+            if (gameState.currentMap === 'mountain') {
+                const slopeMeshes = gameState.slopeMeshes || [];
+                const moveDist = Math.sqrt(moveVec.x * moveVec.x + moveVec.z * moveVec.z);
+                if (slopeMeshes.length > 0 && moveDist > 0.001) {
+                    const dirX = moveVec.x / moveDist;
+                    const dirZ = moveVec.z / moveDist;
+                    const ox = camera.position.x - dirX * 0.5;
+                    const oz = camera.position.z - dirZ * 0.5;
+                    const checkDist = moveDist + 0.85;
+                    const feetY = camera.position.y - 1.7;
+                    const floorAhead = getFloorHeight(camera.position);
+                    if (floorAhead <= feetY + 0.6) {
+                        // Only cast one ray at mid-body — reduces 3 raycasts to 1
+                        const sideRay = new THREE.Raycaster(
+                            _v3a.set(ox, camera.position.y - 0.85, oz),
+                            _v3b.set(dirX, 0, dirZ)
                         );
-                        const hits = ray.intersectObjects(slopeMeshes);
+                        const hits = sideRay.intersectObjects(slopeMeshes);
                         for (const hit of hits) {
                             if (hit.distance > checkDist) break;
                             if (hit.face) {
                                 const wn = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
-                                // Only block on faces that are more vertical than horizontal
-                                // AND where the hit point is above the player's step-up range
                                 if (Math.abs(wn.y) > 0.7) continue;
-                                if (hit.point.y <= feetY + 0.6) continue; // reachable as floor
+                                if (hit.point.y <= feetY + 0.6) continue;
                             }
-                            blocked = true;
+                            camera.position.x = origX;
+                            camera.position.z = origZ;
                             break;
                         }
                     }
-                    if (blocked) {
-                        camera.position.x = origX;
-                        camera.position.z = origZ;
+                }
+            }
+
+            // After horizontal move, check if we've walked into the side of a slope:
+            // if the floor at the new position is more than 0.6m above our feet, push back.
+            if (gameState.currentMap === 'mountain') {
+                const feetY = camera.position.y - 1.7;
+                const floorHere = getFloorHeight(camera.position);
+                if (floorHere > feetY + 0.6) {
+                    camera.position.x = origX;
+                    camera.position.z = origZ;
+                }
+            }
+
+            const prevCamY = camera.position.y;
+            camera.position.y += velocity.y * dt;
+
+            // CCD: if falling on mountain map, sweep the full vertical path for slope surfaces
+            // so the player can't phase through them when moving fast
+            if (gameState.currentMap === 'mountain' && velocity.y < 0) {
+                const prevFeetY = prevCamY - 1.7;
+                const newFeetY = camera.position.y - 1.7;
+                // Cast from previous camera Y (not feet) to cover the full swept path
+                downRaycaster.set(
+                    _v3a.set(camera.position.x, prevCamY, camera.position.z),
+                    _v3b.set(0, -1, 0)
+                );
+                const sweepHits = downRaycaster.intersectObjects(gameState.slopeMeshes || []);
+                for (const hit of sweepHits) {
+                    // Surface was crossed: it was above new feet but below old feet
+                    if (hit.point.y >= newFeetY && hit.point.y < prevFeetY) {
+                        camera.position.y = hit.point.y + 1.7;
+                        velocity.y = 0;
+                        setCanJump(true);
+                        break;
                     }
                 }
             }
-        }
 
-        // After horizontal move, check if we've walked into the side of a slope:
-        // if the floor at the new position is more than 0.6m above our feet, push back.
-        if (gameState.currentMap === 'mountain') {
-            const feetY = camera.position.y - 1.7;
-            const floorHere = getFloorHeight(camera.position);
-            if (floorHere > feetY + 0.6) {
-                camera.position.x = origX;
-                camera.position.z = origZ;
+            let targetFloorY = getFloorHeight(camera.position) + 1.7;
+
+            if (camera.position.y < targetFloorY) {
+                if (velocity.y < -15) {
+                    damagePlayer(Math.floor((-velocity.y - 15) * 1.5));
+                }
+                camera.position.y = targetFloorY;
+                velocity.y = 0;
+                setCanJump(true);
             }
-        }
 
-        const prevCamY = camera.position.y;
-        camera.position.y += velocity.y * dt;
 
-        // CCD: if falling on mountain map, sweep the full vertical path for slope surfaces
-        // so the player can't phase through them when moving fast
-        if (gameState.currentMap === 'mountain' && velocity.y < 0) {
-            const prevFeetY = prevCamY - 1.7;
-            const newFeetY = camera.position.y - 1.7;
-            // Cast from previous camera Y (not feet) to cover the full swept path
-            downRaycaster.set(
-                new THREE.Vector3(camera.position.x, prevCamY, camera.position.z),
-                new THREE.Vector3(0, -1, 0)
-            );
-            const sweepHits = downRaycaster.intersectObjects(gameState.slopeMeshes || []);
-            for (const hit of sweepHits) {
-                // Surface was crossed: it was above new feet but below old feet
-                if (hit.point.y >= newFeetY && hit.point.y < prevFeetY) {
-                    camera.position.y = hit.point.y + 1.7;
-                    velocity.y = 0;
-                    setCanJump(true);
-                    break;
+            // Camera wall clip prevention — throttled to every 3 frames, cached mesh list
+            if (!window._clipFrame) window._clipFrame = 0;
+            window._clipFrame++;
+            if (window._clipFrame % 3 === 0) {
+                if (!window._camObsMeshes || window._camObsMeshesLen !== obstacles.length) {
+                    window._camObsMeshes = obstacles.filter(o => o.mesh && !o.passThrough && !o.isSlope).map(o => o.mesh);
+                    window._camObsMeshesLen = obstacles.length;
+                }
+                const PUSH_DIST = 0.3;
+                const camObsMeshes = window._camObsMeshes;
+                for (const dir of _camDirs) {
+                    _clipRay.set(camera.position, dir);
+                    _clipRay.far = PUSH_DIST;
+                    const hits = _clipRay.intersectObjects(camObsMeshes);
+                    if (hits.length > 0) {
+                        const push = PUSH_DIST - hits[0].distance;
+                        camera.position.x -= dir.x * push;
+                        camera.position.z -= dir.z * push;
+                    }
                 }
             }
-        }
 
-        let targetFloorY = getFloorHeight(camera.position) + 1.7;
+            const { def } = getCurrentWeapon();
+            if (isMouseDown() && def.fireRate <= 0.15) shoot();
 
-        if (camera.position.y < targetFloorY) {
-            if (velocity.y < -15) {
-                damagePlayer(Math.floor((-velocity.y - 15) * 1.5));
-            }
-            camera.position.y = targetFloorY;
-            velocity.y = 0;
-            setCanJump(true);
-        }
+            updateReload();
+            updateFireZones(dt);
+            updateTracers();
 
+            if (gameState.mode === 'zombie' || gameState.mode === 'rescue') updateZombies(dt);
+            else if (gameState.mode === 'pvp') updatePvPEnemy(dt);
 
-        // Camera wall clip prevention: cast short rays in 4 horizontal directions
-        // and push camera back if it's too close to any obstacle face.
-        {
-            const PUSH_DIST = 0.3;
-            const camDirs = [
-                new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
-                new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1),
-            ];
-            const camObsMeshes = obstacles.filter(o => o.mesh && !o.passThrough).map(o => o.mesh);
-            for (const dir of camDirs) {
-                const r = new THREE.Raycaster(camera.position, dir, 0, PUSH_DIST);
-                const hits = r.intersectObjects(camObsMeshes);
-                if (hits.length > 0) {
-                    const push = PUSH_DIST - hits[0].distance;
-                    camera.position.x -= dir.x * push;
-                    camera.position.z -= dir.z * push;
+            if (gameState.mode === 'rescue') {
+                if (gameState.hostage && !gameState.hostage.rescued) {
+                    if (camera.position.distanceTo(gameState.hostage.mesh.position) < 4 && keys.e) {
+                        gameState.hostage.rescued = true;
+                        scene.remove(gameState.hostage.mesh);
+                        spawnExtractionZone(MAPS[gameState.currentMap].size);
+                        for (let i = 0; i < 3; i++) spawnZombie(false, true, 7.0);
+                        document.getElementById('wave-hud').textContent = 'Get to Extraction (Green Pillar)!';
+                        gameState.zombiesToSpawn += 100;
+                        playPickup();
+                    }
+                } else if (gameState.extractionZone) {
+                    const ex = gameState.extractionZone;
+                    const dist = Math.sqrt(Math.pow(camera.position.x - ex.x, 2) + Math.pow(camera.position.z - ex.z, 2));
+                    if (dist < 5 && gameState.active) {
+                        gameState.active = false;
+                        controls.unlock();
+                        playerData.missions++;
+                        playerData.money += 3000;
+                        savePlayerData();
+                        showRoundOverlay('MISSION ACCOMPLISHED', 'Hostage Extracted! +$3000', 0, true);
+                    }
                 }
             }
-        }
 
-        const { def } = getCurrentWeapon();
-        if (isMouseDown() && def.fireRate <= 0.15) shoot();
+            gameState.pickupSpawnTimer = (gameState.pickupSpawnTimer || 0) + dt;
+            if (gameState.pickupSpawnTimer > 20) {
+                const size = MAPS[gameState.currentMap].size;
+                // Ammo crates spawn regularly; medkits much less often (separate slower timer)
+                spawnSinglePickup(size, false);
+                gameState.pickupSpawnTimer = 0;
+            }
+            gameState.medkitSpawnTimer = (gameState.medkitSpawnTimer || 120) - dt;
+            if (gameState.medkitSpawnTimer <= 0) {
+                spawnSinglePickup(MAPS[gameState.currentMap].size, true);
+                gameState.medkitSpawnTimer = 150 + Math.random() * 60;
+            }
 
-        updateReload();
-        updateFireZones(dt);
-
-        if (gameState.mode === 'zombie' || gameState.mode === 'rescue') updateZombies(dt);
-        else if (gameState.mode === 'pvp') updatePvPEnemy(dt);
-
-        if (gameState.mode === 'rescue') {
-            if (gameState.hostage && !gameState.hostage.rescued) {
-                if (camera.position.distanceTo(gameState.hostage.mesh.position) < 4 && keys.e) {
-                    gameState.hostage.rescued = true;
-                    scene.remove(gameState.hostage.mesh);
-                    spawnExtractionZone(MAPS[gameState.currentMap].size);
-                    for (let i = 0; i < 3; i++) spawnZombie(false, true, 7.0);
-                    document.getElementById('wave-hud').textContent = 'Get to Extraction (Green Pillar)!';
-                    gameState.zombiesToSpawn += 100;
-                    playPickup();
-                }
-            } else if (gameState.extractionZone) {
-                const ex = gameState.extractionZone;
-                const dist = Math.sqrt(Math.pow(camera.position.x - ex.x, 2) + Math.pow(camera.position.z - ex.z, 2));
-                if (dist < 5 && gameState.active) {
-                    gameState.active = false;
-                    controls.unlock();
-                    playerData.missions++;
-                    playerData.money += 3000;
-                    savePlayerData();
-                    showRoundOverlay('MISSION ACCOMPLISHED', 'Hostage Extracted! +$3000', 0, true);
+            // Cactus damage (desert map)
+            if (gameState.currentMap === 'desert') {
+                for (const obs of obstacles) {
+                    if (!obs.isCactus) continue;
+                    const cdx = camera.position.x - obs.mesh.position.x;
+                    const cdz = camera.position.z - obs.mesh.position.z;
+                    if (Math.sqrt(cdx * cdx + cdz * cdz) < (obs.radius || 0.5) + 0.35) {
+                        damagePlayer(5 * dt);
+                        break;
+                    }
                 }
             }
-        }
 
-        gameState.pickupSpawnTimer = (gameState.pickupSpawnTimer || 0) + dt;
-        if (gameState.pickupSpawnTimer > 20) {
-            const size = MAPS[gameState.currentMap].size;
-            // Ammo crates spawn regularly; medkits much less often (separate slower timer)
-            spawnSinglePickup(size, false);
-            gameState.pickupSpawnTimer = 0;
-        }
-        gameState.medkitSpawnTimer = (gameState.medkitSpawnTimer || 120) - dt;
-        if (gameState.medkitSpawnTimer <= 0) {
-            spawnSinglePickup(MAPS[gameState.currentMap].size, true);
-            gameState.medkitSpawnTimer = 150 + Math.random() * 60;
-        }
-
-        // Cactus damage (desert map)
-        if (gameState.currentMap === 'desert') {
-            for (const obs of obstacles) {
-                if (!obs.isCactus) continue;
-                const cdx = camera.position.x - obs.mesh.position.x;
-                const cdz = camera.position.z - obs.mesh.position.z;
-                if (Math.sqrt(cdx * cdx + cdz * cdz) < (obs.radius || 0.5) + 0.35) {
-                    damagePlayer(5 * dt);
-                    break;
+            for (const pickup of gameState.ammoPickups) {
+                if (pickup.collected) continue;
+                pickup.mesh.rotation.y += dt * 2;
+                if (camera.position.distanceTo(pickup.mesh.position) < 2) {
+                    pickup.collected = true;
+                    scene.remove(pickup.mesh);
+                    if (pickup.isMedkit) {
+                        playerState.hp = Math.min(playerState.maxHp, playerState.hp + 50);
+                        playPickup();
+                        updateHUD();
+                    } else {
+                        const state = playerState.weaponStates[playerState.weapons[playerState.currentWeaponIndex]];
+                        if (state) { state.reserveAmmo += 20; playPickup(); updateHUD(); }
+                    }
                 }
             }
-        }
 
-        for (const pickup of gameState.ammoPickups) {
-            if (pickup.collected) continue;
-            pickup.mesh.rotation.y += dt * 2;
-            if (camera.position.distanceTo(pickup.mesh.position) < 2) {
-                pickup.collected = true;
-                scene.remove(pickup.mesh);
-                if (pickup.isMedkit) {
-                    playerState.hp = Math.min(playerState.maxHp, playerState.hp + 50);
-                    playPickup();
-                    updateHUD();
+            for (const dw of gameState.droppedWeapons) dw.mesh.rotation.y += dt * 1.5;
+            checkInteractionPrompt();
+
+            if (weaponModel) {
+                weaponModel.visible = !thirdPerson;
+                const currentWep = playerState.weapons[playerState.currentWeaponIndex];
+                if (gameState.playerFlashlight) {
+                    gameState.playerFlashlight.visible = (currentWep === 'flashlight');
+                    // In 3rd person, reposition flashlight to shine from player body forward
+                    if (thirdPerson && currentWep === 'flashlight') {
+                        const fl = gameState.playerFlashlight;
+                        if (fl.parent === camera) {
+                            camera.remove(fl);
+                            camera.remove(fl.target);
+                            scene.add(fl);
+                            scene.add(fl.target);
+                        }
+                        const fwdX = -Math.sin(tpBodyYaw);
+                        const fwdZ = -Math.cos(tpBodyYaw);
+                        fl.position.set(
+                            camera.position.x + fwdX * 0.5,
+                            camera.position.y - 0.3,
+                            camera.position.z + fwdZ * 0.5
+                        );
+                        fl.target.position.set(
+                            camera.position.x + fwdX * 20,
+                            camera.position.y - 0.3,
+                            camera.position.z + fwdZ * 20
+                        );
+                        fl.target.updateMatrixWorld();
+                    } else if (!thirdPerson) {
+                        const fl = gameState.playerFlashlight;
+                        if (fl.parent !== camera) {
+                            scene.remove(fl);
+                            scene.remove(fl.target);
+                            fl.position.set(0, -0.1, -0.3);
+                            fl.target.position.set(0, -0.1, -20);
+                            camera.add(fl);
+                            camera.add(fl.target);
+                        }
+                    }
+                    // Push fog far out while flashlight is on so the beam actually shows distant geometry
+                    if (scene.fog) {
+                        const mapSize = MAPS[gameState.currentMap]?.size ?? 160;
+                        scene.fog.far = (currentWep === 'flashlight')
+                            ? mapSize * 6
+                            : mapSize * 0.38;
+                    }
+                    if (currentWep === 'flashlight' && gameState.zombieEntities.length > 0) {
+                        const _flDir = new THREE.Vector3();
+                        if (thirdPerson) {
+                            _flDir.set(-Math.sin(tpBodyYaw), 0, -Math.cos(tpBodyYaw));
+                        } else {
+                            camera.getWorldDirection(_flDir);
+                        }
+                        const _flCos = Math.cos(Math.PI / 6);
+                        const _flCamPos = camera.position;
+                        for (const z of gameState.zombieEntities) {
+                            if (z.dead) continue;
+                            const _toZ = new THREE.Vector3().subVectors(z.mesh.position, _flCamPos);
+                            const dist = _toZ.length();
+                            if (dist > 900) continue;
+                            if (_toZ.divideScalar(dist).dot(_flDir) > _flCos) z.attracted = true;
+                        }
+                    }
+                }
+                if (currentWep === 'compass') {
+                    const targetPos = (gameState.hostage && !gameState.hostage.rescued) ?
+                        gameState.hostage.mesh.position :
+                        (gameState.extractionZone ? new THREE.Vector3(gameState.extractionZone.x, camera.position.y, gameState.extractionZone.z) : null);
+
+                    if (targetPos) {
+                        const needle = weaponModel.getObjectByName("needle");
+                        const tpNeedle = tpGunGroup.getObjectByName("tp_needle");
+                        if (needle || tpNeedle) {
+                            const dirToTarget = new THREE.Vector3(
+                                targetPos.x - camera.position.x,
+                                0,
+                                targetPos.z - camera.position.z
+                            ).normalize();
+                            if (needle) {
+                                camera.updateMatrixWorld();
+                                const invMatrix = new THREE.Matrix4().copy(camera.matrixWorld).invert();
+                                const localDir = dirToTarget.clone().transformDirection(invMatrix);
+                                needle.rotation.y = Math.atan2(localDir.x, localDir.z);
+                            }
+                            if (tpNeedle) {
+                                tpGunGroup.updateMatrixWorld();
+                                const invMatrix = new THREE.Matrix4().copy(tpGunGroup.matrixWorld).invert();
+                                const localDir = dirToTarget.clone().transformDirection(invMatrix);
+                                tpNeedle.rotation.y = Math.atan2(localDir.x, localDir.z);
+                            }
+                        }
+                    }
+                }
+
+                const bobSpeed = keys.shift ? 12 : 8;
+                const bobAmt = keys.shift ? 0.015 : 0.008;
+                if (direction.x !== 0 || direction.z !== 0) {
+                    weaponModel.position.y = Math.sin(time * 0.001 * bobSpeed) * bobAmt;
+                    weaponModel.position.x = Math.cos(time * 0.001 * bobSpeed * 0.5) * bobAmt * 0.5;
+                }
+                if (weaponSwingTime > 0) {
+                    setWeaponSwingTime(weaponSwingTime - dt);
+                    weaponModel.rotation.x = -weaponSwingTime * 3;
                 } else {
-                    const state = playerState.weaponStates[playerState.weapons[playerState.currentWeaponIndex]];
-                    if (state) { state.reserveAmmo += 20; playPickup(); updateHUD(); }
+                    weaponModel.rotation.x = 0;
                 }
             }
-        }
+            updateHUD();
+        } catch (e) { console.error('Game loop error:', e); }
+    } // end if (gameState.active && !gameState.paused)
 
-        for (const dw of gameState.droppedWeapons) dw.mesh.rotation.y += dt * 1.5;
-        checkInteractionPrompt();
-
-        if (weaponModel) {
-            weaponModel.visible = !thirdPerson;
-            const currentWep = playerState.weapons[playerState.currentWeaponIndex];
-            if (gameState.playerFlashlight) {
-                gameState.playerFlashlight.visible = (currentWep === 'flashlight');
-                // Push fog far out while flashlight is on so the beam actually shows distant geometry
-                if (scene.fog) {
-                    const mapSize = MAPS[gameState.currentMap]?.size ?? 160;
-                    scene.fog.far = (currentWep === 'flashlight')
-                        ? mapSize * 6
-                        : mapSize * 0.38;
-                }
-                if (currentWep === 'flashlight' && gameState.zombieEntities.length > 0) {
-                    const _flDir = new THREE.Vector3();
-                    camera.getWorldDirection(_flDir);
-                    const _flCos = Math.cos(Math.PI / 6);
-                    const _flCamPos = camera.position;
-                    for (const z of gameState.zombieEntities) {
-                        if (z.dead) continue;
-                        const _toZ = new THREE.Vector3().subVectors(z.mesh.position, _flCamPos);
-                        const dist = _toZ.length();
-                        if (dist > 900) continue;
-                        if (_toZ.divideScalar(dist).dot(_flDir) > _flCos) z.attracted = true;
-                    }
-                }
-            }
-            if (currentWep === 'compass') {
-                const targetPos = (gameState.hostage && !gameState.hostage.rescued) ?
-                    gameState.hostage.mesh.position :
-                    (gameState.extractionZone ? new THREE.Vector3(gameState.extractionZone.x, camera.position.y, gameState.extractionZone.z) : null);
-
-                if (targetPos) {
-                    const needle = weaponModel.getObjectByName("needle");
-                    const tpNeedle = tpGunGroup.getObjectByName("tp_needle");
-                    if (needle || tpNeedle) {
-                        const dirToTarget = new THREE.Vector3(
-                            targetPos.x - camera.position.x,
-                            0,
-                            targetPos.z - camera.position.z
-                        ).normalize();
-                        if (needle) {
-                            camera.updateMatrixWorld();
-                            const invMatrix = new THREE.Matrix4().copy(camera.matrixWorld).invert();
-                            const localDir = dirToTarget.clone().transformDirection(invMatrix);
-                            needle.rotation.y = Math.atan2(localDir.x, localDir.z);
-                        }
-                        if (tpNeedle) {
-                            tpGunGroup.updateMatrixWorld();
-                            const invMatrix = new THREE.Matrix4().copy(tpGunGroup.matrixWorld).invert();
-                            const localDir = dirToTarget.clone().transformDirection(invMatrix);
-                            tpNeedle.rotation.y = Math.atan2(localDir.x, localDir.z);
-                        }
-                    }
-                }
-            }
-
-            const bobSpeed = keys.shift ? 12 : 8;
-            const bobAmt = keys.shift ? 0.015 : 0.008;
-            if (direction.x !== 0 || direction.z !== 0) {
-                weaponModel.position.y = Math.sin(time * 0.001 * bobSpeed) * bobAmt;
-                weaponModel.position.x = Math.cos(time * 0.001 * bobSpeed * 0.5) * bobAmt * 0.5;
-            }
-            if (weaponSwingTime > 0) {
-                setWeaponSwingTime(weaponSwingTime - dt);
-                weaponModel.rotation.x = -weaponSwingTime * 3;
-            } else {
-                weaponModel.rotation.x = 0;
-            }
-        }
-        updateHUD();
-
-
-    }
-
-    // 3rd person camera positioning
+    // 3rd person camera positioning + render (always runs when game is active)
     if (thirdPerson && gameState.active) {
         const t = performance.now() * 0.001;
         const isMoving = keys.w || keys.a || keys.s || keys.d;
@@ -1285,11 +1326,11 @@ function animate() {
         // Resolve current weapon
         const curWep = playerState.weapons[playerState.currentWeaponIndex];
         const wDef = WEAPONS[curWep];
-        const isMeleeWep  = !!(wDef && (wDef.type === 'melee' || curWep === 'fists'));
+        const isMeleeWep = !!(wDef && (wDef.type === 'melee' || curWep === 'fists'));
         const isShieldWep = curWep === 'shield';
-        const isRpgWep    = curWep === 'rpg';
-        const isMinigun   = curWep === 'minigun';
-        const isTwoHand   = ['shotgun', 'assault_rifle', 'sniper', 'crossbow'].includes(curWep);
+        const isRpgWep = curWep === 'rpg';
+        const isMinigun = curWep === 'minigun';
+        const isTwoHand = ['shotgun', 'assault_rifle', 'sniper', 'crossbow'].includes(curWep);
 
         // Rebuild 3rd-person weapon mesh when weapon changes
         if (curWep !== tpCurrentWeaponId) {
@@ -1303,47 +1344,47 @@ function animate() {
 
         if (isShieldWep) {
             // Right arm in combat guard; left arm braces the torso-mounted shield
-            armRX  = -0.90 + (-hipR * 0.20);
-            armLX  = -0.65 + (-hipL * 0.15);
-            armLZ  = 0.22;
+            armRX = -0.90 + (-hipR * 0.20);
+            armLX = -0.65 + (-hipL * 0.15);
+            armLZ = 0.22;
             gunRotX = 1.0;
 
         } else if (isRpgWep) {
             // Over-shoulder carry: arm swings backward so the tube rests on the shoulder
-            armRX  =  0.65 + ( hipR * 0.15);   // positive = arm goes back/up
-            armRZ  = -0.18;
-            armLX  = -0.55 + (-hipL * 0.30);   // left arm steadying from front
-            armLZ  =  0.18;
+            armRX = 0.65 + (hipR * 0.15);   // positive = arm goes back/up
+            armRZ = -0.18;
+            armLX = -0.55 + (-hipL * 0.30);   // left arm steadying from front
+            armLZ = 0.18;
             gunRotX = -0.65;                    // cancels arm tilt → tube stays horizontal
             gunPosY = -0.18;                    // slide weapon up toward the shoulder
             gunPosZ = -0.02;
 
         } else if (isMinigun) {
             // Hip-fire: both arms lower, barrel roughly horizontal at waist
-            armRX  = -0.68 + (-hipR * 0.18);
-            armLX  = -0.62 + (-hipL * 0.18);
-            armLZ  =  0.20;
+            armRX = -0.68 + (-hipR * 0.18);
+            armLX = -0.62 + (-hipL * 0.18);
+            armLZ = 0.20;
             gunRotX = 0.68;                     // barrel more horizontal than default
 
         } else if (isTwoHand) {
             // Two-handed shoulder mount: both arms raised and forward
-            armRX  = -1.12 + (-hipR * 0.18);
-            armLX  = -1.08 + (-hipL * 0.22);   // left hand supporting under handguard
-            armLZ  =  0.08;
+            armRX = -1.12 + (-hipR * 0.18);
+            armLX = -1.08 + (-hipL * 0.22);   // left hand supporting under handguard
+            armLZ = 0.08;
             gunRotX = 1.05;
 
         } else if (isMeleeWep) {
             // Weapon at side ready to strike; off-hand swings naturally
-            armRX  = -0.88 + (-hipR * 0.45);
-            armLX  = -0.35 + (-hipL * 0.55);
-            armLZ  =  0.14;
+            armRX = -0.88 + (-hipR * 0.45);
+            armLX = -0.35 + (-hipL * 0.55);
+            armLZ = 0.14;
             gunRotX = 1.0;
 
         } else {
             // Pistol / one-handed: raised forward aim, off-hand loose
-            armRX  = -1.32 + (-hipR * 0.25);
-            armLX  = -0.35 + (-hipL * 0.55);
-            armLZ  =  0.12;
+            armRX = -1.32 + (-hipR * 0.25);
+            armLX = -0.35 + (-hipL * 0.55);
+            armLZ = 0.12;
             gunRotX = 1.12;
         }
 
@@ -1351,13 +1392,13 @@ function animate() {
         tpArmRPivot.rotation.z = armRZ;
         tpArmLPivot.rotation.x = armLX;
         tpArmLPivot.rotation.z = armLZ;
-        tpGunGroup.rotation.x  = gunRotX;
+        tpGunGroup.rotation.x = gunRotX;
         tpGunGroup.position.set(0, gunPosY, gunPosZ);
         tpTorso.position.y = 1.05 + (isMoving ? Math.abs(Math.sin(phase)) * 0.04 : 0);
 
         // Visibility: shield gets its own torso-mounted group
         tpShieldGroup.visible = isShieldWep;
-        tpGunGroup.visible    = !!(wDef && !isShieldWep);
+        tpGunGroup.visible = !!(wDef && !isShieldWep);
 
         // Store shoot NDC for combat.js
         gameState.tpShootNDC = new THREE.Vector2(tpMouseX * 2 - 1, -(tpMouseY * 2 - 1));

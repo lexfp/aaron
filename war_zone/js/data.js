@@ -9,7 +9,7 @@ export const WEAPONS = {
     flashlight: {
         name: 'Flashlight', type: 'utility', range: 'close', damage: 0, fireRate: 1,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
-        cost: 0, reach: 0
+        cost: 0, reach: 0, starter: true
     },
     fists: {
         name: 'Fists', type: 'melee', range: 'close', damage: 3, fireRate: 0.5,
