@@ -214,12 +214,18 @@ function pickRandomWeapon(range) {
 
 const WEAPON_RANGE_UNITS = { close: 8, middle: 25, long: 50 };
 
+// Reusable raycasters and vectors to avoid per-frame allocations
+const _losRay = new THREE.Raycaster();
+const _losDir = new THREE.Vector3();
+const _floorRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
+const _floorOrigin = new THREE.Vector3();
+
 function hasLineOfSight(from, to) {
-    const dir = new THREE.Vector3().subVectors(to, from).normalize();
-    const ray = new THREE.Raycaster(from, dir);
+    _losDir.subVectors(to, from).normalize();
+    _losRay.set(from, _losDir);
     const distToTarget = from.distanceTo(to);
     const obsMeshes = obstacles.filter(o => o.mesh).map(o => o.mesh);
-    const hits = ray.intersectObjects(obsMeshes, true);
+    const hits = _losRay.intersectObjects(obsMeshes, true);
     if (hits.length === 0) return true;
     return hits[0].distance > distToTarget - 0.5;
 }
@@ -344,6 +350,10 @@ export function updateZombies(dt) {
         showRoundOverlay('Wave ' + gameState.wave, 'Incoming!', 2000);
     }
 
+    // Cache obstacle meshes once per frame (not once per zombie)
+    const zRayMeshes = obstacles.filter(o => o.mesh).map(o => o.mesh)
+        .concat(gameState.slopeMeshes || []);
+
     for (let i = gameState.zombieEntities.length - 1; i >= 0; i--) {
         const z = gameState.zombieEntities[i];
         if (z.dead) {
@@ -383,11 +393,10 @@ export function updateZombies(dt) {
         }
         if (playerState.weapons[playerState.currentWeaponIndex] === 'shield') stopDist = Math.max(stopDist, 2.5);
 
-        // Gravity & Raycast Floor Tracking
-        const zRayMeshes = obstacles.filter(o => o.mesh).map(o => o.mesh)
-            .concat(gameState.slopeMeshes || []);
-        const zRay = new THREE.Raycaster(new THREE.Vector3(z.mesh.position.x, z.mesh.position.y + 2, z.mesh.position.z), new THREE.Vector3(0, -1, 0));
-        const zHits = zRay.intersectObjects(zRayMeshes);
+        // Gravity & Raycast Floor Tracking (reuse module-level raycaster)
+        _floorOrigin.set(z.mesh.position.x, z.mesh.position.y + 2, z.mesh.position.z);
+        _floorRay.set(_floorOrigin, _floorRay.ray.direction);
+        const zHits = _floorRay.intersectObjects(zRayMeshes);
         if (zHits.length > 0 && zHits[0].distance < 4) {
             z.mesh.position.y += (zHits[0].point.y - z.mesh.position.y) * dt * 10;
         } else if (zHits.length > 0) {
@@ -532,7 +541,8 @@ export function updateZombies(dt) {
             z.mesh.children[1].rotation.z = Math.sin(walkPhase * 0.7) * 0.1;
         }
 
-        if (z.hpCtx) {
+        if (z.hpCtx && z.hp !== z._lastRenderedHp) {
+            z._lastRenderedHp = z.hp;
             z.hpCtx.clearRect(0, 0, 64, 16);
             z.hpCtx.fillStyle = '#ff0000';
             z.hpCtx.fillRect(0, 0, 64 * (z.hp / z.maxHp), 16);

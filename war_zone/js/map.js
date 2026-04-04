@@ -44,7 +44,7 @@ export function buildMap(mapId) {
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
     dirLight.position.set(size / 2, size, size / 3);
     dirLight.castShadow = true;
-    dirLight.shadow.mapSize.set(2048, 2048);
+    dirLight.shadow.mapSize.set(1024, 1024);
     dirLight.shadow.camera.left = -size;
     dirLight.shadow.camera.right = size;
     dirLight.shadow.camera.top = size;

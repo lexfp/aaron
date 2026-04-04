@@ -21,7 +21,7 @@ function setShootRay() {
     if (ndc && cam) {
         raycaster.setFromCamera(ndc, cam);
     } else {
-        raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+        raycaster.setFromCamera(_centerNDC, camera);
     }
 }
 
@@ -81,7 +81,7 @@ export function shoot() {
     const startPoint = camera.position.clone().add(new THREE.Vector3(0.1, -0.2, -0.5).applyQuaternion(camera.quaternion));
 
     if (def.explosive) {
-        let hitPos = hits.length > 0 ? hits[0].point : camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(100));
+        let hitPos = hits.length > 0 ? hits[0].point : camera.position.clone().add(camera.getWorldDirection(_shootWorldDir).multiplyScalar(100));
         createExplosion(hitPos, def.radius || 5, def.damage);
         createTracer(startPoint, hitPos);
         createMuzzleFlash();
@@ -91,7 +91,7 @@ export function shoot() {
             if (hitEnemy) applyDamageToEnemy(hits[0], calculateDamage(def, hits[0]));
             createTracer(startPoint, hits[0].point);
         } else {
-            createTracer(startPoint, camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(100)));
+            createTracer(startPoint, camera.position.clone().add(camera.getWorldDirection(_shootWorldDir).multiplyScalar(100)));
         }
         createMuzzleFlash();
     }
@@ -299,23 +299,52 @@ export function updateFireZones(dt) {
     }
 }
 
+// --- Object pools to avoid per-shot geometry allocation ---
+const _muzzleFlash = new THREE.Mesh(
+    new THREE.SphereGeometry(0.05, 4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xffff00 })
+);
+_muzzleFlash.position.set(0.15, -0.1, -0.65);
+_muzzleFlash.visible = false;
+let _muzzleFlashTimer = 0;
+
+const _tracerMat = new THREE.LineBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.8 });
+const _tracerPool = Array.from({ length: 20 }, () => {
+    const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+    const line = new THREE.Line(geo, _tracerMat);
+    line.visible = false;
+    line.userData.expireAt = 0;
+    scene.add(line);
+    return line;
+});
+let _tracerPoolIdx = 0;
+
+const _centerNDC = new THREE.Vector2(0, 0);
+const _shootWorldDir = new THREE.Vector3();
+
 function createMuzzleFlash() {
-    const flash = new THREE.Mesh(
-        new THREE.SphereGeometry(0.05, 4, 4),
-        new THREE.MeshBasicMaterial({ color: 0xffff00 })
-    );
-    flash.position.set(0.15, -0.1, -0.65);
-    camera.add(flash);
-    setTimeout(() => camera.remove(flash), 50);
+    if (!_muzzleFlash.parent) camera.add(_muzzleFlash);
+    _muzzleFlash.visible = true;
+    _muzzleFlashTimer = performance.now() + 50;
 }
 
 function createTracer(start, end) {
-    const material = new THREE.LineBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.8 });
-    const points = [start, end];
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const line = new THREE.Line(geometry, material);
-    scene.add(line);
-    setTimeout(() => scene.remove(line), 50);
+    const line = _tracerPool[_tracerPoolIdx % _tracerPool.length];
+    _tracerPoolIdx++;
+    const pos = line.geometry.attributes.position;
+    pos.setXYZ(0, start.x, start.y, start.z);
+    pos.setXYZ(1, end.x, end.y, end.z);
+    pos.needsUpdate = true;
+    line.visible = true;
+    line.userData.expireAt = performance.now() + 50;
+}
+
+export function updateTracers() {
+    const now = performance.now();
+    if (_muzzleFlash.visible && now > _muzzleFlashTimer) _muzzleFlash.visible = false;
+    for (const line of _tracerPool) {
+        if (line.visible && now > line.userData.expireAt) line.visible = false;
+    }
 }
 
 function showDamageNumber(pos, dmg) {
