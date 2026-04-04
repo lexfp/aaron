@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Instructions for Claude
 
-Always keep this file updated as thoroughly as possible. After any significant changes — new features, new files, architecture changes, new commands — update CLAUDE.md to reflect them.
+Do not make any changes until you have 95% confidence in what you need to build. Keep prompting until that level of confidence is reached. 
+Always keep this file updated as thoroughly as possible. After any significant changes — new features, new files, architecture changes, new commands — update CLAUDE.md to reflect them. 
+
 
 ## Repository Overview
 
@@ -80,3 +82,8 @@ Runs entirely in an 800×580px popup. `game.js` + `game.css` are self-contained 
 - `popup.html/js/css`: UI for keybind configuration
 - `content.js`: Injected into pages to detect and click elements
 - `background.js`: Service worker handling click automation timing
+
+## Applied Learning
+When something fails repeatedly or there is a workaround/easier way to do something, add a one-line bullet point less than 15 words mentioning it to save time in the future
+
+  -
