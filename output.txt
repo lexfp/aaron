@@ -1,0 +1,5 @@
+Results for prompt.txt:
+
+2. REMOVE FOG DURING DAYTIME (main.js)
+   When dayFactor > 0.5 (midday): fog.near = fog.far = 1e7 (effectively disabled).
+   During night/dusk/dawn: fog pushes out gradually, 20x farther by dayFactor=0.5.

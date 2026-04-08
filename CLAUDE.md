@@ -84,7 +84,21 @@ Runs entirely in an 800×580px popup. `game.js` + `game.css` are self-contained 
 - `content.js`: Injected into pages to detect and click elements
 - `background.js`: Service worker handling click automation timing
 
+## Recent Features (war_zone)
+- **Day/Night cycle**: 7.5-min cycle; references stored in `gameState.sunLight` / `gameState.ambientLightRef` set in `map.js`, updated in `animate()` in `main.js`
+- **Fly mode cheat**: type `fly` in cheat console; `playerState.flyMode` flag; Space=up, Ctrl=down
+- **Damage threshold**: `DAMAGE_THRESHOLD=10` in `data.js`; tracked via `playerData.weaponUsage` (incremented on game-over); repair $50
+- **Owned armor**: `playerData.ownedArmor[]` tracks purchased armor separately from equipped slots; drag-drop in loadout
+- **Debris collision**: `noStep:true` flag on debris obstacles skips step-over check in `checkCollision()`
+- **Craters**: dirt-coloured materials + floor rocks + soil ring layers (map.js city section); craters only spawn on city blocks (not roads) — ShapeGeometry holes in city ground use `-pit.cz` (shape-Y maps to world -Z after rotateX(-PI/2))
+- **SVG armor icons**: `getArmorSVG(type, name, small)` in ui.js generates inline SVG per tier
+- **Armor prices**: heavy armor ×100 (millions), chainmail ×5, light ×3; heavy breastplate = $8,000,000
+- **Fog**: daytime uses horizon haze (fog.near = mapSize*0.85, far = mapSize*1.35 with sky-blue color); night restores close dark fog
+- **Sun arc**: `sunAngle = dn * 2PI - PI/2` so noon (dn=0.5, dayFactor=1.0) places sun overhead (+Y)
+- **City ground**: ShapeGeometry with `rotateX(-PI/2)` uses `side: THREE.DoubleSide` to ensure visibility regardless of winding order
+- **Fly mode**: cheat console closing calls resumeGameFn() to re-engage pointer lock; shift=down, space=up
+
 ## Applied Learning
 When something fails repeatedly or there is a workaround/easier way to do something, add a one-line bullet point less than 15 words mentioning it to save time in the future
 
-  -
+  - Don't rely on console debug statements. The cursor is locked, so use alerts instead.

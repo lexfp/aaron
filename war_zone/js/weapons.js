@@ -335,12 +335,78 @@ function buildGunDetails(group, weaponId, bodyMat, accentMat, metalMat) {
         stock.position.set(0.15, -0.12, -0.12);
         group.add(stock);
     } else if (weaponId === 'sniper') {
-        const stock = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.045, 0.12), accentMat);
-        stock.position.set(0.15, -0.12, -0.1);
+        const darkMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.4, metalness: 0.7 });
+        const stockMat = new THREE.MeshStandardMaterial({ color: 0x4a3020, roughness: 0.85 }); // dark wood stock
+
+        // Cheekrest / rear stock (wood-tone)
+        const stock = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.06, 0.18), stockMat);
+        stock.position.set(0.15, -0.105, -0.06);
         group.add(stock);
-        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.05, 0.02), bodyMat);
-        mag.position.set(0.15, -0.16, -0.35);
+
+        // Buttstock flare
+        const butt = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.075, 0.04), stockMat);
+        butt.position.set(0.15, -0.108, 0.04);
+        group.add(butt);
+
+        // Detachable box magazine (large, curved)
+        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.075, 0.038), darkMat);
+        mag.position.set(0.15, -0.185, -0.30);
+        mag.rotation.x = -0.12;
         group.add(mag);
+
+        // Bolt handle (sticks out to the right)
+        const boltShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.045, 6), darkMat);
+        boltShaft.rotation.z = Math.PI / 2;
+        boltShaft.position.set(0.185, -0.095, -0.28);
+        group.add(boltShaft);
+        const boltKnob = new THREE.Mesh(new THREE.SphereGeometry(0.010, 6, 6), darkMat);
+        boltKnob.position.set(0.200, -0.095, -0.28);
+        group.add(boltKnob);
+
+        // Large tactical scope body
+        const scopeBody = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.20, 10), darkMat);
+        scopeBody.rotation.x = Math.PI / 2;
+        scopeBody.position.set(0.15, -0.065, -0.32);
+        group.add(scopeBody);
+
+        // Scope objective lens (front bell)
+        const scopeFront = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.018, 0.04, 10), darkMat);
+        scopeFront.rotation.x = Math.PI / 2;
+        scopeFront.position.set(0.15, -0.065, -0.44);
+        group.add(scopeFront);
+
+        // Scope ocular (rear bell)
+        const scopeRear = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.018, 0.03, 10), darkMat);
+        scopeRear.rotation.x = Math.PI / 2;
+        scopeRear.position.set(0.15, -0.065, -0.21);
+        group.add(scopeRear);
+
+        // Scope mount rail rings (2)
+        for (const mz of [-0.26, -0.38]) {
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.020, 0.005, 6, 12), darkMat);
+            ring.rotation.y = Math.PI / 2;
+            ring.position.set(0.15, -0.065, mz);
+            group.add(ring);
+        }
+
+        // Bipod legs (folded forward, angling down)
+        const bipodMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6, metalness: 0.5 });
+        for (const bx of [0.128, 0.172]) {
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.10, 6), bipodMat);
+            leg.rotation.z = (bx < 0.15 ? 0.5 : -0.5);
+            leg.position.set(bx, -0.16, -0.55);
+            group.add(leg);
+            // Foot tip
+            const tip = new THREE.Mesh(new THREE.SphereGeometry(0.006, 4, 4), bipodMat);
+            tip.position.set(bx + (bx < 0.15 ? -0.04 : 0.04), -0.205, -0.55);
+            group.add(tip);
+        }
+
+        // Muzzle brake at end of barrel
+        const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.010, 0.035, 8), darkMat);
+        muzzle.rotation.x = Math.PI / 2;
+        muzzle.position.set(0.15, -0.11, -0.76);
+        group.add(muzzle);
     } else if (weaponId === 'minigun') {
         const housingMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.35, metalness: 0.75 });
         // Cylindrical rotating-barrel housing (replaces the boxy body visually)
