@@ -6,6 +6,7 @@ function defaultPlayerData() {
         missions: 0,
         ownedWeapons: ['fists', 'glock'],
         ownedEquipment: [],
+        ownedArmor: [],
         weaponAttachments: {},
         weaponUsage: {},
         equippedLoadout: ['fists', 'glock'],
@@ -34,6 +35,7 @@ function loadPlayerData() {
                 weaponAttachments: (typeof d.weaponAttachments === 'object' && d.weaponAttachments !== null) ? d.weaponAttachments : def.weaponAttachments,
                 weaponUsage: (typeof d.weaponUsage === 'object' && d.weaponUsage !== null) ? d.weaponUsage : def.weaponUsage,
                 equippedLoadout: Array.isArray(d.equippedLoadout) ? d.equippedLoadout : def.equippedLoadout,
+                ownedArmor: Array.isArray(d.ownedArmor) ? d.ownedArmor : def.ownedArmor,
                 reserveAmmo: (typeof d.reserveAmmo === 'object' && d.reserveAmmo !== null) ? d.reserveAmmo : def.reserveAmmo,
                 stats: (typeof d.stats === 'object' && d.stats !== null) ? { ...def.stats, ...d.stats } : def.stats
             };
@@ -53,7 +55,7 @@ export const playerState = {
     headshotReduction: 0,
     weapons: [], currentWeaponIndex: 0,
     weaponStates: {},
-    isZoomed: false, godMode: false, noClip: false, speedMult: 1,
+    isZoomed: false, godMode: false, noClip: false, flyMode: false, speedMult: 1,
     maxSlots: 4,
     stamina: 100, maxStamina: 100
 };
@@ -62,7 +64,7 @@ export function resetPlayerState(overrides = {}) {
     Object.assign(playerState, {
         hp: 100, maxHp: 100, armor: 0, maxArmor: 0, damageReduction: 0,
         headshotReduction: 0, weapons: [], currentWeaponIndex: 0,
-        weaponStates: {}, isZoomed: false, godMode: false, noClip: false,
+        weaponStates: {}, isZoomed: false, godMode: false, noClip: false, flyMode: false,
         speedMult: 1, maxSlots: 4, stamina: 100, maxStamina: 100, ...overrides
     });
 }
@@ -94,7 +96,14 @@ export const gameState = {
     streetLamps: [],     // { mat, phase } entries for flickering city lamps
     playerFacingYaw: 0,  // player body/camera yaw for shield direction check
     tpShootNDC: null,    // THREE.Vector2 set in 3rd person mode
-    tpShootCamera: null  // tpCamera ref set in 3rd person mode
+    tpShootCamera: null, // tpCamera ref set in 3rd person mode
+    // Day/night cycle
+    dayTime: 0.5,        // 0.0=midnight, 0.25=dawn, 0.5=noon, 0.75=dusk
+    dayNightActive: false,
+    sunLight: null,
+    ambientLightRef: null,
+    fogNearBase: 0,
+    fogFarBase: 0
 };
 
 // --- Leveling ---

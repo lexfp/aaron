@@ -1,7 +1,7 @@
 // Shooting, damage calculation, throwables, explosions, fire zones
 
 import * as THREE from 'three';
-import { WEAPONS, EQUIPMENT } from './data.js';
+import { WEAPONS, EQUIPMENT, DAMAGE_THRESHOLD } from './data.js';
 import { playerData, playerState, savePlayerData, gameState, awardXP } from './state.js';
 import { scene, camera, controls, raycaster, setWeaponSwingTime, obstacles } from './engine.js';
 import { playSound, playGunshot, playHit, playExplosion, playPickup } from './audio.js';
@@ -28,6 +28,16 @@ function setShootRay() {
 export function shoot() {
     const { id, def, state } = getCurrentWeapon();
     const now = performance.now() / 1000;
+
+    // Block firing if weapon is damaged (needs repair)
+    if (!def.starter && def.type !== 'utility' && (playerData.weaponUsage[id] || 0) >= DAMAGE_THRESHOLD) {
+        // Only nag once per second so it doesn't spam
+        if (!shoot._lastDmgWarn || now - shoot._lastDmgWarn > 2) {
+            shoot._lastDmgWarn = now;
+            addKillFeed('⚠ ' + def.name + ' is DAMAGED — repair for $50 in shop!', '#ff4444');
+        }
+        return;
+    }
 
     if (state.reloading || now - state.lastFired < def.fireRate) return;
 

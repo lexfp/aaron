@@ -38,9 +38,14 @@ export function buildMap(mapId) {
 
     scene.fog = new THREE.Fog(0x000000, size * 0.3, size * 0.9);
     scene.background = new THREE.Color(0x111111);
+    gameState.fogNearBase = scene.fog.near;
+    gameState.fogFarBase = scene.fog.far;
 
     // Lighting
-    scene.add(new THREE.AmbientLight(0xffffff, map.ambientLight));
+    const ambLight = new THREE.AmbientLight(0xffffff, map.ambientLight);
+    scene.add(ambLight);
+    gameState.ambientLightRef = ambLight;
+
     const dirLight = new THREE.DirectionalLight(0xffffff, mapId === 'city' ? 0.1 : 0.6);
     dirLight.position.set(size / 2, size, size / 3);
     // City uses dynamic flashlights; skip expensive shadow map there
@@ -51,15 +56,20 @@ export function buildMap(mapId) {
     dirLight.shadow.camera.top = size;
     dirLight.shadow.camera.bottom = -size;
     scene.add(dirLight);
+    gameState.sunLight = dirLight;
+    gameState.dayNightActive = true;
+    gameState.dayTime = 0.5; // start at noon
 
-    // Ground
-    const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(size * 2, size * 2),
-        new THREE.MeshStandardMaterial({ color: map.color, roughness: 0.9 })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    scene.add(ground);
+    // Ground — city map defers ground creation until after craters are placed (ShapeGeometry with holes)
+    if (mapId !== 'city') {
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(size * 2, size * 2),
+            new THREE.MeshStandardMaterial({ color: map.color, roughness: 0.9 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+    }
 
     // Boundary walls
     const wallH = 8;
@@ -178,12 +188,16 @@ export function buildMap(mapId) {
             const dx = (rng() - 0.5) * size * 1.5;
             const dz = (rng() - 0.5) * size * 1.5;
             if (Math.abs(dx) < 8 && Math.abs(dz) < 8) continue;
-            addObstacle(obs, debrisMat, 0.8 + rng() * 1.2, 0.4 + rng() * 0.5, 0.8 + rng(), dx, 0.3, dz);
+            const dh = 0.7 + rng() * 0.6; // taller so they register as solid (min 0.7m)
+            addObstacle(obs, debrisMat, 0.8 + rng() * 1.2, dh, 0.8 + rng(), dx, dh / 2, dz);
+            obs[obs.length - 1].noStep = true;
         }
     } else if (mapId === 'city') {
         // Ruined city atmosphere — pitch black with faint ash haze
         scene.fog = new THREE.Fog(0x060402, size * 0.25, size * 0.65);
         scene.background = new THREE.Color(0x030201);
+        gameState.fogNearBase = scene.fog.near;
+        gameState.fogFarBase = scene.fog.far;
 
         const buildingColors = [0x887766, 0x6a4040, 0x3a4a60, 0x706050, 0x446050, 0x604030, 0x806040];
         const winMat = new THREE.MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.35 });
@@ -620,25 +634,29 @@ export function buildMap(mapId) {
             const rz = (rng() - 0.5) * size * 1.5;
             if (Math.abs(rx) < 8 && Math.abs(rz) < 8) continue;
             if (onRoad(rx, rz)) continue;
-            const rw = 1.1 + rng() * 0.9, rh = 0.35 + rng() * 0.45, rd = 0.9 + rng() * 0.7;
+            const rw = 1.1 + rng() * 0.9, rh = 0.7 + rng() * 0.5, rd = 0.9 + rng() * 0.7; // min height 0.7 for solid collision
             const chunk = new THREE.Mesh(new THREE.BoxGeometry(rw, rh, rd), rng() < 0.5 ? rubbleMat : concChunkMat);
             chunk.position.set(rx, rh / 2, rz);
             chunk.rotation.y = rng() * Math.PI * 2;
             chunk.castShadow = true;
             scene.add(chunk);
-            obs.push({ mesh: chunk, box: new THREE.Box3().setFromObject(chunk) });
+            obs.push({ mesh: chunk, box: new THREE.Box3().setFromObject(chunk), noStep: true });
         }
 
         // Impact craters — actual traversable pits the player can fall into
-        const craterFloorMat = new THREE.MeshStandardMaterial({ color: 0x0d0b06, roughness: 1.0 });
-        const craterWallMat = new THREE.MeshStandardMaterial({ color: 0x1e1208, roughness: 1.0, side: THREE.DoubleSide });
-        const craterRimMat = new THREE.MeshStandardMaterial({ color: 0x554433, roughness: 1.0 });
+        const craterFloorMat = new THREE.MeshStandardMaterial({ color: 0x4a2e12, roughness: 1.0 }); // dark damp dirt
+        const craterWallMat = new THREE.MeshStandardMaterial({ color: 0x6b3d1a, roughness: 1.0, side: THREE.DoubleSide }); // earth brown walls
+        const craterDirtFloorMat = new THREE.MeshStandardMaterial({ color: 0x7a5030, roughness: 1.0 }); // lighter dirt for floor disc
+        const craterRimMat = new THREE.MeshStandardMaterial({ color: 0x7a5a35, roughness: 1.0 }); // dirt-coloured rim chunks
         const craterWarnMat = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0x441100, roughness: 0.8 });
+        const craterRockMat = new THREE.MeshStandardMaterial({ color: 0x4a4035, roughness: 0.95 }); // embedded rocks
 
         for (let i = 0; i < 12; i++) {
             const cx = (rng() - 0.5) * size * 1.3;
             const cz = (rng() - 0.5) * size * 1.3;
             if (Math.abs(cx) < 10 && Math.abs(cz) < 10) continue;
+            // Skip craters on/near roads and sidewalks — those flat planes don't have holes
+            if (onRoad(cx, cz)) continue;
 
             const craterR = 1.8 + rng() * 3.5;
             // Depth scales with radius: ~2.2m for small craters, ~3.5m for large ones.
@@ -658,15 +676,6 @@ export function buildMap(mapId) {
             wall.position.set(cx, -(depth - rimLip) / 2, cz);
             scene.add(wall);
 
-            // Black hole opening — clearly visible dark disc
-            const holeCover = new THREE.Mesh(
-                new THREE.CircleGeometry(craterR * 0.89, 20),
-                craterFloorMat
-            );
-            holeCover.rotation.x = -Math.PI / 2;
-            holeCover.position.set(cx, 0.022, cz);
-            scene.add(holeCover);
-
             // Orange warning ring around the pit edge — clearly visible
             const ringGeo = new THREE.RingGeometry(craterR * 0.88, craterR * 1.3, 24);
             const ring = new THREE.Mesh(ringGeo, craterWarnMat);
@@ -674,20 +683,39 @@ export function buildMap(mapId) {
             ring.position.set(cx, 0.025, cz);
             scene.add(ring);
 
-            // Outer scorch ring
+            // Outer scorch ring (charred dirt, slightly darker)
             const outerRingGeo = new THREE.RingGeometry(craterR * 1.3, craterR * 1.9, 24);
-            const outerRing = new THREE.Mesh(outerRingGeo, craterFloorMat);
+            const outerRing = new THREE.Mesh(outerRingGeo, craterRimMat);
             outerRing.rotation.x = -Math.PI / 2;
             outerRing.position.set(cx, 0.015, cz);
             scene.add(outerRing);
 
-            // Scorched floor disc at the bottom of the pit
+            // Dirt floor disc at the bottom of the pit
             const floorDisc = new THREE.Mesh(
-                new THREE.CylinderGeometry(craterR * 0.82, craterR * 1.0, 0.06, 16),
-                craterFloorMat
+                new THREE.CylinderGeometry(craterR * 0.82, craterR * 1.0, 0.08, 16),
+                craterDirtFloorMat
             );
             floorDisc.position.set(cx, -depth + 0.04, cz);
             scene.add(floorDisc);
+
+            // Mid-depth soil layer ring (shows layered earth cross-section)
+            const soilRingGeo = new THREE.RingGeometry(craterR * 0.6, craterR * 0.82, 20);
+            const soilRing = new THREE.Mesh(soilRingGeo, craterRimMat);
+            soilRing.rotation.x = -Math.PI / 2;
+            soilRing.position.set(cx, -depth + 0.05, cz);
+            scene.add(soilRing);
+
+            // Small rocks/stones scattered on the crater floor
+            const numFloorRocks = 3 + Math.floor(rng() * 4);
+            for (let r = 0; r < numFloorRocks; r++) {
+                const angle = rng() * Math.PI * 2;
+                const dist = rng() * craterR * 0.65;
+                const rw = 0.15 + rng() * 0.35, rh = 0.08 + rng() * 0.18, rd = 0.15 + rng() * 0.3;
+                const rock = new THREE.Mesh(new THREE.BoxGeometry(rw, rh, rd), craterRockMat);
+                rock.position.set(cx + Math.cos(angle) * dist, -depth + rh / 2 + 0.08, cz + Math.sin(angle) * dist);
+                rock.rotation.y = rng() * Math.PI;
+                scene.add(rock);
+            }
 
             // Rim rubble — collision obstacles that require jumping to clear,
             // blocking casual walk-through while still letting the player fall in from above
@@ -701,6 +729,29 @@ export function buildMap(mapId) {
                     cz + Math.sin(angle) * dist
                 );
             }
+        }
+
+        // City ground with holes punched out for each crater pit so you can see into them
+        {
+            const groundShape = new THREE.Shape();
+            const s = size;
+            groundShape.moveTo(-s, -s);
+            groundShape.lineTo(s, -s);
+            groundShape.lineTo(s, s);
+            groundShape.lineTo(-s, s);
+            groundShape.closePath();
+            for (const pit of gameState.craterPits) {
+                const hole = new THREE.Path();
+                // rotateX(-PI/2) maps shape-Y → world -Z, so negate cz to place hole at world (cx,0,cz)
+                hole.absarc(pit.cx, -pit.cz, pit.r * 0.9, 0, Math.PI * 2, true); // CW winding for hole in CCW outer shape
+                groundShape.holes.push(hole);
+            }
+            const cityGroundGeo = new THREE.ShapeGeometry(groundShape, 12);
+            cityGroundGeo.rotateX(-Math.PI / 2); // XY → XZ plane (Y becomes depth axis)
+            const cityGround = new THREE.Mesh(cityGroundGeo,
+                new THREE.MeshStandardMaterial({ color: map.color, roughness: 0.9, side: THREE.DoubleSide }));
+            cityGround.receiveShadow = true;
+            scene.add(cityGround);
         }
     } else if (mapId === 'mountain') {
         const rockMat = new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.95 });

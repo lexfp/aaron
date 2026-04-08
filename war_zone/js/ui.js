@@ -1,6 +1,6 @@
 // Screen management, shop, loadout, HUD, overlays, cheats
 
-import { WEAPONS, EQUIPMENT, ATTACHMENTS, MAPS } from './data.js';
+import { WEAPONS, EQUIPMENT, ATTACHMENTS, MAPS, DAMAGE_THRESHOLD } from './data.js';
 import { playerData, playerState, savePlayerData, gameState, xpToNextLevel, setAwardXPImpl } from './state.js';
 import { cb } from './callbacks.js';
 
@@ -51,7 +51,7 @@ function renderWeaponShop() {
     for (const [id, w] of Object.entries(WEAPONS)) {
         if (w.starter) continue;
         const owned = playerData.ownedWeapons.includes(id);
-        const needsRepair = (playerData.weaponUsage[id] || 0) >= 5;
+        const needsRepair = (playerData.weaponUsage[id] || 0) >= DAMAGE_THRESHOLD;
         let statsHtml = `Damage: ${w.damage}`;
         if (w.zoomedDamage) statsHtml += ` (${w.zoomedDamage} zoomed)`;
         statsHtml += `<br>Range: ${w.range}`;
@@ -158,14 +158,23 @@ window.repairWeapon = function (id) {
 
 window.buyEquipment = function (id) {
     const e = EQUIPMENT[id];
+    const isArmor = ['armor', 'head', 'pants', 'boots'].includes(e.type);
+    // Don't charge again if already owned
+    if (isArmor && playerData.ownedArmor.includes(id)) { showShop(); return; }
     if (playerData.money >= e.cost) {
         playerData.money -= e.cost;
-        if (e.type === 'armor') playerData.equippedArmor = id;
-        else if (e.type === 'head') playerData.equippedHelmet = id;
-        else if (e.type === 'pants') playerData.equippedPants = id;
-        else if (e.type === 'boots') playerData.equippedBoots = id;
-        else if (e.airstrikes) playerData.airstrikes = (playerData.airstrikes || 0) + e.airstrikes;
-        else playerData.ownedEquipment.push(id);
+        if (isArmor) {
+            playerData.ownedArmor.push(id);
+            // Auto-equip new armor piece
+            if (e.type === 'armor') playerData.equippedArmor = id;
+            else if (e.type === 'head') playerData.equippedHelmet = id;
+            else if (e.type === 'pants') playerData.equippedPants = id;
+            else if (e.type === 'boots') playerData.equippedBoots = id;
+        } else if (e.airstrikes) {
+            playerData.airstrikes = (playerData.airstrikes || 0) + e.airstrikes;
+        } else {
+            playerData.ownedEquipment.push(id);
+        }
         savePlayerData();
         window._updateTpArmor?.();
         showShop();
@@ -183,6 +192,68 @@ window.attachToWeapon = function (attachId, weaponId) {
     showShop();
 };
 
+// --- Armor SVG Graphics ---
+
+function getArmorSVG(type, name, small = false) {
+    const s = small ? 44 : 64;
+    const tier = name ? (name.toLowerCase().includes('heavy') ? 'heavy' : name.toLowerCase().includes('chain') ? 'chain' : 'light') : 'empty';
+    const fill = tier === 'heavy' ? '#4a4a4a' : tier === 'chain' ? '#7a7a7a' : tier === 'light' ? '#b0b8c0' : '#2a2a2a';
+    const stroke = tier === 'heavy' ? '#777' : tier === 'chain' ? '#aaa' : tier === 'light' ? '#dde' : '#444';
+    const shine = tier === 'heavy' ? '#666' : tier === 'chain' ? '#bbb' : '#e8f0f8';
+
+    if (type === 'head') {
+        // Medieval helmet: dome with visor slit and cheek guards
+        return `<svg width="${s}" height="${s}" viewBox="0 0 64 64" style="display:block;margin:0 auto">
+            <ellipse cx="32" cy="28" rx="18" ry="16" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
+            <path d="M14 36 Q16 50 20 52 L44 52 Q48 50 50 36" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
+            <rect x="18" y="34" width="28" height="4" rx="2" fill="#111" opacity="0.8"/>
+            <line x1="28" y1="34" x2="28" y2="38" stroke="${stroke}" stroke-width="1"/>
+            <line x1="36" y1="34" x2="36" y2="38" stroke="${stroke}" stroke-width="1"/>
+            <ellipse cx="32" cy="22" rx="8" ry="5" fill="${shine}" opacity="0.2"/>
+            ${tier === 'heavy' ? '<rect x="20" y="48" width="24" height="6" rx="2" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.5"/>' : ''}
+        </svg>`;
+    } else if (type === 'armor') {
+        // Breastplate: central ridge, pauldron hints
+        return `<svg width="${s}" height="${s}" viewBox="0 0 64 64" style="display:block;margin:0 auto">
+            <path d="M12 18 Q10 12 20 10 L32 8 L44 10 Q54 12 52 18 L50 50 Q48 56 32 58 Q16 56 14 50 Z" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
+            <line x1="32" y1="8" x2="32" y2="58" stroke="${stroke}" stroke-width="1.5" opacity="0.6"/>
+            <path d="M20 20 Q24 16 32 15 Q40 16 44 20" fill="none" stroke="${shine}" stroke-width="1.5" opacity="0.4"/>
+            <path d="M18 30 Q22 26 32 25 Q42 26 46 30" fill="none" stroke="${shine}" stroke-width="1" opacity="0.3"/>
+            ${tier === 'heavy' ? '<rect x="14" y="38" width="36" height="8" rx="3" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.5" opacity="0.9"/>' : ''}
+            ${tier === 'chain' ? '<path d="M20 22 Q32 18 44 22 Q32 26 20 22Z" fill="' + shine + '" opacity="0.15"/>' : ''}
+        </svg>`;
+    } else if (type === 'pants') {
+        // Leg armour with knee guards
+        return `<svg width="${s}" height="${s}" viewBox="0 0 64 64" style="display:block;margin:0 auto">
+            <rect x="14" y="8" width="14" height="32" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
+            <rect x="36" y="8" width="14" height="32" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
+            <rect x="13" y="36" width="16" height="10" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+            <rect x="35" y="36" width="16" height="10" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+            <rect x="12" y="44" width="18" height="14" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+            <rect x="34" y="44" width="18" height="14" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+            <ellipse cx="21" cy="39" rx="5" ry="3" fill="${shine}" opacity="0.25"/>
+            <ellipse cx="43" cy="39" rx="5" ry="3" fill="${shine}" opacity="0.25"/>
+        </svg>`;
+    } else if (type === 'boots') {
+        // Sabatons: horizontal plate lines on foot armour
+        return `<svg width="${s}" height="${s}" viewBox="0 0 64 64" style="display:block;margin:0 auto">
+            <rect x="16" y="6" width="32" height="34" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
+            <path d="M14 40 L50 40 L54 52 Q54 58 32 58 Q10 58 10 52 Z" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
+            <line x1="16" y1="18" x2="48" y2="18" stroke="${stroke}" stroke-width="1.5" opacity="0.6"/>
+            <line x1="16" y1="26" x2="48" y2="26" stroke="${stroke}" stroke-width="1.5" opacity="0.6"/>
+            <line x1="16" y1="34" x2="48" y2="34" stroke="${stroke}" stroke-width="1.5" opacity="0.6"/>
+            <line x1="14" y1="46" x2="50" y2="46" stroke="${stroke}" stroke-width="1.5" opacity="0.5"/>
+            <line x1="13" y1="52" x2="51" y2="52" stroke="${stroke}" stroke-width="1.5" opacity="0.5"/>
+            <ellipse cx="32" cy="12" rx="10" ry="3" fill="${shine}" opacity="0.2"/>
+        </svg>`;
+    }
+    // Empty slot placeholder
+    return `<svg width="${s}" height="${s}" viewBox="0 0 64 64" style="display:block;margin:0 auto;opacity:0.25">
+        <rect x="12" y="12" width="40" height="40" rx="6" fill="none" stroke="#666" stroke-width="2" stroke-dasharray="4,4"/>
+        <text x="32" y="37" text-anchor="middle" font-size="20" fill="#666">?</text>
+    </svg>`;
+}
+
 // --- Loadout ---
 
 export function showLoadout() {
@@ -196,7 +267,7 @@ export function showLoadout() {
         const w = WEAPONS[id];
         if (w.starter) continue; // hide starter/utility items from loadout
         const equipped = playerData.equippedLoadout.includes(id);
-        const needsRepair = (playerData.weaponUsage[id] || 0) >= 5;
+        const needsRepair = (playerData.weaponUsage[id] || 0) >= DAMAGE_THRESHOLD;
         const attachments = (playerData.weaponAttachments[id] || []).map(a => ATTACHMENTS[a].name).join(', ');
 
         const item = document.createElement('div');
@@ -236,41 +307,43 @@ export function showLoadout() {
         grid.appendChild(item);
     }
 
-    // --- Armor equip slots ---   
+    // --- Armor equip slots (drag-drop targets) ---
     document.getElementById('loadout-armor-section')?.remove();
     const armorSection = document.createElement('div');
     armorSection.id = 'loadout-armor-section';
-    armorSection.style.cssText = 'max-width:700px;margin:30px auto 0;';
-    armorSection.innerHTML = '<h3 style="color:#00aaff;font-size:22px;text-align:center;margin-bottom:15px">Armor Slots</h3>';
+    armorSection.style.cssText = 'max-width:760px;margin:30px auto 0;';
+    armorSection.innerHTML = '<h3 style="color:#00aaff;font-size:22px;text-align:center;margin-bottom:6px">Armor Slots</h3><p style="color:#666;font-size:12px;text-align:center;margin:0 0 14px">Drag armor from your inventory below into a slot, or click Remove to unequip</p>';
 
     const armorSlotContainer = document.createElement('div');
     armorSlotContainer.style.cssText = 'display:flex;gap:16px;justify-content:center;flex-wrap:wrap;';
 
     const armorSlots = [
-        { key: 'equippedHelmet', label: 'HELMET', color: '#aa88ff' },
-        { key: 'equippedArmor', label: 'BREASTPLATE', color: '#00aaff' },
-        { key: 'equippedPants', label: 'PANTS', color: '#00cc66' },
-        { key: 'equippedBoots', label: 'BOOTS', color: '#ffaa00' }
+        { key: 'equippedHelmet', label: 'HELMET', color: '#aa88ff', slotType: 'head' },
+        { key: 'equippedArmor', label: 'BREASTPLATE', color: '#00aaff', slotType: 'armor' },
+        { key: 'equippedPants', label: 'PANTS', color: '#00cc66', slotType: 'pants' },
+        { key: 'equippedBoots', label: 'BOOTS', color: '#ffaa00', slotType: 'boots' }
     ];
 
-    for (const { key, label, color } of armorSlots) {
+    for (const { key, label, color, slotType } of armorSlots) {
         const slotDiv = document.createElement('div');
-        slotDiv.style.cssText = `background:rgba(0,0,0,0.5);border:2px solid ${color};border-radius:10px;padding:18px 24px;text-align:center;min-width:180px;`;
+        slotDiv.style.cssText = `background:rgba(0,0,0,0.55);border:2px dashed ${color};border-radius:10px;padding:14px 20px;text-align:center;min-width:170px;transition:border-style 0.15s,background 0.15s;`;
         const eq = playerData[key] ? EQUIPMENT[playerData[key]] : null;
         let statsHtml = '';
         if (eq) {
-            if (eq.armor) statsHtml += `<div style="color:#aaa;font-size:12px;margin-top:4px">+${eq.armor} armor</div>`;
+            if (eq.armor) statsHtml += `<div style="color:#aaa;font-size:12px;margin-top:3px">+${eq.armor} armor</div>`;
             if (eq.damageReduction) statsHtml += `<div style="color:#aaa;font-size:12px">-${eq.damageReduction * 100}% dmg</div>`;
             if (eq.headshotReduction) statsHtml += `<div style="color:#aaa;font-size:12px">-${eq.headshotReduction * 100}% headshots</div>`;
         }
+        const svg = getArmorSVG(slotType, eq ? eq.name : null);
         slotDiv.innerHTML = `
-            <div style="font-size:11px;color:#888;letter-spacing:1px;margin-bottom:8px">${label}</div>
-            <div style="font-weight:700;font-size:16px;color:${eq ? color : '#444'}">${eq ? eq.name : 'None'}</div>
+            <div style="font-size:10px;color:#888;letter-spacing:1px;margin-bottom:6px">${label}</div>
+            ${svg}
+            <div style="font-weight:700;font-size:14px;color:${eq ? color : '#444'};margin-top:6px">${eq ? eq.name : '— Empty —'}</div>
             ${statsHtml}
-            <div style="margin-top:10px">
+            <div style="margin-top:8px">
                 ${eq
-                ? `<button data-remove-key="${key}" style="background:#cc2222;color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:13px;cursor:pointer">Remove</button>`
-                : `<div style="color:#555;font-size:12px;margin-top:4px">Purchase in Shop</div>`}
+                ? `<button data-remove-key="${key}" style="background:#cc2222;color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:12px;cursor:pointer">Remove</button>`
+                : `<div style="color:#555;font-size:11px;margin-top:2px">Drop armor here</div>`}
             </div>`;
         const removeBtn = slotDiv.querySelector('[data-remove-key]');
         if (removeBtn) {
@@ -280,10 +353,106 @@ export function showLoadout() {
                 showLoadout();
             };
         }
+
+        // Drag-drop target
+        slotDiv.addEventListener('dragover', e => {
+            e.preventDefault();
+            slotDiv.style.borderStyle = 'solid';
+            slotDiv.style.background = 'rgba(255,255,255,0.08)';
+        });
+        slotDiv.addEventListener('dragleave', () => {
+            slotDiv.style.borderStyle = 'dashed';
+            slotDiv.style.background = 'rgba(0,0,0,0.55)';
+        });
+        slotDiv.addEventListener('drop', e => {
+            e.preventDefault();
+            slotDiv.style.borderStyle = 'dashed';
+            slotDiv.style.background = 'rgba(0,0,0,0.55)';
+            const armorId = e.dataTransfer.getData('armorId');
+            const armorType = e.dataTransfer.getData('armorType');
+            if (armorType === slotType) {
+                playerData[key] = armorId;
+                savePlayerData();
+                window._updateTpArmor?.();
+                showLoadout();
+            } else {
+                // Flash red to indicate wrong slot
+                slotDiv.style.borderColor = '#ff2222';
+                setTimeout(() => { slotDiv.style.borderColor = color; }, 600);
+            }
+        });
         armorSlotContainer.appendChild(slotDiv);
     }
 
     armorSection.appendChild(armorSlotContainer);
+
+    // --- Owned Armor Inventory ---
+    // Retroactively add any currently-equipped armor that might pre-date ownedArmor tracking
+    for (const [eqKey, slotType] of [['equippedHelmet','head'],['equippedArmor','armor'],['equippedPants','pants'],['equippedBoots','boots']]) {
+        const id = playerData[eqKey];
+        if (id && !playerData.ownedArmor.includes(id)) playerData.ownedArmor.push(id);
+    }
+
+    if (playerData.ownedArmor.length > 0) {
+        const invSection = document.createElement('div');
+        invSection.style.cssText = 'margin-top:22px;';
+        invSection.innerHTML = '<h4 style="color:#aaa;font-size:16px;text-align:center;margin:0 0 10px">INVENTORY — Drag to equip</h4>';
+        const invGrid = document.createElement('div');
+        invGrid.style.cssText = 'display:flex;gap:12px;justify-content:center;flex-wrap:wrap;';
+
+        const typeGroups = { head: [], armor: [], pants: [], boots: [] };
+        for (const id of playerData.ownedArmor) {
+            const eq = EQUIPMENT[id];
+            if (eq && typeGroups[eq.type]) typeGroups[eq.type].push(id);
+        }
+
+        for (const [type, ids] of Object.entries(typeGroups)) {
+            for (const id of ids) {
+                const eq = EQUIPMENT[id];
+                if (!eq) continue;
+                const equippedKey = type === 'head' ? 'equippedHelmet' : type === 'armor' ? 'equippedArmor' : type === 'pants' ? 'equippedPants' : 'equippedBoots';
+                const isEquipped = playerData[equippedKey] === id;
+                const slotColor = type === 'head' ? '#aa88ff' : type === 'armor' ? '#00aaff' : type === 'pants' ? '#00cc66' : '#ffaa00';
+
+                const card = document.createElement('div');
+                card.draggable = true;
+                card.style.cssText = `background:rgba(0,0,0,0.6);border:2px solid ${isEquipped ? slotColor : '#555'};border-radius:8px;padding:12px 16px;text-align:center;min-width:130px;cursor:grab;transition:border-color 0.15s,transform 0.1s;`;
+                const svg = getArmorSVG(type, eq.name, true);
+                let statsHtml2 = '';
+                if (eq.armor) statsHtml2 += `<div style="color:#aaa;font-size:11px">+${eq.armor} arm</div>`;
+                if (eq.damageReduction) statsHtml2 += `<div style="color:#aaa;font-size:11px">-${eq.damageReduction * 100}% dmg</div>`;
+                card.innerHTML = `
+                    ${svg}
+                    <div style="font-size:13px;font-weight:700;color:${slotColor};margin-top:4px">${eq.name}</div>
+                    ${statsHtml2}
+                    ${isEquipped ? `<div style="color:${slotColor};font-size:10px;margin-top:4px">✓ EQUIPPED</div>` : ''}
+                `;
+                card.addEventListener('dragstart', e => {
+                    e.dataTransfer.setData('armorId', id);
+                    e.dataTransfer.setData('armorType', type);
+                    card.style.opacity = '0.5';
+                });
+                card.addEventListener('dragend', () => { card.style.opacity = '1'; });
+                // Also allow click-to-equip as fallback
+                card.addEventListener('click', () => {
+                    const eqKey = type === 'head' ? 'equippedHelmet' : type === 'armor' ? 'equippedArmor' : type === 'pants' ? 'equippedPants' : 'equippedBoots';
+                    playerData[eqKey] = isEquipped ? null : id;
+                    savePlayerData();
+                    window._updateTpArmor?.();
+                    showLoadout();
+                });
+                invGrid.appendChild(card);
+            }
+        }
+        invSection.appendChild(invGrid);
+        armorSection.appendChild(invSection);
+    } else {
+        const noArmor = document.createElement('p');
+        noArmor.style.cssText = 'color:#555;text-align:center;margin-top:12px;font-size:13px;';
+        noArmor.textContent = 'No armor owned — visit the Shop to purchase armor.';
+        armorSection.appendChild(noArmor);
+    }
+
     const loadoutScreen = document.getElementById('loadout-screen');
     const backBtn = loadoutScreen.querySelector('.back-btn');
     loadoutScreen.insertBefore(armorSection, backBtn);
@@ -464,6 +633,7 @@ export function buildCheats() {
         'money': () => { playerData.money += 10000; showCheatMsg('+$10,000'); },
         'ammo': () => { cb.refillAllAmmo(); showCheatMsg('Ammo refilled'); },
         'noclip': () => { playerState.noClip = !playerState.noClip; showCheatMsg('NoClip ' + (playerState.noClip ? 'ON' : 'OFF')); },
+        'fly': () => { playerState.flyMode = !playerState.flyMode; showCheatMsg('Fly Mode ' + (playerState.flyMode ? 'ON (Space=up, Shift=down)' : 'OFF')); },
         'kill': () => { cb.killAllEnemies(); showCheatMsg('All enemies killed'); },
         'heal': () => { playerState.hp = playerState.maxHp; showCheatMsg('Healed'); },
         'speed': () => { playerState.speedMult = playerState.speedMult === 1 ? 2 : 1; showCheatMsg('Speed x' + playerState.speedMult); },

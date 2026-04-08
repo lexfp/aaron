@@ -61,7 +61,7 @@ function checkCollision(newPos) {
             if (newPos.x + playerCylRadius > b.min.x && newPos.x - playerCylRadius < b.max.x &&
                 newPos.z + playerCylRadius > b.min.z && newPos.z - playerCylRadius < b.max.z) {
                 if (pMinY < b.max.y && pMaxY > b.min.y) {
-                    if (pMinY >= b.max.y - 0.6) continue; // Allow stepping up heights up to 0.6
+                    if (!obs.noStep && pMinY >= b.max.y - 0.6) continue; // Allow stepping up heights up to 0.6 (except solid debris)
                     return true;
                 }
             }
@@ -927,6 +927,63 @@ function animate() {
         }
     }
 
+    // Day/Night cycle — gradual 7.5-min full cycle, 30-sec dawn/dusk transitions
+    if (gameState.dayNightActive && gameState.sunLight && gameState.ambientLightRef) {
+        gameState.dayTime = (gameState.dayTime + dt / 450) % 1.0; // 450s = 7.5 min full cycle
+        const dn = gameState.dayTime;
+        // dayFactor: 0=midnight, 1=noon — smooth sine curve
+        const dayFactor = Math.max(0, Math.sin(dn * Math.PI * 2 - Math.PI / 2) * 0.5 + 0.5);
+
+        // Ambient light colour: night=deep blue, dawn/dusk=orange, day=white
+        let ambR, ambG, ambB;
+        if (dayFactor < 0.15) {
+            // Night → dawn
+            const f = dayFactor / 0.15;
+            ambR = 0.04 + f * (1.0 - 0.04); ambG = 0.04 + f * (0.53 - 0.04); ambB = 0.12 + f * (0.27 - 0.12);
+        } else if (dayFactor < 0.3) {
+            // Dawn → day
+            const f = (dayFactor - 0.15) / 0.15;
+            ambR = 1.0; ambG = 0.53 + f * (1.0 - 0.53); ambB = 0.27 + f * (1.0 - 0.27);
+        } else if (dayFactor > 0.85) {
+            // Day → dusk → night
+            const f = (dayFactor - 0.85) / 0.15;
+            ambR = 1.0 - f * (1.0 - 0.04); ambG = 1.0 - f * (1.0 - 0.04); ambB = 1.0 - f * (1.0 - 0.12);
+        } else if (dayFactor > 0.7) {
+            // Day → dusk
+            const f = (dayFactor - 0.7) / 0.15;
+            ambR = 1.0; ambG = 1.0 - f * (1.0 - 0.53); ambB = 1.0 - f * (1.0 - 0.27);
+        } else {
+            ambR = 1.0; ambG = 1.0; ambB = 1.0; // full day
+        }
+        const mapAmbBase = MAPS[gameState.currentMap]?.ambientLight || 0.5;
+        const ambIntensity = mapAmbBase * 0.15 + dayFactor * mapAmbBase * 1.3;
+        gameState.ambientLightRef.color.setRGB(ambR, ambG, ambB);
+        gameState.ambientLightRef.intensity = ambIntensity;
+
+        // Sun directional light — arc across sky
+        // Offset by -PI/2 so that dn=0.5 (noon, dayFactor=1) places sun overhead (+Y)
+        const mapSize = MAPS[gameState.currentMap]?.size || 150;
+        const sunAngle = dn * Math.PI * 2 - Math.PI / 2;
+        gameState.sunLight.position.set(Math.cos(sunAngle) * mapSize, Math.sin(sunAngle) * mapSize, mapSize / 3);
+        gameState.sunLight.intensity = dayFactor < 0.08 ? 0 : dayFactor * 0.85;
+        // Sun colour: orange at horizon, white at zenith
+        const isHorizon = dayFactor < 0.35 || dayFactor > 0.65;
+        gameState.sunLight.color.setRGB(1.0, isHorizon ? 0.55 : 1.0, isHorizon ? 0.2 : 1.0);
+
+        // Sky/fog colour — night is pure black, day is blue sky
+        // dayFactor=0 → black, dayFactor=1 → sky blue
+        const skyR = dayFactor * 0.53, skyG = dayFactor * 0.81, skyB = dayFactor < 0.05 ? 0 : dayFactor * 0.92;
+        if (scene.background instanceof THREE.Color) {
+            scene.background.setRGB(skyR, skyG, skyB);
+        }
+        if (scene.fog && gameState.fogNearBase) {
+            scene.fog.color.setRGB(skyR, skyG, skyB);
+            // Fog always stays at the map horizon — darkness limits night visibility, not close fog
+            scene.fog.near = mapSize * 1.1;
+            scene.fog.far = mapSize * 1.8;
+        }
+    }
+
     if (gameState.active && !gameState.paused) {
         try {
             direction.z = Number(keys.w) - Number(keys.s);
@@ -946,12 +1003,30 @@ function animate() {
             const speed = moveSpeed * (isSprinting ? sprintMult : 1) * playerState.speedMult;
             velocity.x -= velocity.x * 10.0 * dt;
             velocity.z -= velocity.z * 10.0 * dt;
-            velocity.y -= gravity * dt;
+
+            if (playerState.flyMode) {
+                // Fly mode: no gravity, Space=up, Shift=down
+                velocity.y = keys.space ? 6 : (keys.shift ? -6 : velocity.y * 0.85);
+            } else {
+                velocity.y -= gravity * dt;
+            }
+
             if (direction.z !== 0) velocity.z -= direction.z * speed * dt * 15;
             if (direction.x !== 0) velocity.x -= direction.x * speed * dt * 15;
-            if (keys.space) {
+            if (keys.space && !playerState.flyMode) {
                 if (canJump) {
-                    velocity.y = jumpForce;
+                    let jForce = jumpForce;
+                    // Inside a crater: boost jump just enough to clear the rim
+                    for (const pit of (gameState.craterPits || [])) {
+                        const _dx = camera.position.x - pit.cx;
+                        const _dz = camera.position.z - pit.cz;
+                        if (_dx * _dx + _dz * _dz < pit.r * pit.r) {
+                            // v = sqrt(2 * g * h), h = depth + rimLip(0.45) + tiny clearance
+                            jForce = Math.sqrt(2 * gravity * (pit.depth + 0.1));
+                            break;
+                        }
+                    }
+                    velocity.y = jForce;
                     setCanJump(false);
                 } else if (gameState.currentMap === 'forest') {
                     // Tree scaling: holding Space near a trunk climbs it
@@ -1057,7 +1132,7 @@ function animate() {
 
             let targetFloorY = getFloorHeight(camera.position) + 1.7;
 
-            if (camera.position.y < targetFloorY) {
+            if (!playerState.flyMode && camera.position.y < targetFloorY) {
                 if (velocity.y < -15) {
                     damagePlayer(Math.floor((-velocity.y - 15) * 1.5));
                 }
@@ -1209,11 +1284,10 @@ function animate() {
                         }
                     }
                     // Push fog far out while flashlight is on so the beam actually shows distant geometry
-                    if (scene.fog) {
+                    // (day/night cycle manages fog.near/far when flashlight is off)
+                    if (scene.fog && currentWep === 'flashlight') {
                         const mapSize = MAPS[gameState.currentMap]?.size ?? 160;
-                        scene.fog.far = (currentWep === 'flashlight')
-                            ? mapSize * 6
-                            : mapSize * 0.38;
+                        scene.fog.far = mapSize * 6;
                     }
                     if (currentWep === 'flashlight' && gameState.zombieEntities.length > 0) {
                         const _flDir = new THREE.Vector3();

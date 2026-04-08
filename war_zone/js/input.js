@@ -98,6 +98,9 @@ export function setupInput(CHEATS, resumeGameFn) {
             e.target.value = '';
             cheatOpen = false;
             document.getElementById('cheat-console').style.display = 'none';
+            e.target.blur();
+            // Re-engage pointer lock (may have been released when input was focused)
+            if (gameState.active) resumeGameFn();
         }
     });
 
