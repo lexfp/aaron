@@ -248,12 +248,17 @@ const _floorRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, 
 const _floorOrigin = new THREE.Vector3();
 const _collPos = new THREE.Vector3(); // reusable for checkZombieCollision calls
 
+let _losMeshes = [];
+let _losMeshesLen = -1;
 function hasLineOfSight(from, to) {
+    if (obstacles.length !== _losMeshesLen) {
+        _losMeshes = obstacles.filter(o => o.mesh).map(o => o.mesh);
+        _losMeshesLen = obstacles.length;
+    }
     _losDir.subVectors(to, from).normalize();
     _losRay.set(from, _losDir);
     const distToTarget = from.distanceTo(to);
-    const obsMeshes = obstacles.filter(o => o.mesh).map(o => o.mesh);
-    const hits = _losRay.intersectObjects(obsMeshes, true);
+    const hits = _losRay.intersectObjects(_losMeshes, true);
     if (hits.length === 0) return true;
     return hits[0].distance > distToTarget - 0.5;
 }
@@ -446,16 +451,11 @@ export function updateZombies(dt) {
         if (!z._floorFrame) z._floorFrame = i % 3;
         z._floorFrame = (z._floorFrame + 1) % 3;
         if (z._floorFrame === 0) {
-            _floorOrigin.set(z.mesh.position.x, z.mesh.position.y + 2, z.mesh.position.z);
+            // Start ray well above zombie so it works even if partially underground
+            _floorOrigin.set(z.mesh.position.x, z.mesh.position.y + 6, z.mesh.position.z);
             _floorRay.set(_floorOrigin, _floorRay.ray.direction);
             const zHits = _floorRay.intersectObjects(zRayMeshes);
-            if (zHits.length > 0 && zHits[0].distance < 4) {
-                z._cachedFloorY = zHits[0].point.y;
-            } else if (zHits.length > 0) {
-                z._cachedFloorY = zHits[0].point.y;
-            } else {
-                z._cachedFloorY = 0;
-            }
+            z._cachedFloorY = zHits.length > 0 ? zHits[0].point.y : 0;
         }
         // Apply floor snap every frame using cached value
         const cachedFloor = z._cachedFloorY ?? 0;
@@ -465,6 +465,8 @@ export function updateZombies(dt) {
         } else {
             z.mesh.position.y += (cachedFloor - z.mesh.position.y) * Math.min(1, dt * 10);
         }
+        // Hard clamp — prevents staying underground if raycast is stale
+        if (z.mesh.position.y < cachedFloor) z.mesh.position.y = cachedFloor;
 
         // AI state — always player-focused (no "cover" toward buildings)
         z.aiTimer -= dt;
@@ -616,16 +618,17 @@ export function updateZombies(dt) {
         if (!isWandering && canReachPlayer && dist < attackDist) {
             z.attackCooldown -= dt;
             if (z.attackCooldown <= 0) {
+                const eyePos = new THREE.Vector3(z.mesh.position.x, z.mesh.position.y + 1.5, z.mesh.position.z);
                 if (useWeapon && wDef.type === 'gun') {
-                    const eyePos = new THREE.Vector3(z.mesh.position.x, z.mesh.position.y + 1.5, z.mesh.position.z);
-                    const playerTarget = camera.position.clone();
-                    if (hasLineOfSight(eyePos, playerTarget)) {
+                    if (hasLineOfSight(eyePos, camera.position)) {
                         damagePlayer(Math.floor(weaponDamage * (0.8 + Math.random() * 0.4)), z.mesh.position);
                         playGunshot();
                         z.attackCooldown = 1 / (wDef.fireRate || 0.5);
                     }
                 } else {
-                    damagePlayer(weaponDamage, z.mesh.position);
+                    if (hasLineOfSight(eyePos, camera.position)) {
+                        damagePlayer(weaponDamage, z.mesh.position);
+                    }
                     z.attackCooldown = useWeapon && wDef.type === 'melee' ? (1 / (wDef.fireRate || 0.5)) : 1;
                 }
             }

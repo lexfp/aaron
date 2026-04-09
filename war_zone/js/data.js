@@ -139,7 +139,7 @@ export const MAPS = {
     },
     city: {
         name: 'City Ruins', description: 'Urban combat with buildings and streets',
-        size: 160, color: 0x666666, wallColor: 0x888888, ambientLight: 0.05
+        size: 480, color: 0x666666, wallColor: 0x888888, ambientLight: 0.05
     },
     forest: {
         name: 'Dark Forest', description: 'Dense forest with limited visibility',

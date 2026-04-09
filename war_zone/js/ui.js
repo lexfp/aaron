@@ -697,8 +697,8 @@ export function updateConsumablesPanel() {
 const TUTORIAL_STEPS = [
     { title: 'Welcome to Warzone!', body: "You're a soldier fighting for survival. This tutorial will teach you the basics." },
     { title: 'Movement', body: '<b>WASD</b> to move &bull; <b>Shift</b> to sprint &bull; <b>Space</b> to jump<br>On forest maps, hold <b>Space</b> near a tree trunk to climb it.' },
-    { title: 'Combat', body: '<b>Left Click</b> to shoot &bull; <b>Right Click</b> or <b>Z</b> to zoom<br><b>G</b> to reload &bull; Aim for the head for bonus damage!' },
-    { title: 'Weapons', body: '<b>1&ndash;9</b> or <b>mouse wheel</b> to switch weapons &bull; <b>C</b> switches forward<br><b>R</b> drops your current weapon &bull; <b>E</b> picks up dropped weapons.' },
+    { title: 'Combat', body: '<b>Left Click</b> to shoot &bull; <b>Right Click</b> or <b>Z</b> to zoom<br><b>R</b> to reload &bull; Aim for the head for bonus damage!' },
+    { title: 'Weapons', body: '<b>1&ndash;9</b> or <b>mouse wheel</b> to switch weapons &bull; <b>C</b> switches forward<br><b>X</b> drops your current weapon &bull; <b>E</b> picks up dropped weapons.' },
     { title: 'Consumables', body: '<b>Q</b> &ndash; Use Med Kit (restores 50 HP)<br><b>Y</b> &ndash; Use Adrenaline (temp HP boost)<br><b>F</b> &ndash; Call Airstrike (once per 5 min)<br><b>E</b> &ndash; View your consumables list' },
     { title: 'Armor & Shop', body: 'Buy weapons, armor (helmet, breastplate, pants, boots), and consumables in the <b>Shop</b> for an up to 90% damage reduction.<br>Equip your gear before a mission in <b>Loadout</b>.' },
     { title: 'Game Modes', body: '<b>Zombie Apocalypse</b> &ndash; Survive waves of zombies. Bosses & Giga Zombies spawn later.<br><b>Rescue Mission</b> &ndash; Find and extract the hostage.<br><b>PvP Arena</b> &ndash; Fight an AI opponent.' },

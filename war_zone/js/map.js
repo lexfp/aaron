@@ -193,8 +193,8 @@ export function buildMap(mapId) {
             obs[obs.length - 1].noStep = true;
         }
     } else if (mapId === 'city') {
-        // Ruined city atmosphere — pitch black with faint ash haze
-        scene.fog = new THREE.Fog(0x060402, size * 0.25, size * 0.65);
+        // Ruined city atmosphere — dense ash fog hides distant geometry (matched to camera.far)
+        scene.fog = new THREE.Fog(0x060402, 100, 220);
         scene.background = new THREE.Color(0x030201);
         gameState.fogNearBase = scene.fog.near;
         gameState.fogFarBase = scene.fog.far;
@@ -211,16 +211,16 @@ export function buildMap(mapId) {
         const roadSurfW = 10;       // asphalt road width
         const swalkW = 2.5;         // sidewalk width on each side of road
         const mapR = size * 0.95;   // how far roads extend (near boundary)
-        // Roads at x,z = {-50, 0, +50}; Block centers at x,z = {-75, -25, +25, +75}
+        const numGridRoads = Math.floor(mapR / blockPitch); // number of roads on each side of center
 
         // --- Road & sidewalk materials ---
         const asphaltMat = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.95 });
         const curbMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.85 });
         const markingMat = new THREE.MeshBasicMaterial({ color: 0xddcc00 });
 
-        // N-S roads (parallel to Z axis, at x = -50, 0, +50)
+        // N-S roads (parallel to Z axis)
         const nsDashPos = [];
-        for (let rxi = -1; rxi <= 1; rxi++) {
+        for (let rxi = -numGridRoads; rxi <= numGridRoads; rxi++) {
             const rx = rxi * blockPitch;
             const rMesh = new THREE.Mesh(new THREE.PlaneGeometry(roadSurfW, mapR * 2), asphaltMat);
             rMesh.rotation.x = -Math.PI / 2;
@@ -241,9 +241,9 @@ export function buildMap(mapId) {
             }
         }
 
-        // E-W roads (parallel to X axis, at z = -50, 0, +50)
+        // E-W roads (parallel to X axis)
         const ewDashPos = [];
-        for (let rzi = -1; rzi <= 1; rzi++) {
+        for (let rzi = -numGridRoads; rzi <= numGridRoads; rzi++) {
             const rz = rzi * blockPitch;
             const rMesh = new THREE.Mesh(new THREE.PlaneGeometry(mapR * 2, roadSurfW), asphaltMat);
             rMesh.rotation.x = -Math.PI / 2;
@@ -290,7 +290,8 @@ export function buildMap(mapId) {
         // Helper: returns true if point (px, pz) falls within any road or sidewalk corridor
         const halfCorridor = roadSurfW / 2 + swalkW + 1.5;
         const onRoad = (px, pz) => {
-            for (const rc of [-blockPitch, 0, blockPitch]) {
+            for (let ri = -numGridRoads; ri <= numGridRoads; ri++) {
+                const rc = ri * blockPitch;
                 if (Math.abs(px - rc) < halfCorridor) return true;
                 if (Math.abs(pz - rc) < halfCorridor) return true;
             }
@@ -301,13 +302,12 @@ export function buildMap(mapId) {
         const bMats = buildingColors.map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 }));
 
         // === BUILDING GRID ===
-        // 4 × 4 city blocks, each block has 2 rows × 2 columns of buildings
-        const blockCenters = [
-            -blockPitch * 1.5,  // -75
-            -blockPitch * 0.5,  // -25
-            blockPitch * 0.5,  //  25
-            blockPitch * 1.5,  //  75
-        ];
+        // Dynamic grid: one block center between each pair of adjacent roads, plus outer edges
+        const allBlockCenters = [];
+        allBlockCenters.push((-numGridRoads - 0.5) * blockPitch); // outer left/top
+        for (let i = -numGridRoads; i < numGridRoads; i++) allBlockCenters.push((i + 0.5) * blockPitch);
+        allBlockCenters.push((numGridRoads + 0.5) * blockPitch);  // outer right/bottom
+        const blockCenters = allBlockCenters;
 
         for (const bcx of blockCenters) {
             for (const bcz of blockCenters) {
@@ -606,7 +606,7 @@ export function buildMap(mapId) {
         const concChunkMat = new THREE.MeshStandardMaterial({ color: 0x887766, roughness: 0.95 });
 
         // Small decorative rubble: InstancedMesh, appears everywhere including roads (realistic)
-        const SMALL_COUNT = 400;
+        const SMALL_COUNT = Math.min(2000, Math.round(400 * (size / 160) ** 2));
         const _rDummy = new THREE.Object3D();
         const smallRubbleInst = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), rubbleMat, SMALL_COUNT);
         const smallConcInst = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), concChunkMat, SMALL_COUNT);
@@ -629,7 +629,7 @@ export function buildMap(mapId) {
         scene.add(smallConcInst);
 
         // Medium collision rubble: off-road only, individual meshes for AABB collision
-        for (let i = 0; i < 35; i++) {
+        for (let i = 0; i < Math.round(35 * (size / 160)); i++) {
             const rx = (rng() - 0.5) * size * 1.5;
             const rz = (rng() - 0.5) * size * 1.5;
             if (Math.abs(rx) < 8 && Math.abs(rz) < 8) continue;
@@ -651,7 +651,7 @@ export function buildMap(mapId) {
         const craterWarnMat = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0x441100, roughness: 0.8 });
         const craterRockMat = new THREE.MeshStandardMaterial({ color: 0x4a4035, roughness: 0.95 }); // embedded rocks
 
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < Math.round(12 * (size / 160)); i++) {
             const cx = (rng() - 0.5) * size * 1.3;
             const cz = (rng() - 0.5) * size * 1.3;
             if (Math.abs(cx) < 10 && Math.abs(cz) < 10) continue;

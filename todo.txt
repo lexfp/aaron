@@ -3,3 +3,10 @@ remake starcraft?
 make warzone multiplayer
 
 --resume fddffde0-6837-47bf-a1b1-e9a8cacf63ab
+
+could you also add fog near the edge of the map even during day
+
+make sure more zombies are actually automatically continuing to spawn in, because, i still only see a couple when 
+minutes into the game
+
+/resume
