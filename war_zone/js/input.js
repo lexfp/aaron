@@ -74,7 +74,7 @@ export function setupInput(CHEATS, resumeGameFn) {
             }
         }
         if (key === 'z') toggleZoom();
-        if (e.key === 'Control' || e.key === 'Tab') {
+        if (e.key === 'Tab') {
             e.preventDefault();
             if (gameState.active && (controls.isLocked || window._isThirdPerson?.())) {
                 window._toggleThirdPerson && window._toggleThirdPerson();

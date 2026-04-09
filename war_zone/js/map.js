@@ -728,6 +728,7 @@ export function buildMap(mapId) {
                     cx + Math.cos(angle) * dist, ch / 2,
                     cz + Math.sin(angle) * dist
                 );
+                obs[obs.length - 1].isRimRubble = true;
             }
         }
 
@@ -823,8 +824,8 @@ export function buildMap(mapId) {
         const leafColors = [0x113a11, 0x0d3010, 0x1a4a1a, 0x0a2a0a];
         const mossColors = [0x2a4a1a, 0x3a5a2a];
 
-        scene.fog = new THREE.Fog(0x051105, size * 0.15, size * 0.55);
-        scene.background = new THREE.Color(0x020802);
+        scene.fog = new THREE.Fog(0x060402, size * 0.25, size * 0.65);
+        scene.background = new THREE.Color(0x030201);
 
         // Dense Poisson-disk-style tree placement — min 2.5m apart
         const treePositions = [];

@@ -299,7 +299,7 @@ function checkZombieCollision(pos, radius) {
     const pMaxY = pos.y + 1.8;
 
     for (const obs of obstacles) {
-        if (obs.isSlope) continue;
+        if (obs.isSlope || obs.isRimRubble) continue;
         if (obs.box) {
             const b = obs.box;
             // Quick XZ distance cull before full AABB test
