@@ -573,7 +573,7 @@ export function refillAllAmmo() {
 export function dropCurrentWeapon() {
     if (playerState.weapons.length <= 1) return;
     const id = playerState.weapons[playerState.currentWeaponIndex];
-    if (id === 'fists' || id === 'compass') return;
+    if (id === 'fists' || id === 'compass' || id === 'flashlight') return;
 
     const pos = camera.position.clone();
     pos.y = 0.3;
@@ -593,19 +593,19 @@ export function dropCurrentWeapon() {
 // The group is placed in world space by dropWeapon with a random Y rotation.
 
 function _buildDroppedGunGroup(group, weaponId) {
-    const cfg         = GUN_CONFIGS[weaponId] || {};
-    const bodyColor   = cfg.bodyColor   || 0x333333;
+    const cfg = GUN_CONFIGS[weaponId] || {};
+    const bodyColor = cfg.bodyColor || 0x333333;
     const accentColor = cfg.accentColor || 0x4a3520;
-    const metalColor  = cfg.metalColor  || 0x555555;
-    const bodyLen     = cfg.bodyLen     || 0.30;
-    const bodyH       = cfg.bodyH       || 0.040;
-    const bodyW       = cfg.bodyW       || 0.030;
-    const barrelLen   = cfg.barrelLen   || 0.15;
-    const barrelR     = cfg.barrelRadius || 0.008;
+    const metalColor = cfg.metalColor || 0x555555;
+    const bodyLen = cfg.bodyLen || 0.30;
+    const bodyH = cfg.bodyH || 0.040;
+    const bodyW = cfg.bodyW || 0.030;
+    const barrelLen = cfg.barrelLen || 0.15;
+    const barrelR = cfg.barrelRadius || 0.008;
 
-    const bodyMat   = new THREE.MeshStandardMaterial({ color: bodyColor,   roughness: 0.4, metalness: 0.6 });
+    const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.4, metalness: 0.6 });
     const accentMat = new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.7 });
-    const metalMat  = new THREE.MeshStandardMaterial({ color: metalColor,  roughness: 0.2, metalness: 0.8 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: metalColor, roughness: 0.2, metalness: 0.8 });
 
     // Body
     const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, bodyLen), bodyMat);
@@ -693,8 +693,8 @@ function _buildDroppedGunGroup(group, weaponId) {
 
 function _buildDroppedMeleeGroup(group, weaponId) {
     const metalMat = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 0.9, roughness: 0.1 });
-    const woodMat  = new THREE.MeshStandardMaterial({ color: 0x4a3520, roughness: 0.85 });
-    const skinMat  = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 });
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a3520, roughness: 0.85 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 });
 
     if (weaponId === 'fists') {
         group.add(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.10, 0.10), skinMat));

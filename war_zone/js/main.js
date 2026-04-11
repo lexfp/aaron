@@ -445,6 +445,18 @@ function rebuildTpWeapon(weaponId, wDef) {
             new THREE.MeshStandardMaterial({ color: col }));
         mesh.position.set(0, 0, 0.05);
         tpGunGroup.add(mesh);
+    } else if (weaponId === 'flashlight') {
+        // Flashlight cylinder model
+        const mat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.3 });
+        const lensMat = new THREE.MeshStandardMaterial({ color: 0xffffcc, emissive: 0xffff88, emissiveIntensity: 2.0 });
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.28, 8), mat);
+        body.rotation.x = Math.PI / 2;
+        body.position.set(0, 0, 0.1);
+        tpGunGroup.add(body);
+        const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.04, 8), lensMat);
+        lens.rotation.x = Math.PI / 2;
+        lens.position.set(0, 0, 0.26);
+        tpGunGroup.add(lens);
     } else {
         _buildTpGunModel(weaponId);
     }
@@ -1259,8 +1271,8 @@ function animate() {
                             scene.add(fl);
                             scene.add(fl.target);
                         }
-                        const fwdX = -Math.sin(tpBodyYaw);
-                        const fwdZ = -Math.cos(tpBodyYaw);
+                        const fwdX = Math.sin(tpBodyYaw);
+                        const fwdZ = Math.cos(tpBodyYaw);
                         fl.position.set(
                             camera.position.x + fwdX * 0.5,
                             camera.position.y - 0.3,
@@ -1271,6 +1283,7 @@ function animate() {
                             camera.position.y - 0.3,
                             camera.position.z + fwdZ * 20
                         );
+                        fl.updateMatrixWorld();
                         fl.target.updateMatrixWorld();
                     } else if (!thirdPerson) {
                         const fl = gameState.playerFlashlight;
@@ -1292,7 +1305,7 @@ function animate() {
                     if (currentWep === 'flashlight' && gameState.zombieEntities.length > 0) {
                         const _flDir = new THREE.Vector3();
                         if (thirdPerson) {
-                            _flDir.set(-Math.sin(tpBodyYaw), 0, -Math.cos(tpBodyYaw));
+                            _flDir.set(Math.sin(tpBodyYaw), 0, Math.cos(tpBodyYaw));
                         } else {
                             camera.getWorldDirection(_flDir);
                         }

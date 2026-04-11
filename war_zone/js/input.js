@@ -32,8 +32,9 @@ export function setupInput(CHEATS, resumeGameFn) {
         if (!gameState.active) return;
 
         if (key >= '1' && key <= '9') switchWeapon(parseInt(key) - 1);
-        if (key === 'r') dropCurrentWeapon();
-        if (key === 'g') reload();
+        if (key === 'r') reload();
+        if (key === 'g') dropCurrentWeapon();
+        if (key === 'x') dropCurrentWeapon();
         if (key === 'e') {
             if (!tryPickup()) {
                 const panel = document.getElementById('consumables-panel');
