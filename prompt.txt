@@ -1,11 +1,7 @@
 implement the following in steps so that in case of disconnect you can restart where you left off
 war_zone/
 
-multiply all heavy armor prices by *100, and make all other armor cost more too
-remove fog during daytime
-pits are still not showing, as whatever surface they are in is still covering them. fix that PROPERLY.
-fix fly mode(space does nothing when activated)
-reduce amount jumped while in pits to just enough to get out
+make enemies unable to hit me through walls          
 
 
 

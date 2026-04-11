@@ -53,11 +53,14 @@ function checkCollision(newPos) {
     const pMinY = newPos.y - 1.7;
     const pMaxY = newPos.y + 0.2;
 
+    const CULL = 20; // skip obstacles clearly outside this radius
     for (const obs of obstacles) {
         if (obs.passThrough) continue;
         if (obs.isSlope) continue; // slopes use steepness guard + floor snap, not AABB
         if (obs.box) {
             const b = obs.box;
+            if (b.max.x < newPos.x - CULL || b.min.x > newPos.x + CULL ||
+                b.max.z < newPos.z - CULL || b.min.z > newPos.z + CULL) continue;
             if (newPos.x + playerCylRadius > b.min.x && newPos.x - playerCylRadius < b.max.x &&
                 newPos.z + playerCylRadius > b.min.z && newPos.z - playerCylRadius < b.max.z) {
                 if (pMinY < b.max.y && pMaxY > b.min.y) {
@@ -122,12 +125,15 @@ function getFloorHeight(pos, allowUncapped = false) {
     for (const obs of obstacles) {
         if (obs.passThrough || obs.isSlope) continue;
         if (obs.box) {
+            const b2 = obs.box;
+            if (b2.max.x < pos.x - 20 || b2.min.x > pos.x + 20 ||
+                b2.max.z < pos.z - 20 || b2.min.z > pos.z + 20) continue;
             // No lateral tolerance: only snap up to a box top when the player center is
             // actually inside its XZ footprint. A tolerance here combined with the vertical
             // snap would teleport the player on top of any obstacle they walk into from the
             // side whose top is below feetY + 0.8 (anything ~0.4–0.8 m tall).
-            if (pos.x > obs.box.min.x && pos.x < obs.box.max.x &&
-                pos.z > obs.box.min.z && pos.z < obs.box.max.z) {
+            if (pos.x > b2.min.x && pos.x < b2.max.x &&
+                pos.z > b2.min.z && pos.z < b2.max.z) {
                 const obsTop = obs.box.max.y;
                 if (obsTop > floor && feetY >= obsTop - 0.8) floor = obsTop;
             }
@@ -725,6 +731,9 @@ function startGame(mode, mapId) {
     document.getElementById('hud').style.display = 'block';
 
     buildMap(mapId);
+    // City uses dense fog — clip camera at fog.far so GPU skips invisible geometry
+    camera.far = (mapId === 'city') ? 220 : 500;
+    camera.updateProjectionMatrix();
     scene.add(tpBody);
     tpBody.visible = false;
     updateTpArmor();
@@ -1012,7 +1021,16 @@ function animate() {
                 if (playerState.stamina > playerState.maxStamina) playerState.stamina = playerState.maxStamina;
             }
 
-            const speed = moveSpeed * (isSprinting ? sprintMult : 1) * playerState.speedMult;
+            // Each piece contributes 1/4 of its full-set penalty (light=5%, chainmail=10%, heavy=40%)
+            let armorPenalty = 0;
+            for (const slot of [playerData.equippedHelmet, playerData.equippedArmor, playerData.equippedPants, playerData.equippedBoots]) {
+                if (!slot) continue;
+                if (slot.startsWith('heavy_')) armorPenalty += 0.10;
+                else if (slot.startsWith('chainmail_')) armorPenalty += 0.025;
+                else if (slot.startsWith('light_')) armorPenalty += 0.0125;
+            }
+            const armorSpeedMult = 1 - armorPenalty;
+            const speed = moveSpeed * (isSprinting ? sprintMult : 1) * playerState.speedMult * armorSpeedMult;
             velocity.x -= velocity.x * 10.0 * dt;
             velocity.z -= velocity.z * 10.0 * dt;
 
