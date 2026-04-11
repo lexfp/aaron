@@ -476,7 +476,10 @@ export function showLoadout() {
     const statDefs = [
         { key: 'health', label: 'Health', color: '#00ff88', desc: '+5 max HP per point' },
         { key: 'speed', label: 'Speed', color: '#00aaff', desc: '+2% move speed per point' },
-        { key: 'damage', label: 'Damage', color: '#ff4444', desc: '+2% damage per point' }
+        { key: 'damage', label: 'Damage', color: '#ff4444', desc: '+2% damage per point' },
+        { key: 'stamina', label: 'Stamina', color: '#ffaa00', desc: '+10 max stamina per point' },
+        { key: 'jump', label: 'Jump', color: '#aa66ff', desc: '+5% jump height per point' },
+        { key: 'reload', label: 'Reload', color: '#00ddff', desc: '-5% reload time per point' }
     ];
 
     const statGrid = document.createElement('div');

@@ -546,7 +546,8 @@ export function updateReload() {
         const state = playerState.weaponStates[wid];
         if (!state.reloading) continue;
         const def = WEAPONS[wid];
-        if (performance.now() / 1000 - state.reloadStart >= def.reloadTime) {
+        const reloadMult = Math.max(0.2, 1 - (playerData.stats?.reload || 0) * 0.05);
+        if (performance.now() / 1000 - state.reloadStart >= def.reloadTime * reloadMult) {
             const needed = def.maxAmmo - state.ammo;
             const available = Math.min(needed, state.reserveAmmo);
             state.ammo += available;

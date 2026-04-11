@@ -750,11 +750,14 @@ function startGame(mode, mapId) {
     }
 
     const bonusHp = (playerData.stats?.health || 0) * 5;
+    const bonusStamina = (playerData.stats?.stamina || 0) * 10;
     resetPlayerState({
         weapons: initialWeapons,
         maxSlots: inGameSlots,
         hp: 100 + bonusHp,
         maxHp: 100 + bonusHp,
+        stamina: 100 + bonusStamina,
+        maxStamina: 100 + bonusStamina,
         speedMult: 1 + (playerData.stats?.speed || 0) * 0.02
     });
 
@@ -1045,7 +1048,7 @@ function animate() {
             if (direction.x !== 0) velocity.x -= direction.x * speed * dt * 15;
             if (keys.space && !playerState.flyMode) {
                 if (canJump) {
-                    let jForce = jumpForce;
+                    let jForce = jumpForce * (1 + (playerData.stats?.jump || 0) * 0.05);
                     // Inside a crater: boost jump just enough to clear the rim
                     for (const pit of (gameState.craterPits || [])) {
                         const _dx = camera.position.x - pit.cx;
