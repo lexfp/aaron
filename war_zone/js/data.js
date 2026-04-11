@@ -16,7 +16,7 @@ export const WEAPONS = {
     fists: {
         name: 'Fists', type: 'melee', range: 'close', damage: 3, fireRate: 0.5,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
-        cost: 0, starter: true, reach: 1.7
+        cost: 0, starter: true, reach: 2.5
     },
     glock: {
         name: 'Glock', type: 'gun', range: 'middle', damage: 2, fireRate: 0.5,
@@ -81,7 +81,7 @@ export const WEAPONS = {
     minigun: {
         name: 'Minigun', type: 'gun', range: 'long', damage: 1, fireRate: 0.03,
         ammo: 900, maxAmmo: 900, reserveAmmo: 2700, reloadTime: 5,
-        cost: 60000, makesNoise: true
+        cost: 110000, makesNoise: true
     },
     grenade: {
         name: 'Grenade', type: 'throwable', range: 'middle', damage: 60,
