@@ -14,14 +14,19 @@ function mulberry32(seed) {
     };
 }
 
-function addObstacle(obstacleList, mat, w, h, d, x, y, z) {
+let _noShadowMap = false; // set true for maps where shadows are disabled
+
+function addObstacle(obstacleList, mat, w, h, d, x, y, z, opts = {}) {
     const geo = new THREE.BoxGeometry(w, h, d);
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, z);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    const shadow = !opts.noShadow && !_noShadowMap;
+    mesh.castShadow = shadow;
+    mesh.receiveShadow = shadow;
     scene.add(mesh);
-    obstacleList.push({ mesh, box: new THREE.Box3().setFromObject(mesh) });
+    if (!opts.noCollide) {
+        obstacleList.push({ mesh, box: new THREE.Box3().setFromObject(mesh) });
+    }
 }
 
 export function buildMap(mapId) {
@@ -193,6 +198,7 @@ export function buildMap(mapId) {
             obs[obs.length - 1].noStep = true;
         }
     } else if (mapId === 'city') {
+        _noShadowMap = true;
         // Ruined city atmosphere — dense ash fog hides distant geometry (matched to camera.far)
         scene.fog = new THREE.Fog(0x060402, 100, 220);
         scene.background = new THREE.Color(0x030201);
@@ -909,6 +915,7 @@ export function buildMap(mapId) {
     }
 
     setObstacles(obs);
+    _noShadowMap = false;
     gameState.ammoPickups = [];
     // Start with 5 ammo crates; more spawn in over time
     for (let _ai = 0; _ai < 5; _ai++) spawnSinglePickup(size, false);

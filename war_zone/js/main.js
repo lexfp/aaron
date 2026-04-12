@@ -233,6 +233,18 @@ const tpArmL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.55, 0.18), tpShirtMa
 tpArmL.position.y = -0.27;
 tpArmLPivot.add(tpArmL);
 
+// Left fist — shown only when fists are equipped
+const tpLeftFist = new THREE.Group();
+tpLeftFist.visible = false;
+tpArmLPivot.add(tpLeftFist);
+const _lfMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 });
+const _lfMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.12), _lfMat);
+_lfMesh.position.set(0, -0.55, 0.08);
+tpLeftFist.add(_lfMesh);
+const _lfKnuckles = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.04, 0.03), _lfMat);
+_lfKnuckles.position.set(0, -0.51, 0.14);
+tpLeftFist.add(_lfKnuckles);
+
 // Right upper arm (pivot at shoulder) — holds gun
 const tpArmRPivot = new THREE.Group();
 tpArmRPivot.position.set(0.35, 0.28, 0);
@@ -451,6 +463,18 @@ function rebuildTpWeapon(weaponId, wDef) {
             new THREE.MeshStandardMaterial({ color: col }));
         mesh.position.set(0, 0, 0.05);
         tpGunGroup.add(mesh);
+    } else if (weaponId === 'flashlight') {
+        // Flashlight cylinder model
+        const mat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.3 });
+        const lensMat = new THREE.MeshStandardMaterial({ color: 0xffffcc, emissive: 0xffff88, emissiveIntensity: 2.0 });
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.28, 8), mat);
+        body.rotation.x = Math.PI / 2;
+        body.position.set(0, 0, 0.1);
+        tpGunGroup.add(body);
+        const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.04, 8), lensMat);
+        lens.rotation.x = Math.PI / 2;
+        lens.position.set(0, 0, 0.26);
+        tpGunGroup.add(lens);
     } else {
         _buildTpGunModel(weaponId);
     }
@@ -623,9 +647,14 @@ function _buildTpMeleeModel(weaponId) {
     const darkMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 });
 
     if (weaponId === 'fists') {
-        const fist = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.10, 0.10), skinMat);
-        fist.position.set(0, 0, 0.06);
+        // Right fist — matches left fist size exactly
+        const fist = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.12), skinMat);
+        fist.position.set(0, 0, 0.08);
         tpGunGroup.add(fist);
+        // Knuckle ridge
+        const knuckles = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.04, 0.03), skinMat);
+        knuckles.position.set(0, 0.04, 0.14);
+        tpGunGroup.add(knuckles);
 
     } else if (weaponId === 'knife') {
         const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.12, 8), darkMat);
@@ -738,11 +767,14 @@ function startGame(mode, mapId) {
     }
 
     const bonusHp = (playerData.stats?.health || 0) * 5;
+    const bonusStamina = (playerData.stats?.stamina || 0) * 10;
     resetPlayerState({
         weapons: initialWeapons,
         maxSlots: inGameSlots,
         hp: 100 + bonusHp,
         maxHp: 100 + bonusHp,
+        stamina: 100 + bonusStamina,
+        maxStamina: 100 + bonusStamina,
         speedMult: 1 + (playerData.stats?.speed || 0) * 0.02
     });
 
@@ -1033,7 +1065,7 @@ function animate() {
             if (direction.x !== 0) velocity.x -= direction.x * speed * dt * 15;
             if (keys.space && !playerState.flyMode) {
                 if (canJump) {
-                    let jForce = jumpForce;
+                    let jForce = jumpForce * (1 + (playerData.stats?.jump || 0) * 0.05);
                     // Inside a crater: boost jump just enough to clear the rim
                     for (const pit of (gameState.craterPits || [])) {
                         const _dx = camera.position.x - pit.cx;
@@ -1277,8 +1309,8 @@ function animate() {
                             scene.add(fl);
                             scene.add(fl.target);
                         }
-                        const fwdX = -Math.sin(tpBodyYaw);
-                        const fwdZ = -Math.cos(tpBodyYaw);
+                        const fwdX = Math.sin(tpBodyYaw);
+                        const fwdZ = Math.cos(tpBodyYaw);
                         fl.position.set(
                             camera.position.x + fwdX * 0.5,
                             camera.position.y - 0.3,
@@ -1289,6 +1321,7 @@ function animate() {
                             camera.position.y - 0.3,
                             camera.position.z + fwdZ * 20
                         );
+                        fl.updateMatrixWorld();
                         fl.target.updateMatrixWorld();
                     } else if (!thirdPerson) {
                         const fl = gameState.playerFlashlight;
@@ -1310,7 +1343,7 @@ function animate() {
                     if (currentWep === 'flashlight' && gameState.zombieEntities.length > 0) {
                         const _flDir = new THREE.Vector3();
                         if (thirdPerson) {
-                            _flDir.set(-Math.sin(tpBodyYaw), 0, -Math.cos(tpBodyYaw));
+                            _flDir.set(Math.sin(tpBodyYaw), 0, Math.cos(tpBodyYaw));
                         } else {
                             camera.getWorldDirection(_flDir);
                         }
@@ -1465,6 +1498,16 @@ function animate() {
             armLZ = 0.08;
             gunRotX = 1.05;
 
+        } else if (curWep === 'fists') {
+            // Boxing stance — both arms raised and forward symmetrically
+            armRX = -1.15 + (-hipR * 0.25);
+            armRZ = -0.18;
+            armLX = -1.15 + (-hipL * 0.25);
+            armLZ = 0.18;
+            gunRotX = 0.0;
+            gunPosY = -0.55;
+            gunPosZ = 0.08;
+
         } else if (isMeleeWep) {
             // Weapon at side ready to strike; off-hand swings naturally
             armRX = -0.88 + (-hipR * 0.45);
@@ -1491,6 +1534,7 @@ function animate() {
         // Visibility: shield gets its own torso-mounted group
         tpShieldGroup.visible = isShieldWep;
         tpGunGroup.visible = !!(wDef && !isShieldWep);
+        tpLeftFist.visible = (curWep === 'fists');
 
         // Store shoot NDC for combat.js
         gameState.tpShootNDC = new THREE.Vector2(tpMouseX * 2 - 1, -(tpMouseY * 2 - 1));
