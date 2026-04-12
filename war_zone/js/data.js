@@ -135,7 +135,7 @@ export const MAPS = {
     },
     desert: {
         name: 'Desert Outpost', description: 'Open terrain with scattered cover',
-        size: 200, color: 0xc2a645, wallColor: 0x8b7332, ambientLight: 0.8
+        size: 480, color: 0xc2a645, wallColor: 0x8b7332, ambientLight: 0.8
     },
     city: {
         name: 'City Ruins', description: 'Urban combat with buildings and streets',
@@ -143,10 +143,10 @@ export const MAPS = {
     },
     forest: {
         name: 'Dark Forest', description: 'Dense forest with limited visibility',
-        size: 220, color: 0x2d5a1e, wallColor: 0x3d6a2e, ambientLight: 0.2
+        size: 480, color: 0x2d5a1e, wallColor: 0x3d6a2e, ambientLight: 0.2
     },
     mountain: {
         name: 'Rocky Mountains', description: 'Uneven terrain with valleys and peaks',
-        size: 300, color: 0x555555, wallColor: 0x444444, ambientLight: 0.5
+        size: 480, color: 0x555555, wallColor: 0x444444, ambientLight: 0.5
     }
 };

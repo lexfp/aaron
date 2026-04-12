@@ -64,12 +64,32 @@ export function createWeaponModel(weaponId) {
 function buildMeleeModel(group, weaponId, w) {
     const skinMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 });
     if (weaponId === 'fists') {
-        const fist = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), skinMat);
-        fist.position.set(0.15, -0.12, -0.3);
-        group.add(fist);
-        const fist2 = fist.clone();
-        fist2.position.x = -0.15;
-        group.add(fist2);
+        const knuckleMat = new THREE.MeshStandardMaterial({ color: 0xc49060, roughness: 0.45 });
+        const grooveMat  = new THREE.MeshStandardMaterial({ color: 0xb07050, roughness: 0.8 });
+        // Right fist (+x), left fist (-x); thumbDir toward centre for each hand
+        [[0.15, -1], [-0.15, 1]].forEach(([fx, thumbDir]) => {
+            // Main body — wider than a cube
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.072, 0.088), skinMat);
+            body.position.set(fx, -0.12, -0.30);
+            group.add(body);
+            // 4 knuckle bumps on top face (visible from camera angle)
+            [-0.033, -0.011, 0.011, 0.033].forEach(kx => {
+                const k = new THREE.Mesh(new THREE.SphereGeometry(0.015, 6, 4), knuckleMat);
+                k.position.set(fx + kx, -0.12 + 0.036, -0.30 - 0.010);
+                group.add(k);
+            });
+            // Thumb on the side toward centre
+            const thumb = new THREE.Mesh(new THREE.BoxGeometry(0.040, 0.055, 0.040), skinMat);
+            thumb.position.set(fx + thumbDir * 0.062, -0.126, -0.294);
+            thumb.rotation.z = -thumbDir * 0.38;
+            group.add(thumb);
+            // 3 finger-separation grooves on forward face
+            [-0.028, 0, 0.028].forEach(gx => {
+                const groove = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.072, 0.004), grooveMat);
+                groove.position.set(fx + gx, -0.12, -0.30 - 0.046);
+                group.add(groove);
+            });
+        });
     } else if (weaponId === 'shield') {
         const shieldMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5 });
         const shield = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.05), shieldMat);

@@ -2,11 +2,25 @@ remake starcraft?
 
 make warzone multiplayer
 
---resume fddffde0-6837-47bf-a1b1-e9a8cacf63ab
+add cave map
+add castle map
 
-could you also add fog near the edge of the map even during day
+add escape mode
+add new map for it
 
-make sure more zombies are actually automatically continuing to spawn in, because, i still only see a couple when 
-minutes into the game
+add tower defense gamemode
+
+make zombies stronger and faster at night
+
+add a magic element to the game(zombie mages, magic spells)
+
+make money cheat allow you to choose how much
+
+allow you to choose how much to level up using cheat
+
+make '`' not give cheat codes but instead open up chat system: things normally typed just display above your head for 5secs, 
+typing '`admin' asks for access code to give access to cheats, then typing '`cheatName' activates cheats
+
+/plugin install frontend-design@claude-plugins-official
 
 /resume

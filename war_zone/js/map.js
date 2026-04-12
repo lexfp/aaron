@@ -29,6 +29,593 @@ function addObstacle(obstacleList, mat, w, h, d, x, y, z, opts = {}) {
     }
 }
 
+// --- City chunk streaming ---
+const _cityChunks = new Map();  // key → { meshes[], chunkObs[] }
+let _cityObs = null;            // live reference to the active obstacles array
+let _cityBlockCenters = [];     // flat [x0,z0, x1,z1, ...] of all block centers
+let _cityMats = null;           // shared materials passed to chunk builder
+const CHUNK_LOAD_DIST = 150;
+const CHUNK_UNLOAD_DIST = 240;
+
+// --- Forest chunk streaming ---
+const _forestChunks = new Map();
+let _forestObs = null;
+let _forestChunkCenters = [];
+let _forestMats = null;
+const FOREST_CHUNK_SIZE = 60;
+
+// --- Mountain chunk streaming ---
+const _mountainChunks = new Map();
+let _mountainObs = null;
+let _mountainChunkCenters = [];
+let _mountainMats = null;
+const MOUNTAIN_TILE_STEP = 44;
+
+// --- Desert chunk streaming ---
+const _desertChunks = new Map();
+let _desertObs = null;
+let _desertChunkCenters = [];
+let _desertMats = null;
+const DESERT_CHUNK_SIZE = 60;
+
+const TERRAIN_LOAD_DIST = 150;
+const TERRAIN_UNLOAD_DIST = 240;
+
+function _buildCityChunkMeshes(bcx, bcz) {
+    const seed = Math.abs(Math.imul(bcx | 0, 73856093) ^ Math.imul(bcz | 0, 19349663));
+    const rng = mulberry32((seed % 0x7fffffff) + 1);
+    const meshes = [];
+    const chunkObs = [];
+    const { bMats, winMat, roofMat, metalMat, crateMat, furnitureMat, furnitureMat2, acMat, barrelMat, trashMat, grafMats } = _cityMats;
+
+    const addObs = (mat, w, h, d, x, y, z, opts = {}) => {
+        const geo = new THREE.BoxGeometry(w, h, d);
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x, y, z);
+        scene.add(mesh);
+        meshes.push(mesh);
+        if (!opts.noCollide) chunkObs.push({ mesh, box: new THREE.Box3().setFromObject(mesh) });
+    };
+    const addVis = (mesh) => { scene.add(mesh); meshes.push(mesh); };
+
+    for (const rowOff of [-7, 7]) {
+        for (const colOff of [-9, 9]) {
+            const bx = bcx + colOff;
+            const bz = bcz + rowOff;
+            if (Math.abs(bx) < 14 && Math.abs(bz) < 14) continue;
+
+            const w = 12 + rng() * 5, h = 8 + rng() * 8, d = 10 + rng() * 3;
+            const bMat = bMats[Math.floor(rng() * bMats.length)];
+            const thickness = 0.5;
+            const doorW = 2.5, doorH = 3.5;
+            const winBottom = 1.5, winTop = 3.8, winGapW = 2.2;
+
+            // Front wall with door — side panels sometimes breached
+            const fPanelW = (w - doorW) / 2;
+            const fPanelXL = bx - w / 2 + fPanelW / 2;
+            const fPanelXR = bx + w / 2 - fPanelW / 2;
+            const fWallZ = bz + d / 2;
+            if (fPanelW > 3 && rng() < 0.5) {
+                const fbH = 1.5 + rng() * 2.0;
+                const fbBot = fbH * 0.3;
+                addObs(bMat, fPanelW, fbBot, thickness, fPanelXL, fbBot / 2, fWallZ);
+                const fbTop = h - fbH;
+                if (fbTop > 0.3) addObs(bMat, fPanelW, fbTop, thickness, fPanelXL, fbH + fbTop / 2, fWallZ);
+            } else {
+                addObs(bMat, fPanelW, h, thickness, fPanelXL, h / 2, fWallZ);
+            }
+            if (fPanelW > 3 && rng() < 0.5) {
+                const fbH2 = 1.5 + rng() * 2.0;
+                const fbBot2 = fbH2 * 0.3;
+                addObs(bMat, fPanelW, fbBot2, thickness, fPanelXR, fbBot2 / 2, fWallZ);
+                const fbTop2 = h - fbH2;
+                if (fbTop2 > 0.3) addObs(bMat, fPanelW, fbTop2, thickness, fPanelXR, fbH2 + fbTop2 / 2, fWallZ);
+            } else {
+                addObs(bMat, fPanelW, h, thickness, fPanelXR, h / 2, fWallZ);
+            }
+            addObs(bMat, doorW, h - doorH, thickness, bx, h - (h - doorH) / 2, fWallZ);
+            for (let fw = -1; fw <= 1; fw += 2) {
+                const wm = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.8), winMat);
+                wm.position.set(bx + fw * w * 0.28, h * 0.55, bz + d / 2 + 0.02);
+                addVis(wm);
+            }
+
+            // Back wall (50% backdoor)
+            if (rng() > 0.5) {
+                addObs(bMat, (w - doorW) / 2, h, thickness, bx - w / 2 + (w - doorW) / 4, h / 2, bz - d / 2);
+                addObs(bMat, (w - doorW) / 2, h, thickness, bx + w / 2 - (w - doorW) / 4, h / 2, bz - d / 2);
+                addObs(bMat, doorW, h - doorH, thickness, bx, h - (h - doorH) / 2, bz - d / 2);
+            } else {
+                addObs(bMat, w, h, thickness, bx, h / 2, bz - d / 2);
+                const bwm = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.8), winMat);
+                bwm.position.set(bx, h * 0.55, bz - d / 2 - 0.02);
+                bwm.rotation.y = Math.PI;
+                addVis(bwm);
+            }
+
+            // Side walls — with jumpable window openings
+            const sideWallX = [bx - w / 2, bx + w / 2];
+            const sideSign = [-1, 1];
+            for (let sw = 0; sw < 2; sw++) {
+                const swx = sideWallX[sw];
+                if (d > winGapW + 3) {
+                    addObs(bMat, thickness, winBottom, d, swx, winBottom / 2, bz);
+                    if (h > winTop) {
+                        const lintelH = h - winTop;
+                        if (lintelH > 1.5 && rng() < 0.65) {
+                            const brW3 = 1.5 + rng() * 2.5;
+                            const brZ3 = bz + (rng() - 0.5) * (d - brW3 - 1.0);
+                            const ljD3 = (brZ3 - brW3 / 2) - (bz - d / 2);
+                            const rjD3 = (bz + d / 2) - (brZ3 + brW3 / 2);
+                            if (ljD3 > 0.3) addObs(bMat, thickness, lintelH, ljD3, swx, winTop + lintelH / 2, bz - d / 2 + ljD3 / 2);
+                            if (rjD3 > 0.3) addObs(bMat, thickness, lintelH, rjD3, swx, winTop + lintelH / 2, bz + d / 2 - rjD3 / 2);
+                            for (let r = 0; r < 3; r++) {
+                                const rc = new THREE.Mesh(new THREE.BoxGeometry(0.4 + rng() * 0.8, 0.3 + rng() * 0.5, 0.4 + rng() * 0.7), bMat);
+                                rc.position.set(swx + sideSign[sw] * (0.3 + rng() * 1.5), winTop + 0.3 + rng() * 0.5, brZ3 + (rng() - 0.5) * brW3 * 0.8);
+                                rc.rotation.y = rng() * Math.PI; rc.rotation.x = (rng() - 0.5) * 0.6;
+                                addVis(rc);
+                            }
+                        } else {
+                            addObs(bMat, thickness, lintelH, d, swx, winTop + lintelH / 2, bz);
+                        }
+                    }
+                    const lJambD = (d - winGapW) / 2;
+                    const lJambZ = bz - winGapW / 2 - lJambD / 2;
+                    if (lJambD > 2.0 && rng() < 0.5) {
+                        const brD4 = 0.8 + rng() * (lJambD * 0.6);
+                        const brZ4 = lJambZ + (rng() - 0.5) * (lJambD - brD4) * 0.6;
+                        const b4L = (brZ4 - brD4 / 2) - (lJambZ - lJambD / 2);
+                        const b4R = (lJambZ + lJambD / 2) - (brZ4 + brD4 / 2);
+                        if (b4L > 0.2) addObs(bMat, thickness, winTop - winBottom, b4L, swx, winBottom + (winTop - winBottom) / 2, lJambZ - lJambD / 2 + b4L / 2);
+                        if (b4R > 0.2) addObs(bMat, thickness, winTop - winBottom, b4R, swx, winBottom + (winTop - winBottom) / 2, lJambZ + lJambD / 2 - b4R / 2);
+                    } else {
+                        addObs(bMat, thickness, winTop - winBottom, lJambD, swx, winBottom + (winTop - winBottom) / 2, lJambZ);
+                    }
+                    addObs(bMat, thickness, winTop - winBottom, (d - winGapW) / 2, swx, winBottom + (winTop - winBottom) / 2, bz + winGapW / 2 + (d - winGapW) / 4);
+                    const sideGlass = new THREE.Mesh(new THREE.PlaneGeometry(winGapW, winTop - winBottom), winMat);
+                    sideGlass.rotation.y = Math.PI / 2 * (sw === 0 ? -1 : 1);
+                    sideGlass.position.set(swx, winBottom + (winTop - winBottom) / 2, bz);
+                    addVis(sideGlass);
+                } else if (rng() < 0.8) {
+                    const brH = 1.8 + rng() * 2.2;
+                    const brD = 1.8 + rng() * 2.5;
+                    const brZ = bz + (rng() - 0.5) * d * 0.4;
+                    addObs(bMat, thickness, brH * 0.35, d, swx, brH * 0.175, bz);
+                    const topH = h - brH;
+                    if (topH > 0.4) addObs(bMat, thickness, topH, d, swx, brH + topH / 2, bz);
+                    const lJambD2 = (brZ - brD / 2) - (bz - d / 2);
+                    if (lJambD2 > 0.3) addObs(bMat, thickness, brH, lJambD2, swx, brH / 2, bz - d / 2 + lJambD2 / 2);
+                    const rJambD = (bz + d / 2) - (brZ + brD / 2);
+                    if (rJambD > 0.3) addObs(bMat, thickness, brH, rJambD, swx, brH / 2, bz + d / 2 - rJambD / 2);
+                    for (let r = 0; r < 4; r++) {
+                        const rChunk = new THREE.Mesh(new THREE.BoxGeometry(0.4 + rng() * 0.8, 0.25 + rng() * 0.5, 0.4 + rng() * 0.7), bMat);
+                        rChunk.position.set(swx + sideSign[sw] * (0.3 + rng() * 2.0), 0.2 + rng() * 0.2, brZ + (rng() - 0.5) * brD);
+                        rChunk.rotation.y = rng() * Math.PI;
+                        rChunk.rotation.x = (rng() - 0.5) * 0.6;
+                        addVis(rChunk);
+                    }
+                } else {
+                    addObs(bMat, thickness, h, d, swx, h / 2, bz);
+                }
+            }
+
+            // Roof — sometimes damaged with holes
+            if (rng() < 0.6) {
+                addObs(roofMat, w, thickness, d, bx, h + thickness / 2, bz);
+            } else {
+                const hx = bx + (rng() - 0.5) * w * 0.4;
+                const hz = bz + (rng() - 0.5) * d * 0.4;
+                const holeW = 2.5 + rng() * 3.5;
+                const holeD = 2.5 + rng() * 3.5;
+                const lw = (hx - holeW / 2) - (bx - w / 2);
+                if (lw > 0.4) addObs(roofMat, lw, thickness, d, bx - w / 2 + lw / 2, h + thickness / 2, bz);
+                const rw2 = (bx + w / 2) - (hx + holeW / 2);
+                if (rw2 > 0.4) addObs(roofMat, rw2, thickness, d, bx + w / 2 - rw2 / 2, h + thickness / 2, bz);
+                const fd = (hz - holeD / 2) - (bz - d / 2);
+                if (fd > 0.4) addObs(roofMat, holeW, thickness, fd, hx, h + thickness / 2, bz - d / 2 + fd / 2);
+                const bd = (bz + d / 2) - (hz + holeD / 2);
+                if (bd > 0.4) addObs(roofMat, holeW, thickness, bd, hx, h + thickness / 2, bz + d / 2 - bd / 2);
+                for (let e = 0; e < 6; e++) {
+                    const angle = (e / 6) * Math.PI * 2;
+                    const ex = hx + Math.cos(angle) * (holeW / 2 + rng() * 0.6);
+                    const ez = hz + Math.sin(angle) * (holeD / 2 + rng() * 0.6);
+                    const ew = 0.3 + rng() * 0.8;
+                    const chunk = new THREE.Mesh(new THREE.BoxGeometry(ew, thickness + rng() * 0.5, ew), roofMat);
+                    chunk.position.set(ex, h + thickness * 0.7, ez);
+                    chunk.rotation.y = rng() * Math.PI;
+                    chunk.rotation.z = (rng() - 0.5) * 0.9;
+                    addVis(chunk);
+                }
+            }
+            if (rng() > 0.5) {
+                addObs(acMat, 2, 1.2, 1.5, bx + (rng() - 0.5) * (w - 3), h + thickness + 0.6, bz + (rng() - 0.5) * (d - 3));
+            }
+            addObs(bMat, w, 0.8, thickness * 1.5, bx, h + thickness + 0.4, bz + d / 2);
+            addObs(bMat, w, 0.8, thickness * 1.5, bx, h + thickness + 0.4, bz - d / 2);
+            addObs(bMat, thickness * 1.5, 0.8, d, bx - w / 2, h + thickness + 0.4, bz);
+            addObs(bMat, thickness * 1.5, 0.8, d, bx + w / 2, h + thickness + 0.4, bz);
+
+            // Second floor & interior stairs
+            if (rng() > 0.35) {
+                const floorH = h * 0.45;
+                addObs(bMat, w - thickness * 2, thickness, d / 2 - thickness, bx, floorH, bz - d / 4);
+                const steps = 8;
+                const stepW = 2.5;
+                const stepD = (d / 2 - 1) / steps;
+                const stepH = floorH / steps;
+                for (let s = 0; s < steps; s++) {
+                    const curH = stepH * (s + 1);
+                    addObs(bMat, stepW, curH, stepD,
+                        bx - w / 2 + thickness + stepW / 2,
+                        curH / 2,
+                        bz + d / 2 - thickness - 0.5 - stepD * s - stepD / 2);
+                }
+                addObs(furnitureMat, 2.5, 0.8, 1.2, bx, floorH + 0.4, bz - d / 4 + 1.5);
+            }
+
+            // External fire escape stairs
+            if (rng() > 0.5) {
+                const rsSteps = 12, rsW = 2;
+                const rsD = (d - 2) / rsSteps;
+                const rsH = (h + thickness) / rsSteps;
+                for (let s = 0; s < rsSteps; s++) {
+                    const curH = rsH * (s + 1);
+                    addObs(metalMat, rsW, curH, rsD,
+                        bx + w / 2 + rsW / 2, curH / 2,
+                        bz - d / 2 + 1 + rsD * s + rsD / 2);
+                }
+            }
+
+            // Interior furniture
+            if (rng() < 0.7) addObs(furnitureMat2, 1.5, 0.75, 0.8, bx + (rng() - 0.5) * (w - 3), 0.375, bz + (rng() - 0.5) * (d - 3));
+            if (rng() < 0.5) addObs(furnitureMat2, 0.8, 1.5, 0.5, bx + (rng() - 0.5) * (w - 3), 0.75, bz + (rng() - 0.5) * (d - 3));
+
+            // Exterior crates & barrels
+            const numCrates = Math.floor(rng() * 4) + 1;
+            for (let c = 0; c < numCrates; c++) {
+                const cx2 = bx + (rng() - 0.5) * (w + 4);
+                const cz2 = bz + d / 2 + 1 + rng() * 3;
+                addObs(crateMat, 1.0 + rng() * 0.5, 1.0 + rng() * 0.5, 1.0 + rng() * 0.5, cx2, 0.6, cz2);
+            }
+            if (rng() < 0.5) {
+                const barX = bx + (rng() - 0.5) * (w + 2);
+                const barZ = bz - d / 2 - 1.5 - rng() * 2;
+                addObs(barrelMat, 0.7, 1.1, 0.7, barX, 0.55, barZ);
+                if (rng() < 0.5) addObs(barrelMat, 0.7, 1.1, 0.7, barX + 1.0, 0.55, barZ);
+            }
+            if (rng() < 0.4) {
+                addObs(trashMat, 0.4, 0.6, 0.4, bx - w / 2 - 1, 0.3, bz + rng() * d - d / 2);
+            }
+
+            // Graffiti decal
+            const grafMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.5 + rng() * 2, 0.8 + rng() * 1.2), grafMats[Math.floor(rng() * grafMats.length)]);
+            grafMesh.position.set(bx + (rng() - 0.5) * (w - 2), 1.5 + rng() * 2, bz + d / 2 + 0.03);
+            addVis(grafMesh);
+        }
+    }
+    return { meshes, chunkObs };
+}
+
+export function updateCityChunks(px, pz) {
+    if (!_cityBlockCenters.length || !_cityObs) return;
+    for (let i = 0; i < _cityBlockCenters.length; i += 2) {
+        const bcx = _cityBlockCenters[i], bcz = _cityBlockCenters[i + 1];
+        const dist = Math.hypot(px - bcx, pz - bcz);
+        const key = `${bcx},${bcz}`;
+        if (dist < CHUNK_LOAD_DIST && !_cityChunks.has(key)) {
+            const { meshes, chunkObs } = _buildCityChunkMeshes(bcx, bcz);
+            _cityChunks.set(key, { meshes, chunkObs });
+            for (const o of chunkObs) _cityObs.push(o);
+        } else if (dist > CHUNK_UNLOAD_DIST && _cityChunks.has(key)) {
+            const chunk = _cityChunks.get(key);
+            for (const m of chunk.meshes) { scene.remove(m); if (m.geometry) m.geometry.dispose(); }
+            for (const o of chunk.chunkObs) {
+                const idx = _cityObs.indexOf(o);
+                if (idx >= 0) _cityObs.splice(idx, 1);
+            }
+            _cityChunks.delete(key);
+        }
+    }
+}
+
+// ─── Forest chunk builder ────────────────────────────────────────────────────
+function _buildForestChunkMeshes(cx, cz) {
+    const seed = Math.abs(Math.imul(Math.round(cx) | 0, 73856093) ^ Math.imul(Math.round(cz) | 0, 19349663));
+    const rng = mulberry32((seed % 0x7fffffff) + 1);
+    const meshes = [], chunkObs = [];
+    const { treeMat, leafMats, mossMats } = _forestMats;
+
+    const treePositions = [];
+    const minDist = 2.5;
+    let attempts = 0;
+    while (treePositions.length < 28 && attempts < 2000) {
+        attempts++;
+        const tx = cx + (rng() - 0.5) * FOREST_CHUNK_SIZE;
+        const tz = cz + (rng() - 0.5) * FOREST_CHUNK_SIZE;
+        if (Math.abs(tx) < 9 && Math.abs(tz) < 9) continue;
+        let tooClose = false;
+        for (const p of treePositions) {
+            const pdx = tx - p[0], pdz = tz - p[1];
+            if (pdx * pdx + pdz * pdz < minDist * minDist) { tooClose = true; break; }
+        }
+        if (!tooClose) treePositions.push([tx, tz]);
+    }
+
+    for (const [x, z] of treePositions) {
+        const scale = 0.4 + rng() * 1.8;
+        const thisLeafMat = leafMats[Math.floor(rng() * leafMats.length)];
+
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * scale, 0.55 * scale, 8 * scale, 6), treeMat);
+        trunk.position.set(x, 4 * scale, z);
+        scene.add(trunk); meshes.push(trunk);
+        chunkObs.push({ mesh: trunk, radius: 0.55 * scale, box: new THREE.Box3().setFromObject(trunk), isTrunk: true });
+
+        const canopy = new THREE.Mesh(new THREE.SphereGeometry(3.2 * scale, 7, 5), thisLeafMat);
+        canopy.position.set(x, 8.5 * scale, z); canopy.scale.y = 0.85;
+        scene.add(canopy); meshes.push(canopy);
+        chunkObs.push({ mesh: canopy, box: new THREE.Box3().setFromObject(canopy), passThrough: true });
+
+        if (scale > 1.2) {
+            const canopy2 = new THREE.Mesh(new THREE.SphereGeometry(2.2 * scale, 6, 4), thisLeafMat);
+            canopy2.position.set(x + (rng() - 0.5) * scale, 10.5 * scale, z + (rng() - 0.5) * scale);
+            scene.add(canopy2); meshes.push(canopy2);
+        }
+
+        if (scale > 1.0) {
+            for (let j = 0; j < 3; j++) {
+                const rootAngle = j * (Math.PI * 2 / 3) + rng() * 0.5;
+                const root = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * scale, 0.35 * scale, 2.2 * scale, 4), treeMat);
+                root.rotation.x = Math.PI / 2 + 0.4 + rng() * 0.3;
+                root.rotation.y = rootAngle;
+                root.position.set(x + Math.cos(rootAngle) * scale * 0.75, 0.1, z + Math.sin(rootAngle) * scale * 0.75);
+                root.updateMatrixWorld(true);
+                scene.add(root); meshes.push(root);
+            }
+        }
+
+        if (rng() < 0.3) {
+            const mossMat = mossMats[Math.floor(rng() * mossMats.length)];
+            const moss = new THREE.Mesh(new THREE.CylinderGeometry(1.2 * scale, 1.4 * scale, 0.08, 8), mossMat);
+            moss.position.set(x, 0.04, z);
+            scene.add(moss); meshes.push(moss);
+        }
+    }
+
+    const logCount = 1 + Math.floor(rng() * 3);
+    for (let l = 0; l < logCount; l++) {
+        const lx = cx + (rng() - 0.5) * FOREST_CHUNK_SIZE;
+        const lz = cz + (rng() - 0.5) * FOREST_CHUNK_SIZE;
+        if (Math.abs(lx) < 8 && Math.abs(lz) < 8) continue;
+        const logScale = 0.5 + rng() * 1.2;
+        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.22 * logScale, 0.28 * logScale, 4 * logScale, 6), treeMat);
+        log.rotation.z = Math.PI / 2;
+        log.rotation.y = rng() * Math.PI;
+        log.position.set(lx, 0.22 * logScale, lz);
+        scene.add(log); meshes.push(log);
+        chunkObs.push({ mesh: log, box: new THREE.Box3().setFromObject(log) });
+    }
+
+    return { meshes, chunkObs };
+}
+
+export function updateForestChunks(px, pz) {
+    if (!_forestChunkCenters.length || !_forestObs) return;
+    for (let i = 0; i < _forestChunkCenters.length; i += 2) {
+        const cx = _forestChunkCenters[i], cz = _forestChunkCenters[i + 1];
+        const dist = Math.hypot(px - cx, pz - cz);
+        const key = `${cx},${cz}`;
+        if (dist < TERRAIN_LOAD_DIST && !_forestChunks.has(key)) {
+            const { meshes, chunkObs } = _buildForestChunkMeshes(cx, cz);
+            _forestChunks.set(key, { meshes, chunkObs });
+            for (const o of chunkObs) _forestObs.push(o);
+        } else if (dist > TERRAIN_UNLOAD_DIST && _forestChunks.has(key)) {
+            const chunk = _forestChunks.get(key);
+            for (const m of chunk.meshes) { scene.remove(m); if (m.geometry) m.geometry.dispose(); }
+            for (const o of chunk.chunkObs) {
+                const idx = _forestObs.indexOf(o);
+                if (idx >= 0) _forestObs.splice(idx, 1);
+            }
+            _forestChunks.delete(key);
+        }
+    }
+}
+
+// ─── Mountain chunk builder ───────────────────────────────────────────────────
+function _buildMountainChunkMeshes(cx, cz) {
+    const seed = Math.abs(Math.imul(Math.round(cx) | 0, 73856093) ^ Math.imul(Math.round(cz) | 0, 19349663));
+    const rng = mulberry32((seed % 0x7fffffff) + 1);
+    const meshes = [], chunkObs = [], chunkSlopes = [];
+    const { rockMat, rockMat2 } = _mountainMats;
+
+    // One terrain tile per chunk (skip flat spawn zone)
+    if (Math.abs(cx) >= 22 || Math.abs(cz) >= 22) {
+        const ty = rng() * 3.5;
+        const rotX = (rng() - 0.5) * 0.65;
+        const rotZ = (rng() - 0.5) * 0.65;
+        const mat = rng() < 0.5 ? rockMat : rockMat2;
+        const tile = new THREE.Mesh(new THREE.BoxGeometry(48, 5, 48), mat);
+        tile.rotation.x = rotX; tile.rotation.z = rotZ;
+        tile.position.set(cx, ty, cz);
+        tile.receiveShadow = true;
+        scene.add(tile); tile.updateMatrixWorld(true);
+        meshes.push(tile); chunkSlopes.push(tile);
+    }
+
+    // Rock formations within this chunk area
+    const rockCount = 2 + Math.floor(rng() * 4);
+    for (let i = 0; i < rockCount; i++) {
+        const bx = cx + (rng() - 0.5) * MOUNTAIN_TILE_STEP * 0.9;
+        const bz = cz + (rng() - 0.5) * MOUNTAIN_TILE_STEP * 0.9;
+        if (Math.abs(bx) < 20 && Math.abs(bz) < 20) continue;
+        const w = 10 + rng() * 20, h = 10 + rng() * 25, d = 10 + rng() * 20;
+
+        const hasGap = rng() < 0.40;
+        if (hasGap && w > 8 && d > 8) {
+            const gapSize = 3.0 + rng() * 1.5;
+            if (rng() < 0.5) {
+                const halfD = (d - gapSize) / 2;
+                if (halfD > 1) {
+                    const m1 = new THREE.Mesh(new THREE.BoxGeometry(w, h, halfD), rockMat);
+                    m1.position.set(bx, h / 2, bz - gapSize / 2 - halfD / 2);
+                    scene.add(m1); meshes.push(m1);
+                    chunkObs.push({ mesh: m1, box: new THREE.Box3().setFromObject(m1) });
+                    const m2 = new THREE.Mesh(new THREE.BoxGeometry(w, h, halfD), rockMat);
+                    m2.position.set(bx, h / 2, bz + gapSize / 2 + halfD / 2);
+                    scene.add(m2); meshes.push(m2);
+                    chunkObs.push({ mesh: m2, box: new THREE.Box3().setFromObject(m2) });
+                } else {
+                    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), rockMat);
+                    m.position.set(bx, h / 2, bz); scene.add(m); meshes.push(m);
+                    chunkObs.push({ mesh: m, box: new THREE.Box3().setFromObject(m) });
+                }
+            } else {
+                const halfW = (w - gapSize) / 2;
+                if (halfW > 1) {
+                    const m1 = new THREE.Mesh(new THREE.BoxGeometry(halfW, h, d), rockMat);
+                    m1.position.set(bx - gapSize / 2 - halfW / 2, h / 2, bz);
+                    scene.add(m1); meshes.push(m1);
+                    chunkObs.push({ mesh: m1, box: new THREE.Box3().setFromObject(m1) });
+                    const m2 = new THREE.Mesh(new THREE.BoxGeometry(halfW, h, d), rockMat);
+                    m2.position.set(bx + gapSize / 2 + halfW / 2, h / 2, bz);
+                    scene.add(m2); meshes.push(m2);
+                    chunkObs.push({ mesh: m2, box: new THREE.Box3().setFromObject(m2) });
+                } else {
+                    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), rockMat);
+                    m.position.set(bx, h / 2, bz); scene.add(m); meshes.push(m);
+                    chunkObs.push({ mesh: m, box: new THREE.Box3().setFromObject(m) });
+                }
+            }
+        } else {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), rockMat);
+            m.position.set(bx, h / 2, bz); scene.add(m); meshes.push(m);
+            chunkObs.push({ mesh: m, box: new THREE.Box3().setFromObject(m) });
+        }
+        const slope = new THREE.Mesh(new THREE.BoxGeometry(w * 1.5, h * 0.5, d * 1.5), rockMat);
+        slope.rotation.x = (rng() - 0.5); slope.rotation.z = (rng() - 0.5);
+        slope.position.set(bx, h / 4, bz);
+        scene.add(slope); slope.updateMatrixWorld(true);
+        meshes.push(slope);
+        chunkObs.push({ mesh: slope, isSlope: true, box: new THREE.Box3().setFromObject(slope) });
+        chunkSlopes.push(slope);
+    }
+
+    return { meshes, chunkObs, chunkSlopes };
+}
+
+export function updateMountainChunks(px, pz) {
+    if (!_mountainChunkCenters.length || !_mountainObs) return;
+    for (let i = 0; i < _mountainChunkCenters.length; i += 2) {
+        const cx = _mountainChunkCenters[i], cz = _mountainChunkCenters[i + 1];
+        const dist = Math.hypot(px - cx, pz - cz);
+        const key = `${cx},${cz}`;
+        if (dist < TERRAIN_LOAD_DIST && !_mountainChunks.has(key)) {
+            const { meshes, chunkObs, chunkSlopes } = _buildMountainChunkMeshes(cx, cz);
+            _mountainChunks.set(key, { meshes, chunkObs, chunkSlopes });
+            for (const o of chunkObs) _mountainObs.push(o);
+            for (const s of chunkSlopes) gameState.slopeMeshes.push(s);
+        } else if (dist > TERRAIN_UNLOAD_DIST && _mountainChunks.has(key)) {
+            const chunk = _mountainChunks.get(key);
+            for (const m of chunk.meshes) { scene.remove(m); if (m.geometry) m.geometry.dispose(); }
+            for (const o of chunk.chunkObs) {
+                const idx = _mountainObs.indexOf(o);
+                if (idx >= 0) _mountainObs.splice(idx, 1);
+            }
+            for (const s of chunk.chunkSlopes) {
+                const idx = gameState.slopeMeshes.indexOf(s);
+                if (idx >= 0) gameState.slopeMeshes.splice(idx, 1);
+            }
+            _mountainChunks.delete(key);
+        }
+    }
+}
+
+// ─── Desert chunk builder ─────────────────────────────────────────────────────
+function _buildDesertChunkMeshes(cx, cz) {
+    const seed = Math.abs(Math.imul(Math.round(cx) | 0, 73856093) ^ Math.imul(Math.round(cz) | 0, 19349663));
+    const rng = mulberry32((seed % 0x7fffffff) + 1);
+    const meshes = [], chunkObs = [];
+    const { cactusMat, sandRockMat, debrisMat } = _desertMats;
+
+    // Cacti
+    const cactiCount = 3 + Math.floor(rng() * 4);
+    for (let i = 0; i < cactiCount; i++) {
+        const bx = cx + (rng() - 0.5) * DESERT_CHUNK_SIZE;
+        const bz = cz + (rng() - 0.5) * DESERT_CHUNK_SIZE;
+        if (Math.abs(bx) < 5 && Math.abs(bz) < 5) continue;
+        const s = 0.6 + rng() * 1.4;
+
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * s, 0.38 * s, 2.8 * s, 7), cactusMat);
+        body.position.set(bx, 1.4 * s, bz);
+        body.castShadow = true; scene.add(body); meshes.push(body);
+        body.updateMatrixWorld(true);
+        chunkObs.push({ mesh: body, radius: 0.4 * s, isCactus: true, box: new THREE.Box3().setFromObject(body) });
+
+        const lArmH = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.16 * s, 0.75 * s, 6), cactusMat);
+        lArmH.rotation.z = Math.PI / 2; lArmH.position.set(bx - 0.55 * s, 1.4 * s, bz);
+        scene.add(lArmH); meshes.push(lArmH);
+        const lArmV = new THREE.Mesh(new THREE.CylinderGeometry(0.13 * s, 0.15 * s, 0.65 * s, 6), cactusMat);
+        lArmV.position.set(bx - 0.92 * s, 1.8 * s, bz);
+        scene.add(lArmV); meshes.push(lArmV);
+
+        if (s > 1.0) {
+            const rArmH = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.14 * s, 0.65 * s, 6), cactusMat);
+            rArmH.rotation.z = -Math.PI / 2; rArmH.position.set(bx + 0.52 * s, 1.55 * s, bz);
+            scene.add(rArmH); meshes.push(rArmH);
+            const rArmV = new THREE.Mesh(new THREE.CylinderGeometry(0.11 * s, 0.13 * s, 0.55 * s, 6), cactusMat);
+            rArmV.position.set(bx + 0.84 * s, 1.85 * s, bz);
+            scene.add(rArmV); meshes.push(rArmV);
+        }
+    }
+
+    // Rocks
+    const rockCount = 2 + Math.floor(rng() * 3);
+    for (let i = 0; i < rockCount; i++) {
+        const rs = 1 + rng() * 3;
+        const rx = cx + (rng() - 0.5) * DESERT_CHUNK_SIZE;
+        const rz = cz + (rng() - 0.5) * DESERT_CHUNK_SIZE;
+        if (Math.abs(rx) < 5 && Math.abs(rz) < 5) continue;
+        const m = new THREE.Mesh(new THREE.BoxGeometry(rs, rs * 0.5, rs * 0.9), sandRockMat);
+        m.position.set(rx, rs * 0.25, rz); scene.add(m); meshes.push(m);
+        chunkObs.push({ mesh: m, box: new THREE.Box3().setFromObject(m) });
+    }
+
+    // Debris
+    if (rng() < 0.5) {
+        const dx = cx + (rng() - 0.5) * DESERT_CHUNK_SIZE;
+        const dz = cz + (rng() - 0.5) * DESERT_CHUNK_SIZE;
+        if (!(Math.abs(dx) < 8 && Math.abs(dz) < 8)) {
+            const dh = 0.7 + rng() * 0.6;
+            const dm = new THREE.Mesh(new THREE.BoxGeometry(0.8 + rng() * 1.2, dh, 0.8 + rng()), debrisMat);
+            dm.position.set(dx, dh / 2, dz); scene.add(dm); meshes.push(dm);
+            chunkObs.push({ mesh: dm, box: new THREE.Box3().setFromObject(dm), noStep: true });
+        }
+    }
+
+    return { meshes, chunkObs };
+}
+
+export function updateDesertChunks(px, pz) {
+    if (!_desertChunkCenters.length || !_desertObs) return;
+    for (let i = 0; i < _desertChunkCenters.length; i += 2) {
+        const cx = _desertChunkCenters[i], cz = _desertChunkCenters[i + 1];
+        const dist = Math.hypot(px - cx, pz - cz);
+        const key = `${cx},${cz}`;
+        if (dist < TERRAIN_LOAD_DIST && !_desertChunks.has(key)) {
+            const { meshes, chunkObs } = _buildDesertChunkMeshes(cx, cz);
+            _desertChunks.set(key, { meshes, chunkObs });
+            for (const o of chunkObs) _desertObs.push(o);
+        } else if (dist > TERRAIN_UNLOAD_DIST && _desertChunks.has(key)) {
+            const chunk = _desertChunks.get(key);
+            for (const m of chunk.meshes) { scene.remove(m); if (m.geometry) m.geometry.dispose(); }
+            for (const o of chunk.chunkObs) {
+                const idx = _desertObs.indexOf(o);
+                if (idx >= 0) _desertObs.splice(idx, 1);
+            }
+            _desertChunks.delete(key);
+        }
+    }
+}
+
 export function buildMap(mapId) {
     while (scene.children.length) scene.remove(scene.children[0]);
     const obs = [];
@@ -37,6 +624,12 @@ export function buildMap(mapId) {
     gameState.slopeMeshes = [];
     gameState.craterPits = [];
     gameState.streetLamps = [];
+    gameState.warehouseLights = [];
+
+    // Clear streaming chunk state from previous map
+    _forestChunks.clear(); _forestObs = null; _forestChunkCenters = []; _forestMats = null;
+    _mountainChunks.clear(); _mountainObs = null; _mountainChunkCenters = []; _mountainMats = null;
+    _desertChunks.clear(); _desertObs = null; _desertChunkCenters = []; _desertMats = null;
 
     const map = MAPS[mapId];
     const size = map.size;
@@ -145,58 +738,48 @@ export function buildMap(mapId) {
             const r = size * 0.35;
             addObstacle(obs, pillarMat, 0.8, 6, 0.8, Math.cos(angle) * r, 3, Math.sin(angle) * r);
         }
+        // Roof
+        const roofMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.8, metalness: 0.4, side: THREE.DoubleSide });
+        const roof = new THREE.Mesh(new THREE.PlaneGeometry(size * 2, size * 2), roofMat);
+        roof.rotation.x = Math.PI / 2;
+        roof.position.set(0, wallH, 0);
+        roof.receiveShadow = true;
+        scene.add(roof);
+        // Industrial ceiling light fixtures (flickering)
+        gameState.warehouseLights = [];
+        const ceilLightGeo = new THREE.BoxGeometry(0.8, 0.15, 2.5);
+        const lightSpots = [
+            [-size * 0.4, -size * 0.4], [-size * 0.4, 0], [-size * 0.4, size * 0.4],
+            [0, -size * 0.4], [0, 0], [0, size * 0.4],
+            [size * 0.4, -size * 0.4], [size * 0.4, 0], [size * 0.4, size * 0.4],
+        ];
+        for (const [lx, lz] of lightSpots) {
+            const mat = new THREE.MeshStandardMaterial({ color: 0xffffcc, emissive: 0xffffaa, emissiveIntensity: 1.5 });
+            const fixture = new THREE.Mesh(ceilLightGeo, mat);
+            fixture.position.set(lx, wallH - 0.1, lz);
+            scene.add(fixture);
+            const ptLight = new THREE.PointLight(0xffffdd, 1.2, size * 0.55);
+            ptLight.position.set(lx, wallH - 0.5, lz);
+            scene.add(ptLight);
+            gameState.warehouseLights.push({ mat, light: ptLight, phase: Math.random() * Math.PI * 2 });
+        }
     } else if (mapId === 'desert') {
-        const cactusMat = new THREE.MeshStandardMaterial({ color: 0x3a8c3a, roughness: 0.85 });
-        const sandRockMat = new THREE.MeshStandardMaterial({ color: 0xb89050, roughness: 0.95 });
-        for (let i = 0; i < 90; i++) {
-            const s = 0.6 + rng() * 1.4;
-            const bx = (rng() - 0.5) * size * 1.6;
-            const bz = (rng() - 0.5) * size * 1.6;
-            if (Math.abs(bx) < 5 && Math.abs(bz) < 5) continue;
-            // Cactus body
-            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * s, 0.38 * s, 2.8 * s, 7), cactusMat);
-            body.position.set(bx, 1.4 * s, bz);
-            body.castShadow = true;
-            scene.add(body);
-            obs.push({ mesh: body, radius: 0.4 * s, isCactus: true });
-            // Left arm horizontal
-            const lArmH = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.16 * s, 0.75 * s, 6), cactusMat);
-            lArmH.rotation.z = Math.PI / 2;
-            lArmH.position.set(bx - 0.55 * s, 1.4 * s, bz);
-            scene.add(lArmH);
-            // Left arm vertical
-            const lArmV = new THREE.Mesh(new THREE.CylinderGeometry(0.13 * s, 0.15 * s, 0.65 * s, 6), cactusMat);
-            lArmV.position.set(bx - 0.92 * s, 1.8 * s, bz);
-            scene.add(lArmV);
-            // Right arm (bigger cacti only)
-            if (s > 1.0) {
-                const rArmH = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.14 * s, 0.65 * s, 6), cactusMat);
-                rArmH.rotation.z = -Math.PI / 2;
-                rArmH.position.set(bx + 0.52 * s, 1.55 * s, bz);
-                scene.add(rArmH);
-                const rArmV = new THREE.Mesh(new THREE.CylinderGeometry(0.11 * s, 0.13 * s, 0.55 * s, 6), cactusMat);
-                rArmV.position.set(bx + 0.84 * s, 1.85 * s, bz);
-                scene.add(rArmV);
-            }
-        }
-        // Scattered rocks
-        for (let i = 0; i < 50; i++) {
-            const rs = 1 + rng() * 3;
-            const rx = (rng() - 0.5) * size * 1.7;
-            const rz = (rng() - 0.5) * size * 1.7;
-            if (Math.abs(rx) < 5 && Math.abs(rz) < 5) continue;
-            addObstacle(obs, sandRockMat, rs, rs * 0.5, rs * 0.9, rx, rs * 0.25, rz);
-        }
-        // Debris / broken crates
-        const debrisMat = new THREE.MeshStandardMaterial({ color: 0x7a5a30, roughness: 0.9 });
-        for (let i = 0; i < 20; i++) {
-            const dx = (rng() - 0.5) * size * 1.5;
-            const dz = (rng() - 0.5) * size * 1.5;
-            if (Math.abs(dx) < 8 && Math.abs(dz) < 8) continue;
-            const dh = 0.7 + rng() * 0.6; // taller so they register as solid (min 0.7m)
-            addObstacle(obs, debrisMat, 0.8 + rng() * 1.2, dh, 0.8 + rng(), dx, dh / 2, dz);
-            obs[obs.length - 1].noStep = true;
-        }
+        scene.fog = new THREE.Fog(0x000000, 90, 200);
+        gameState.fogNearBase = scene.fog.near;
+        gameState.fogFarBase = scene.fog.far;
+        _desertChunks.clear();
+        _desertObs = obs;
+        _desertMats = {
+            cactusMat: new THREE.MeshStandardMaterial({ color: 0x3a8c3a, roughness: 0.85 }),
+            sandRockMat: new THREE.MeshStandardMaterial({ color: 0xb89050, roughness: 0.95 }),
+            debrisMat: new THREE.MeshStandardMaterial({ color: 0x7a5a30, roughness: 0.9 }),
+        };
+        const halfD = Math.ceil(size * 1.1 / DESERT_CHUNK_SIZE) * DESERT_CHUNK_SIZE;
+        _desertChunkCenters = [];
+        for (let dx = -halfD; dx <= halfD; dx += DESERT_CHUNK_SIZE)
+            for (let dz = -halfD; dz <= halfD; dz += DESERT_CHUNK_SIZE)
+                _desertChunkCenters.push(dx, dz);
+        updateDesertChunks(0, 0);
     } else if (mapId === 'city') {
         _noShadowMap = true;
         // Ruined city atmosphere — dense ash fog hides distant geometry (matched to camera.far)
@@ -304,270 +887,29 @@ export function buildMap(mapId) {
             return false;
         };
 
-        // Pre-create one shared material per building colour (avoids 64 new allocations)
+        // === BUILDING GRID (streamed by chunk) ===
+        // Shared materials created once — reused across all chunks to minimise GPU state changes
         const bMats = buildingColors.map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 }));
+        const furnitureMat = new THREE.MeshStandardMaterial({ color: 0x6b4226, roughness: 0.9 });
+        const furnitureMat2 = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.9 });
+        const acMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.4 });
+        const barrelMat = new THREE.MeshStandardMaterial({ color: 0x334455, metalness: 0.4 });
+        const trashMat = new THREE.MeshStandardMaterial({ color: 0x555533, roughness: 1.0 });
+        const grafMats = graffitiColors.map(c => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.7 }));
 
-        // === BUILDING GRID ===
-        // Dynamic grid: one block center between each pair of adjacent roads, plus outer edges
+        // Register all block centers as a flat [x,z, x,z, ...] array for streaming
+        _cityChunks.clear();
+        _cityObs = obs;
+        _cityMats = { bMats, winMat, roofMat, metalMat, crateMat, furnitureMat, furnitureMat2, acMat, barrelMat, trashMat, grafMats };
         const allBlockCenters = [];
         allBlockCenters.push((-numGridRoads - 0.5) * blockPitch); // outer left/top
         for (let i = -numGridRoads; i < numGridRoads; i++) allBlockCenters.push((i + 0.5) * blockPitch);
         allBlockCenters.push((numGridRoads + 0.5) * blockPitch);  // outer right/bottom
-        const blockCenters = allBlockCenters;
+        _cityBlockCenters = [];
+        for (const bcx of allBlockCenters) for (const bcz of allBlockCenters) _cityBlockCenters.push(bcx, bcz);
 
-        for (const bcx of blockCenters) {
-            for (const bcz of blockCenters) {
-                // 2 rows (±7 from block centre Z) × 2 columns (±9 from block centre X)
-                for (const rowOff of [-7, 7]) {
-                    for (const colOff of [-9, 9]) {
-                        const bx = bcx + colOff;
-                        const bz = bcz + rowOff;
-
-                        if (Math.abs(bx) < 14 && Math.abs(bz) < 14) continue;
-
-                        const w = 12 + rng() * 5, h = 8 + rng() * 8, d = 10 + rng() * 3;
-
-                        const bMat = bMats[Math.floor(rng() * bMats.length)];
-                        const thickness = 0.5;
-                        const doorW = 2.5, doorH = 3.5;
-                        // Jumpable window gap: bottom at 1.5m, top at 3.8m
-                        const winBottom = 1.5, winTop = 3.8, winGapW = 2.2;
-
-                        // Front wall with door — side panels sometimes breached
-                        const fPanelW = (w - doorW) / 2;
-                        const fPanelXL = bx - w / 2 + fPanelW / 2;
-                        const fPanelXR = bx + w / 2 - fPanelW / 2;
-                        const fWallZ = bz + d / 2;
-                        if (fPanelW > 3 && rng() < 0.5) {
-                            // Breach in left front panel
-                            const fbH = 1.5 + rng() * 2.0;
-                            const fbBot = fbH * 0.3;
-                            addObstacle(obs, bMat, fPanelW, fbBot, thickness, fPanelXL, fbBot / 2, fWallZ);
-                            const fbTop = h - fbH;
-                            if (fbTop > 0.3) addObstacle(obs, bMat, fPanelW, fbTop, thickness, fPanelXL, fbH + fbTop / 2, fWallZ);
-                        } else {
-                            addObstacle(obs, bMat, fPanelW, h, thickness, fPanelXL, h / 2, fWallZ);
-                        }
-                        if (fPanelW > 3 && rng() < 0.5) {
-                            // Breach in right front panel
-                            const fbH2 = 1.5 + rng() * 2.0;
-                            const fbBot2 = fbH2 * 0.3;
-                            addObstacle(obs, bMat, fPanelW, fbBot2, thickness, fPanelXR, fbBot2 / 2, fWallZ);
-                            const fbTop2 = h - fbH2;
-                            if (fbTop2 > 0.3) addObstacle(obs, bMat, fPanelW, fbTop2, thickness, fPanelXR, fbH2 + fbTop2 / 2, fWallZ);
-                        } else {
-                            addObstacle(obs, bMat, fPanelW, h, thickness, fPanelXR, h / 2, fWallZ);
-                        }
-                        addObstacle(obs, bMat, doorW, h - doorH, thickness, bx, h - (h - doorH) / 2, fWallZ);
-                        // Front windows (decorative)
-                        for (let fw = -1; fw <= 1; fw += 2) {
-                            const wm = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.8), winMat);
-                            wm.position.set(bx + fw * w * 0.28, h * 0.55, bz + d / 2 + 0.02);
-                            scene.add(wm);
-                        }
-
-                        // Back wall (50% backdoor)
-                        if (rng() > 0.5) {
-                            addObstacle(obs, bMat, (w - doorW) / 2, h, thickness, bx - w / 2 + (w - doorW) / 4, h / 2, bz - d / 2);
-                            addObstacle(obs, bMat, (w - doorW) / 2, h, thickness, bx + w / 2 - (w - doorW) / 4, h / 2, bz - d / 2);
-                            addObstacle(obs, bMat, doorW, h - doorH, thickness, bx, h - (h - doorH) / 2, bz - d / 2);
-                        } else {
-                            addObstacle(obs, bMat, w, h, thickness, bx, h / 2, bz - d / 2);
-                            // Back window (decorative)
-                            const bwm = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.8), winMat);
-                            bwm.position.set(bx, h * 0.55, bz - d / 2 - 0.02);
-                            bwm.rotation.y = Math.PI;
-                            scene.add(bwm);
-                        }
-
-                        // Side walls — with jumpable window openings
-                        const sideWallZ = [bx - w / 2, bx + w / 2];
-                        const sideSign = [-1, 1];
-                        for (let sw = 0; sw < 2; sw++) {
-                            const swx = sideWallZ[sw];
-                            if (d > winGapW + 3) {
-                                // Bottom sill
-                                addObstacle(obs, bMat, thickness, winBottom, d, swx, winBottom / 2, bz);
-                                // Top lintel — sometimes blown out
-                                if (h > winTop) {
-                                    const lintelH = h - winTop;
-                                    if (lintelH > 1.5 && rng() < 0.65) {
-                                        const brW3 = 1.5 + rng() * 2.5;
-                                        const brZ3 = bz + (rng() - 0.5) * (d - brW3 - 1.0);
-                                        const ljD3 = (brZ3 - brW3 / 2) - (bz - d / 2);
-                                        const rjD3 = (bz + d / 2) - (brZ3 + brW3 / 2);
-                                        if (ljD3 > 0.3) addObstacle(obs, bMat, thickness, lintelH, ljD3, swx, winTop + lintelH / 2, bz - d / 2 + ljD3 / 2);
-                                        if (rjD3 > 0.3) addObstacle(obs, bMat, thickness, lintelH, rjD3, swx, winTop + lintelH / 2, bz + d / 2 - rjD3 / 2);
-                                        for (let r = 0; r < 3; r++) {
-                                            const rc = new THREE.Mesh(new THREE.BoxGeometry(0.4 + rng() * 0.8, 0.3 + rng() * 0.5, 0.4 + rng() * 0.7), bMat);
-                                            rc.position.set(swx + sideSign[sw] * (0.3 + rng() * 1.5), winTop + 0.3 + rng() * 0.5, brZ3 + (rng() - 0.5) * brW3 * 0.8);
-                                            rc.rotation.y = rng() * Math.PI; rc.rotation.x = (rng() - 0.5) * 0.6;
-                                            scene.add(rc);
-                                        }
-                                    } else {
-                                        addObstacle(obs, bMat, thickness, lintelH, d, swx, winTop + lintelH / 2, bz);
-                                    }
-                                }
-                                // Left jamb — sometimes breached
-                                const lJambD = (d - winGapW) / 2;
-                                const lJambZ = bz - winGapW / 2 - lJambD / 2;
-                                if (lJambD > 2.0 && rng() < 0.5) {
-                                    const brD4 = 0.8 + rng() * (lJambD * 0.6);
-                                    const brZ4 = lJambZ + (rng() - 0.5) * (lJambD - brD4) * 0.6;
-                                    const b4L = (brZ4 - brD4 / 2) - (lJambZ - lJambD / 2);
-                                    const b4R = (lJambZ + lJambD / 2) - (brZ4 + brD4 / 2);
-                                    if (b4L > 0.2) addObstacle(obs, bMat, thickness, winTop - winBottom, b4L, swx, winBottom + (winTop - winBottom) / 2, lJambZ - lJambD / 2 + b4L / 2);
-                                    if (b4R > 0.2) addObstacle(obs, bMat, thickness, winTop - winBottom, b4R, swx, winBottom + (winTop - winBottom) / 2, lJambZ + lJambD / 2 - b4R / 2);
-                                } else {
-                                    addObstacle(obs, bMat, thickness, winTop - winBottom, lJambD, swx, winBottom + (winTop - winBottom) / 2, lJambZ);
-                                }
-                                // Right jamb
-                                addObstacle(obs, bMat, thickness, winTop - winBottom, (d - winGapW) / 2, swx, winBottom + (winTop - winBottom) / 2, bz + winGapW / 2 + (d - winGapW) / 4);
-                                // Glass pane (visual, no collision)
-                                const sideGlass = new THREE.Mesh(new THREE.PlaneGeometry(winGapW, winTop - winBottom), winMat);
-                                sideGlass.rotation.y = Math.PI / 2 * (sw === 0 ? -1 : 1);
-                                sideGlass.position.set(swx, winBottom + (winTop - winBottom) / 2, bz);
-                                scene.add(sideGlass);
-                            } else if (rng() < 0.8) {
-                                // Breach: blown-out hole in wall
-                                const brH = 1.8 + rng() * 2.2;
-                                const brD = 1.8 + rng() * 2.5;
-                                const brZ = bz + (rng() - 0.5) * d * 0.4;
-                                // Bottom sill
-                                addObstacle(obs, bMat, thickness, brH * 0.35, d, swx, brH * 0.175, bz);
-                                // Top section
-                                const topH = h - brH;
-                                if (topH > 0.4) addObstacle(obs, bMat, thickness, topH, d, swx, brH + topH / 2, bz);
-                                // Left jamb
-                                const lJambD = (brZ - brD / 2) - (bz - d / 2);
-                                if (lJambD > 0.3) addObstacle(obs, bMat, thickness, brH, lJambD, swx, brH / 2, bz - d / 2 + lJambD / 2);
-                                // Right jamb
-                                const rJambD = (bz + d / 2) - (brZ + brD / 2);
-                                if (rJambD > 0.3) addObstacle(obs, bMat, thickness, brH, rJambD, swx, brH / 2, bz + d / 2 - rJambD / 2);
-                                // Rubble spilled through breach
-                                for (let r = 0; r < 4; r++) {
-                                    const rChunk = new THREE.Mesh(new THREE.BoxGeometry(0.4 + rng() * 0.8, 0.25 + rng() * 0.5, 0.4 + rng() * 0.7), bMat);
-                                    rChunk.position.set(swx + sideSign[sw] * (0.3 + rng() * 2.0), 0.2 + rng() * 0.2, brZ + (rng() - 0.5) * brD);
-                                    rChunk.rotation.y = rng() * Math.PI;
-                                    rChunk.rotation.x = (rng() - 0.5) * 0.6;
-                                    scene.add(rChunk);
-                                }
-                            } else {
-                                addObstacle(obs, bMat, thickness, h, d, swx, h / 2, bz);
-                            }
-                        }
-
-                        // Roof — sometimes damaged with holes
-                        if (rng() < 0.6) {
-                            addObstacle(obs, roofMat, w, thickness, d, bx, h + thickness / 2, bz);
-                        } else {
-                            const hx = bx + (rng() - 0.5) * w * 0.4;
-                            const hz = bz + (rng() - 0.5) * d * 0.4;
-                            const holeW = 2.5 + rng() * 3.5;
-                            const holeD = 2.5 + rng() * 3.5;
-                            const lw = (hx - holeW / 2) - (bx - w / 2);
-                            if (lw > 0.4) addObstacle(obs, roofMat, lw, thickness, d, bx - w / 2 + lw / 2, h + thickness / 2, bz);
-                            const rw2 = (bx + w / 2) - (hx + holeW / 2);
-                            if (rw2 > 0.4) addObstacle(obs, roofMat, rw2, thickness, d, bx + w / 2 - rw2 / 2, h + thickness / 2, bz);
-                            const fd = (hz - holeD / 2) - (bz - d / 2);
-                            if (fd > 0.4) addObstacle(obs, roofMat, holeW, thickness, fd, hx, h + thickness / 2, bz - d / 2 + fd / 2);
-                            const bd = (bz + d / 2) - (hz + holeD / 2);
-                            if (bd > 0.4) addObstacle(obs, roofMat, holeW, thickness, bd, hx, h + thickness / 2, bz + d / 2 - bd / 2);
-                            // Jagged chunks around the hole edge
-                            for (let e = 0; e < 6; e++) {
-                                const angle = (e / 6) * Math.PI * 2;
-                                const ex = hx + Math.cos(angle) * (holeW / 2 + rng() * 0.6);
-                                const ez = hz + Math.sin(angle) * (holeD / 2 + rng() * 0.6);
-                                const ew = 0.3 + rng() * 0.8;
-                                const chunk = new THREE.Mesh(new THREE.BoxGeometry(ew, thickness + rng() * 0.5, ew), roofMat);
-                                chunk.position.set(ex, h + thickness * 0.7, ez);
-                                chunk.rotation.y = rng() * Math.PI;
-                                chunk.rotation.z = (rng() - 0.5) * 0.9;
-                                scene.add(chunk);
-                            }
-                        }
-                        // Roof details: AC unit
-                        if (rng() > 0.5) {
-                            addObstacle(obs, new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.4 }), 2, 1.2, 1.5, bx + (rng() - 0.5) * (w - 3), h + thickness + 0.6, bz + (rng() - 0.5) * (d - 3));
-                        }
-                        // Roof parapet
-                        addObstacle(obs, bMat, w, 0.8, thickness * 1.5, bx, h + thickness + 0.4, bz + d / 2);
-                        addObstacle(obs, bMat, w, 0.8, thickness * 1.5, bx, h + thickness + 0.4, bz - d / 2);
-                        addObstacle(obs, bMat, thickness * 1.5, 0.8, d, bx - w / 2, h + thickness + 0.4, bz);
-                        addObstacle(obs, bMat, thickness * 1.5, 0.8, d, bx + w / 2, h + thickness + 0.4, bz);
-
-                        // Second floor & interior stairs
-                        if (rng() > 0.35) {
-                            const floorH = h * 0.45;
-                            addObstacle(obs, bMat, w - thickness * 2, thickness, d / 2 - thickness, bx, floorH, bz - d / 4);
-                            // Interior stairs
-                            const steps = 8;
-                            const stepW = 2.5;
-                            const stepD = (d / 2 - 1) / steps;
-                            const stepH = floorH / steps;
-                            for (let s = 0; s < steps; s++) {
-                                const curH = stepH * (s + 1);
-                                addObstacle(obs, bMat, stepW, curH, stepD,
-                                    bx - w / 2 + thickness + stepW / 2,
-                                    curH / 2,
-                                    bz + d / 2 - thickness - 0.5 - stepD * s - stepD / 2);
-                            }
-                            // Second floor furniture
-                            const furnitureMat = new THREE.MeshStandardMaterial({ color: 0x6b4226, roughness: 0.9 });
-                            addObstacle(obs, furnitureMat, 2.5, 0.8, 1.2, bx, floorH + 0.4, bz - d / 4 + 1.5);
-                        }
-
-                        // External fire escape stairs
-                        if (rng() > 0.5) {
-                            const rsSteps = 12, rsW = 2;
-                            const rsD = (d - 2) / rsSteps;
-                            const rsH = (h + thickness) / rsSteps;
-                            for (let s = 0; s < rsSteps; s++) {
-                                const curH = rsH * (s + 1);
-                                addObstacle(obs, metalMat, rsW, curH, rsD,
-                                    bx + w / 2 + rsW / 2, curH / 2,
-                                    bz - d / 2 + 1 + rsD * s + rsD / 2);
-                            }
-                        }
-
-                        // Interior furniture
-                        const furnitureMat2 = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.9 });
-                        if (rng() < 0.7) addObstacle(obs, furnitureMat2, 1.5, 0.75, 0.8, bx + (rng() - 0.5) * (w - 3), 0.375, bz + (rng() - 0.5) * (d - 3));
-                        if (rng() < 0.5) addObstacle(obs, furnitureMat2, 0.8, 1.5, 0.5, bx + (rng() - 0.5) * (w - 3), 0.75, bz + (rng() - 0.5) * (d - 3));
-
-                        // Exterior crates & barrels
-                        const numCrates = Math.floor(rng() * 4) + 1;
-                        for (let c = 0; c < numCrates; c++) {
-                            const cx = bx + (rng() - 0.5) * (w + 4);
-                            const cz = bz + d / 2 + 1 + rng() * 3;
-                            addObstacle(obs, crateMat, 1.0 + rng() * 0.5, 1.0 + rng() * 0.5, 1.0 + rng() * 0.5, cx, 0.6, cz);
-                        }
-                        // Barrels
-                        if (rng() < 0.5) {
-                            const barrelMat = new THREE.MeshStandardMaterial({ color: 0x334455, metalness: 0.4 });
-                            const barX = bx + (rng() - 0.5) * (w + 2);
-                            const barZ = bz - d / 2 - 1.5 - rng() * 2;
-                            addObstacle(obs, barrelMat, 0.7, 1.1, 0.7, barX, 0.55, barZ);
-                            if (rng() < 0.5) addObstacle(obs, barrelMat, 0.7, 1.1, 0.7, barX + 1.0, 0.55, barZ);
-                        }
-                        // Street trash / debris
-                        if (rng() < 0.4) {
-                            const trashMat = new THREE.MeshStandardMaterial({ color: 0x555533, roughness: 1.0 });
-                            addObstacle(obs, trashMat, 0.4, 0.6, 0.4, bx - w / 2 - 1, 0.3, bz + rng() * d - d / 2);
-                        }
-
-                        // Graffiti decals on exterior walls
-                        const grafMat = new THREE.MeshBasicMaterial({
-                            color: graffitiColors[Math.floor(rng() * graffitiColors.length)],
-                            transparent: true, opacity: 0.7
-                        });
-                        const grafMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.5 + rng() * 2, 0.8 + rng() * 1.2), grafMat);
-                        grafMesh.position.set(bx + (rng() - 0.5) * (w - 2), 1.5 + rng() * 2, bz + d / 2 + 0.03);
-                        scene.add(grafMesh);
-                    }   // end colOff loop
-                }   // end rowOff loop
-            }   // end bcz loop
-        }   // end bcx loop
+        // Load only chunks near the player start; the rest stream in as the player moves
+        updateCityChunks(0, 0);
 
         // Street lights — placed along roads on the sidewalks (each gets its own material for independent flicker)
         const lightPoleMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.6 });
@@ -761,157 +1103,39 @@ export function buildMap(mapId) {
             scene.add(cityGround);
         }
     } else if (mapId === 'mountain') {
-        const rockMat = new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.95 });
-        const rockMat2 = new THREE.MeshStandardMaterial({ color: 0x3d3d3d, roughness: 0.98 });
-
-        // Dense terrain grid — sloped tiles cover the entire map so there is NO flat ground.
-        // Each tile is a thick slab tilted 12–28 degrees in a random direction.
-        const tileStep = 44;
-        const tileW = 48, tileThick = 5, tileD = 48;
-        const halfSpan = Math.ceil(size * 1.05 / tileStep) * tileStep;
-        for (let tx = -halfSpan; tx <= halfSpan; tx += tileStep) {
-            for (let tz = -halfSpan; tz <= halfSpan; tz += tileStep) {
-                if (Math.abs(tx) < 22 && Math.abs(tz) < 22) continue; // keep spawn flat
-                const ty = rng() * 3.5;                        // 0–3.5 m elevation
-                const rotX = (rng() - 0.5) * 0.65;              // ±0.32 rad ≈ ±18°
-                const rotZ = (rng() - 0.5) * 0.65;
-                const mat = rng() < 0.5 ? rockMat : rockMat2;
-                const tile = new THREE.Mesh(new THREE.BoxGeometry(tileW, tileThick, tileD), mat);
-                tile.rotation.x = rotX;
-                tile.rotation.z = rotZ;
-                tile.position.set(tx, ty, tz);
-                tile.receiveShadow = true;
-                scene.add(tile);
-                tile.updateMatrixWorld(true);
-                gameState.slopeMeshes.push(tile);
-            }
-        }
-
-        // Large rock formations on top of the sloped terrain
-        for (let i = 0; i < 240; i++) {
-            const w = 10 + rng() * 20, h = 10 + rng() * 25, d = 10 + rng() * 20;
-            const bx = (rng() - 0.5) * size * 1.8;
-            const bz = (rng() - 0.5) * size * 1.8;
-            if (Math.abs(bx) < 20 && Math.abs(bz) < 20) continue;
-
-            // ~40% of rocks have a passage cut through them so no area is fully sealed off
-            const hasGap = rng() < 0.40;
-            if (hasGap && w > 8 && d > 8) {
-                const gapSize = 3.0 + rng() * 1.5; // 3–4.5 m passage
-                // Alternate gap orientation per rock
-                if (rng() < 0.5) {
-                    // Gap along X — split into front and back slabs
-                    const halfD = (d - gapSize) / 2;
-                    if (halfD > 1) {
-                        addObstacle(obs, rockMat, w, h, halfD, bx, h / 2, bz - gapSize / 2 - halfD / 2);
-                        addObstacle(obs, rockMat, w, h, halfD, bx, h / 2, bz + gapSize / 2 + halfD / 2);
-                    } else { addObstacle(obs, rockMat, w, h, d, bx, h / 2, bz); }
-                } else {
-                    // Gap along Z — split into left and right slabs
-                    const halfW = (w - gapSize) / 2;
-                    if (halfW > 1) {
-                        addObstacle(obs, rockMat, halfW, h, d, bx - gapSize / 2 - halfW / 2, h / 2, bz);
-                        addObstacle(obs, rockMat, halfW, h, d, bx + gapSize / 2 + halfW / 2, h / 2, bz);
-                    } else { addObstacle(obs, rockMat, w, h, d, bx, h / 2, bz); }
-                }
-            } else {
-                addObstacle(obs, rockMat, w, h, d, bx, h / 2, bz);
-            }
-            const slope = new THREE.Mesh(new THREE.BoxGeometry(w * 1.5, h * 0.5, d * 1.5), rockMat);
-            slope.rotation.x = (rng() - 0.5); slope.rotation.z = (rng() - 0.5);
-            slope.position.set(bx, h / 4, bz);
-            scene.add(slope);
-            slope.updateMatrixWorld(true);
-            obs.push({ mesh: slope, isSlope: true, box: new THREE.Box3().setFromObject(slope) });
-            gameState.slopeMeshes.push(slope);
-        }
+        scene.fog = new THREE.Fog(0x000000, 90, 200);
+        gameState.fogNearBase = scene.fog.near;
+        gameState.fogFarBase = scene.fog.far;
+        _mountainChunks.clear();
+        _mountainObs = obs;
+        _mountainMats = {
+            rockMat: new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.95 }),
+            rockMat2: new THREE.MeshStandardMaterial({ color: 0x3d3d3d, roughness: 0.98 }),
+        };
+        const halfM = Math.ceil(size * 1.1 / MOUNTAIN_TILE_STEP) * MOUNTAIN_TILE_STEP;
+        _mountainChunkCenters = [];
+        for (let mx = -halfM; mx <= halfM; mx += MOUNTAIN_TILE_STEP)
+            for (let mz = -halfM; mz <= halfM; mz += MOUNTAIN_TILE_STEP)
+                _mountainChunkCenters.push(mx, mz);
+        updateMountainChunks(0, 0);
     } else if (mapId === 'forest') {
-        const treeMat = new THREE.MeshStandardMaterial({ color: 0x3d2b1f });
-        const leafColors = [0x113a11, 0x0d3010, 0x1a4a1a, 0x0a2a0a];
-        const mossColors = [0x2a4a1a, 0x3a5a2a];
-
-        scene.fog = new THREE.Fog(0x060402, size * 0.25, size * 0.65);
+        scene.fog = new THREE.Fog(0x060402, 80, 190);
         scene.background = new THREE.Color(0x030201);
-
-        // Dense Poisson-disk-style tree placement — min 2.5m apart
-        const treePositions = [];
-        const minDist = 2.5;
-        let attempts = 0;
-        while (treePositions.length < 1800 && attempts < 80000) {
-            attempts++;
-            const tx = (rng() - 0.5) * size * 1.88;
-            const tz = (rng() - 0.5) * size * 1.88;
-            if (Math.abs(tx) < 9 && Math.abs(tz) < 9) continue;
-            let tooClose = false;
-            for (const p of treePositions) {
-                const pdx = tx - p[0], pdz = tz - p[1];
-                if (pdx * pdx + pdz * pdz < minDist * minDist) { tooClose = true; break; }
-            }
-            if (!tooClose) treePositions.push([tx, tz]);
-        }
-
-        const leafMat = new THREE.MeshStandardMaterial({ color: leafColors[0] });
-        for (const [x, z] of treePositions) {
-            const scale = 0.4 + rng() * 1.8;
-            const leafColor = leafColors[Math.floor(rng() * leafColors.length)];
-            const thisLeafMat = new THREE.MeshStandardMaterial({ color: leafColor });
-
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * scale, 0.55 * scale, 8 * scale, 6), treeMat);
-            trunk.position.set(x, 4 * scale, z);
-            trunk.castShadow = true;
-            scene.add(trunk);
-            obs.push({ mesh: trunk, radius: 0.55 * scale, box: new THREE.Box3().setFromObject(trunk), isTrunk: true });
-
-            // Canopy (sometimes layered for large trees)
-            const canopy = new THREE.Mesh(new THREE.SphereGeometry(3.2 * scale, 7, 5), thisLeafMat);
-            canopy.position.set(x, 8.5 * scale, z);
-            canopy.scale.y = 0.85;
-            canopy.castShadow = true;
-            scene.add(canopy);
-            obs.push({ mesh: canopy, box: new THREE.Box3().setFromObject(canopy), passThrough: true });
-
-            if (scale > 1.2) {
-                const canopy2 = new THREE.Mesh(new THREE.SphereGeometry(2.2 * scale, 6, 4), thisLeafMat);
-                canopy2.position.set(x + (rng() - 0.5) * scale, 10.5 * scale, z + (rng() - 0.5) * scale);
-                scene.add(canopy2);
-            }
-
-            // Roots (only for larger trees to save drawcalls)
-            if (scale > 1.0) {
-                for (let j = 0; j < 3; j++) {
-                    const rootAngle = j * (Math.PI * 2 / 3) + rng() * 0.5;
-                    const root = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * scale, 0.35 * scale, 2.2 * scale, 4), treeMat);
-                    root.rotation.x = Math.PI / 2 + 0.4 + rng() * 0.3;
-                    root.rotation.y = rootAngle;
-                    root.position.set(x + Math.cos(rootAngle) * scale * 0.75, 0.1, z + Math.sin(rootAngle) * scale * 0.75);
-                    root.updateMatrixWorld(true);
-                    scene.add(root);
-                }
-            }
-
-            // Moss patches on ground around trunk
-            if (rng() < 0.3) {
-                const mossMat = new THREE.MeshStandardMaterial({ color: mossColors[Math.floor(rng() * mossColors.length)], roughness: 1.0 });
-                const moss = new THREE.Mesh(new THREE.CylinderGeometry(1.2 * scale, 1.4 * scale, 0.08, 8), mossMat);
-                moss.position.set(x, 0.04, z);
-                scene.add(moss);
-            }
-        }
-
-        // Fallen logs
-        for (let l = 0; l < 60; l++) {
-            const lx = (rng() - 0.5) * size * 1.8;
-            const lz = (rng() - 0.5) * size * 1.8;
-            if (Math.abs(lx) < 8 && Math.abs(lz) < 8) continue;
-            const logScale = 0.5 + rng() * 1.2;
-            const log = new THREE.Mesh(new THREE.CylinderGeometry(0.22 * logScale, 0.28 * logScale, 4 * logScale, 6), treeMat);
-            log.rotation.z = Math.PI / 2;
-            log.rotation.y = rng() * Math.PI;
-            log.position.set(lx, 0.22 * logScale, lz);
-            log.castShadow = true;
-            scene.add(log);
-            obs.push({ mesh: log, box: new THREE.Box3().setFromObject(log) });
-        }
+        gameState.fogNearBase = scene.fog.near;
+        gameState.fogFarBase = scene.fog.far;
+        _forestChunks.clear();
+        _forestObs = obs;
+        _forestMats = {
+            treeMat: new THREE.MeshStandardMaterial({ color: 0x3d2b1f }),
+            leafMats: [0x113a11, 0x0d3010, 0x1a4a1a, 0x0a2a0a].map(c => new THREE.MeshStandardMaterial({ color: c })),
+            mossMats: [0x2a4a1a, 0x3a5a2a].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 1.0 })),
+        };
+        const halfF = Math.ceil(size * 1.1 / FOREST_CHUNK_SIZE) * FOREST_CHUNK_SIZE;
+        _forestChunkCenters = [];
+        for (let fx = -halfF; fx <= halfF; fx += FOREST_CHUNK_SIZE)
+            for (let fz = -halfF; fz <= halfF; fz += FOREST_CHUNK_SIZE)
+                _forestChunkCenters.push(fx, fz);
+        updateForestChunks(0, 0);
     }
 
     setObstacles(obs);

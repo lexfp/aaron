@@ -94,6 +94,7 @@ export const gameState = {
     slopeMeshes: [],
     craterPits: [],
     streetLamps: [],     // { mat, phase } entries for flickering city lamps
+    warehouseLights: [], // { mat, light, phase } entries for flickering warehouse ceiling lights
     playerFacingYaw: 0,  // player body/camera yaw for shield direction check
     tpShootNDC: null,    // THREE.Vector2 set in 3rd person mode
     tpShootCamera: null, // tpCamera ref set in 3rd person mode

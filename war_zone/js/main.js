@@ -9,7 +9,7 @@ import {
     canJump, setCanJump, obstacles, moveSpeed, sprintMult, jumpForce, gravity,
     weaponModel, weaponSwingTime, setWeaponSwingTime
 } from './engine.js';
-import { buildMap, spawnSinglePickup, spawnExtractionZone } from './map.js';
+import { buildMap, spawnSinglePickup, spawnExtractionZone, updateCityChunks, updateForestChunks, updateMountainChunks, updateDesertChunks } from './map.js';
 import {
     showScreen, updateHomeStats, showShop, showLoadout,
     renderMapScreen, updateHUD, renderWeaponSlots,
@@ -176,6 +176,8 @@ let tpRightDrag = false;
 let tpDragMoved = false;
 let tpMouseX = 0, tpMouseY = 0; // free cursor position (0-1 normalized)
 let tpBodyYaw = 0;     // body facing direction (from movement)
+let tpPunchSide = -1;    // alternates: +1 = right fist, -1 = left fist
+let tpPrevSwingTime = 0; // detect new punch (weaponSwingTime jump)
 
 // Orbit camera input
 document.addEventListener('mousemove', (e) => {
@@ -206,6 +208,39 @@ window.addEventListener('resize', () => {
     tpCamera.updateProjectionMatrix();
 });
 
+// Builds detailed fist meshes into `group` with fist centre at (cx, cy, cz).
+// thumbDir: +1 = thumb on +x side (left hand), -1 = thumb on -x side (right hand).
+function _buildDetailedFistMeshes(group, thumbDir, cx, cy, cz) {
+    const skinMat    = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 });
+    const knuckleMat = new THREE.MeshStandardMaterial({ color: 0xc49060, roughness: 0.45 });
+    const grooveMat  = new THREE.MeshStandardMaterial({ color: 0xb07050, roughness: 0.8 });
+
+    // Main fist body — wider than tall
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.10), skinMat);
+    body.position.set(cx, cy, cz);
+    group.add(body);
+
+    // 4 knuckle sphere bumps along the top-front edge
+    [-0.052, -0.017, 0.017, 0.052].forEach(kx => {
+        const k = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 4), knuckleMat);
+        k.position.set(cx + kx, cy + 0.045, cz + 0.044);
+        group.add(k);
+    });
+
+    // Thumb — angled outward from the correct side
+    const thumb = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.072, 0.052), skinMat);
+    thumb.position.set(cx + thumbDir * 0.086, cy - 0.008, cz + 0.010);
+    thumb.rotation.z = -thumbDir * 0.38;
+    group.add(thumb);
+
+    // 3 finger-separation grooves on the front face
+    [-0.035, 0, 0.035].forEach(gx => {
+        const groove = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.09, 0.004), grooveMat);
+        groove.position.set(cx + gx, cy, cz + 0.052);
+        group.add(groove);
+    });
+}
+
 // Player body group
 const tpBody = new THREE.Group();
 
@@ -233,17 +268,11 @@ const tpArmL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.55, 0.18), tpShirtMa
 tpArmL.position.y = -0.27;
 tpArmLPivot.add(tpArmL);
 
-// Left fist — shown only when fists are equipped
+// Left fist — always visible; thumb on +x (right) side = correct for left hand
 const tpLeftFist = new THREE.Group();
 tpLeftFist.visible = false;
 tpArmLPivot.add(tpLeftFist);
-const _lfMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 });
-const _lfMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.12), _lfMat);
-_lfMesh.position.set(0, -0.55, 0.08);
-tpLeftFist.add(_lfMesh);
-const _lfKnuckles = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.04, 0.03), _lfMat);
-_lfKnuckles.position.set(0, -0.51, 0.14);
-tpLeftFist.add(_lfKnuckles);
+_buildDetailedFistMeshes(tpLeftFist, +1, 0, -0.55, 0.08);
 
 // Right upper arm (pivot at shoulder) — holds gun
 const tpArmRPivot = new THREE.Group();
@@ -252,6 +281,12 @@ tpTorso.add(tpArmRPivot); // [1] child
 const tpArmR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.55, 0.18), tpShirtMat);
 tpArmR.position.y = -0.27;
 tpArmRPivot.add(tpArmR);
+
+// Right fist — always visible when NOT holding fists; thumb on -x side = correct for right hand
+const tpRightFist = new THREE.Group();
+tpRightFist.visible = true;
+tpArmRPivot.add(tpRightFist);
+_buildDetailedFistMeshes(tpRightFist, -1, 0, -0.55, 0.08);
 
 // Gun held in right hand (dynamic — rebuilt when weapon changes)
 const tpGunGroup = new THREE.Group();
@@ -449,7 +484,7 @@ function _tpClearWeapon() {
 function rebuildTpWeapon(weaponId, wDef) {
     _tpClearWeapon();
     // 2× scale so weapons are clearly visible from the orbit camera distance
-    tpGunGroup.scale.setScalar(!wDef || weaponId === 'compass' ? 1.0 : 2.0);
+    tpGunGroup.scale.setScalar(!wDef || weaponId === 'compass' || weaponId === 'fists' ? 1.0 : 2.0);
     if (!wDef) return;
     if (weaponId === 'compass') {
         _buildTpCompassModel();
@@ -647,14 +682,9 @@ function _buildTpMeleeModel(weaponId) {
     const darkMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 });
 
     if (weaponId === 'fists') {
-        // Right fist — matches left fist size exactly
-        const fist = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.12), skinMat);
-        fist.position.set(0, 0, 0.08);
-        tpGunGroup.add(fist);
-        // Knuckle ridge
-        const knuckles = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.04, 0.03), skinMat);
-        knuckles.position.set(0, 0.04, 0.14);
-        tpGunGroup.add(knuckles);
+        // tpGunGroup is already at (0, -0.55, 0.08) in arm-pivot space, so centre = (0,0,0)
+        // thumbDir = -1 → thumb on -x side (correct for right hand)
+        _buildDetailedFistMeshes(tpGunGroup, -1, 0, 0, 0);
 
     } else if (weaponId === 'knife') {
         const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.12, 8), darkMat);
@@ -941,6 +971,10 @@ window.returnToMenu = function () {
 // --- Game Loop ---
 
 let prevTime = performance.now();
+let _cityChunkTimer = 0;
+let _forestChunkTimer = 0;
+let _mountainChunkTimer = 0;
+let _desertChunkTimer = 0;
 
 function animate() {
     requestAnimationFrame(animate);
@@ -959,12 +993,54 @@ function animate() {
         }
     }
 
+    // Stream city building chunks — load/unload every 0.5s based on player position
+    if (gameState.active && gameState.currentMap === 'city') {
+        _cityChunkTimer += dt;
+        if (_cityChunkTimer >= 0.5) {
+            _cityChunkTimer = 0;
+            updateCityChunks(camera.position.x, camera.position.z);
+        }
+    }
+    if (gameState.active && gameState.currentMap === 'forest') {
+        _forestChunkTimer += dt;
+        if (_forestChunkTimer >= 0.5) {
+            _forestChunkTimer = 0;
+            updateForestChunks(camera.position.x, camera.position.z);
+        }
+    }
+    if (gameState.active && gameState.currentMap === 'mountain') {
+        _mountainChunkTimer += dt;
+        if (_mountainChunkTimer >= 0.5) {
+            _mountainChunkTimer = 0;
+            updateMountainChunks(camera.position.x, camera.position.z);
+        }
+    }
+    if (gameState.active && gameState.currentMap === 'desert') {
+        _desertChunkTimer += dt;
+        if (_desertChunkTimer >= 0.5) {
+            _desertChunkTimer = 0;
+            updateDesertChunks(camera.position.x, camera.position.z);
+        }
+    }
+
     // Animate street lamp flicker (emissive only — PointLights are at intersections, not per-lamp)
     if (gameState.streetLamps.length > 0) {
         const t = time * 0.001;
         for (const sl of gameState.streetLamps) {
             const shouldFlicker = Math.sin(t * 0.5 + sl.phase) > 0.82;
             sl.mat.emissiveIntensity = shouldFlicker ? (Math.sin(t * 28 + sl.phase) > 0 ? 1.0 : 0.0) : 1.0;
+        }
+    }
+
+    // Animate warehouse ceiling light flicker
+    if (gameState.warehouseLights && gameState.warehouseLights.length > 0) {
+        const t = time * 0.001;
+        for (const wl of gameState.warehouseLights) {
+            // Occasional flicker burst — each light has its own phase so they're independent
+            const bursting = Math.sin(t * 0.4 + wl.phase) > 0.75;
+            const on = bursting ? (Math.sin(t * 40 + wl.phase) > -0.3 ? 1.0 : 0.0) : 1.0;
+            wl.mat.emissiveIntensity = on * 1.5;
+            wl.light.intensity = on * 1.2;
         }
     }
 
@@ -1499,10 +1575,17 @@ function animate() {
             gunRotX = 1.05;
 
         } else if (curWep === 'fists') {
-            // Boxing stance — both arms raised and forward symmetrically
-            armRX = -1.15 + (-hipR * 0.25);
+            // Detect new punch: weaponSwingTime jumped back up
+            if (weaponSwingTime > tpPrevSwingTime + 0.1) {
+                tpPunchSide = -tpPunchSide; // alternate right/left
+            }
+            tpPrevSwingTime = weaponSwingTime;
+            // punchAmt: 0.2→0 maps to 0.5→0 extension on the punching arm
+            const punchAmt = weaponSwingTime * 2.5;
+            // Boxing stance — both arms raised; punching arm extends forward
+            armRX = -1.15 + (-hipR * 0.25) - (tpPunchSide === 1 ? punchAmt : 0);
             armRZ = -0.18;
-            armLX = -1.15 + (-hipL * 0.25);
+            armLX = -1.15 + (-hipL * 0.25) - (tpPunchSide === -1 ? punchAmt : 0);
             armLZ = 0.18;
             gunRotX = 0.0;
             gunPosY = -0.55;
@@ -1534,7 +1617,8 @@ function animate() {
         // Visibility: shield gets its own torso-mounted group
         tpShieldGroup.visible = isShieldWep;
         tpGunGroup.visible = !!(wDef && !isShieldWep);
-        tpLeftFist.visible = (curWep === 'fists');
+        tpLeftFist.visible = true;
+        tpRightFist.visible = (curWep !== 'fists'); // fists weapon uses tpGunGroup's own fist
 
         // Store shoot NDC for combat.js
         gameState.tpShootNDC = new THREE.Vector2(tpMouseX * 2 - 1, -(tpMouseY * 2 - 1));
@@ -1562,7 +1646,19 @@ function animate() {
 renderMapScreen(startGame);
 
 document.getElementById('btn-zombie').addEventListener('click', () => { gameState.pendingMode = 'zombie'; showScreen('map-screen'); });
-document.getElementById('btn-rescue').addEventListener('click', () => { startGame('rescue', 'mountain'); });
+document.getElementById('btn-rescue').addEventListener('click', () => {
+    if (playerData.level < 10) {
+        const overlay = document.getElementById('rescue-warning-overlay');
+        document.getElementById('rescue-warn-level').textContent = `Level ${playerData.level}`;
+        document.getElementById('rescue-warn-proceed').onclick = () => {
+            overlay.style.display = 'none';
+            startGame('rescue', 'mountain');
+        };
+        overlay.style.display = 'flex';
+    } else {
+        startGame('rescue', 'mountain');
+    }
+});
 document.getElementById('btn-pvp').addEventListener('click', () => { gameState.pendingMode = 'pvp'; showScreen('map-screen'); });
 document.getElementById('btn-shop').addEventListener('click', showShop);
 document.getElementById('btn-loadout').addEventListener('click', showLoadout);

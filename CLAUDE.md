@@ -97,6 +97,7 @@ Runs entirely in an 800×580px popup. `game.js` + `game.css` are self-contained 
 - **Sun arc**: `sunAngle = dn * 2PI - PI/2` so noon (dn=0.5, dayFactor=1.0) places sun overhead (+Y)
 - **City ground**: ShapeGeometry with `rotateX(-PI/2)` uses `side: THREE.DoubleSide` to ensure visibility regardless of winding order
 - **Fly mode**: cheat console closing calls resumeGameFn() to re-engage pointer lock; shift=down, space=up
+- **Chunk streaming (forest/mountain/desert)**: all three maps size=480, streamed via `updateForestChunks`/`updateMountainChunks`/`updateDesertChunks` (TERRAIN_LOAD_DIST=150, UNLOAD=240); chunk builders `_buildForestChunkMeshes`, `_buildMountainChunkMeshes`, `_buildDesertChunkMeshes` in map.js; called every 0.5s in animate() like city; mountain slopeMeshes added/removed from `gameState.slopeMeshes` on chunk load/unload
 
 ## Applied Learning
 When something fails repeatedly or there is a workaround/easier way to do something, add a one-line bullet point less than 15 words mentioning it to save time in the future

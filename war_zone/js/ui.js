@@ -265,7 +265,7 @@ export function showLoadout() {
     grid.innerHTML = '';
     for (const id of playerData.ownedWeapons) {
         const w = WEAPONS[id];
-        if (w.starter) continue; // hide starter/utility items from loadout
+        if (w.type === 'utility') continue; // hide utility items (compass, flashlight) from loadout
         const equipped = playerData.equippedLoadout.includes(id);
         const needsRepair = (playerData.weaponUsage[id] || 0) >= DAMAGE_THRESHOLD;
         const attachments = (playerData.weaponAttachments[id] || []).map(a => ATTACHMENTS[a].name).join(', ');
@@ -295,7 +295,6 @@ export function showLoadout() {
         item.onclick = () => {
             if (needsRepair) return;
             if (equipped) {
-                if (playerData.equippedLoadout.length <= 1) return; // Prevent unequipping last weapon
                 playerData.equippedLoadout = playerData.equippedLoadout.filter(x => x !== id);
             } else {
                 if (playerData.equippedLoadout.length >= maxSlots) return;
@@ -478,8 +477,8 @@ export function showLoadout() {
         { key: 'speed', label: 'Speed', color: '#00aaff', desc: '+2% move speed per point' },
         { key: 'damage', label: 'Damage', color: '#ff4444', desc: '+2% damage per point' },
         { key: 'stamina', label: 'Stamina', color: '#ffaa00', desc: '+10 max stamina per point' },
-        { key: 'jump', label: 'Jump', color: '#aa66ff', desc: '+5% jump height per point' },
-        { key: 'reload', label: 'Reload', color: '#00ddff', desc: '-5% reload time per point' }
+        { key: 'jump', label: 'Jump Height', color: '#aa66ff', desc: '+5% jump height per point' },
+        { key: 'reload', label: 'Reload Time', color: '#00ddff', desc: '-5% reload time per point' }
     ];
 
     const statGrid = document.createElement('div');

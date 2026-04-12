@@ -13,17 +13,31 @@ import { damagePlayer, checkPvPEnd } from './combat.js';
 
 export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
     const mapSize = MAPS[gameState.currentMap].size;
-    let centerX, centerZ, dist;
-    if (gameState.mode === 'rescue' && gameState.extractionZone) {
-        centerX = gameState.extractionZone.x;
-        centerZ = gameState.extractionZone.z;
-        dist = 8 + Math.random() * 20;
-    } else {
-        centerX = 0;
-        centerZ = 0;
-        dist = mapSize * 0.7 + Math.random() * mapSize * 0.2;
-    }
     const angle = Math.random() * Math.PI * 2;
+    let spawnX, spawnZ;
+    if (gameState.mode === 'rescue' && gameState.extractionZone) {
+        const d = 8 + Math.random() * 20;
+        spawnX = gameState.extractionZone.x + Math.cos(angle) * d;
+        spawnZ = gameState.extractionZone.z + Math.sin(angle) * d;
+    } else {
+        // Spawn anywhere in unloaded area — at least 160 units from player, within map bounds
+        const px = camera.position.x, pz = camera.position.z;
+        const bound = mapSize * 0.9;
+        spawnX = null;
+        for (let t = 0; t < 20; t++) {
+            const a = Math.random() * Math.PI * 2;
+            const d = 160 + Math.random() * mapSize * 0.5;
+            const sx = px + Math.cos(a) * d;
+            const sz = pz + Math.sin(a) * d;
+            if (Math.abs(sx) <= bound && Math.abs(sz) <= bound) {
+                spawnX = sx; spawnZ = sz; break;
+            }
+        }
+        if (spawnX === null) {
+            spawnX = Math.cos(angle) * mapSize * 0.85;
+            spawnZ = Math.sin(angle) * mapSize * 0.85;
+        }
+    }
 
     let hp, damage, dropMoney, weaponId = null;
     const bodySize = isGiga ? 4.05 : (isBoss ? 2.5 : 0.9);
@@ -131,19 +145,19 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
         if (wpnMesh) { wpnMesh.castShadow = true; group.add(wpnMesh); }
     }
 
-    let spawnX = centerX + Math.cos(angle) * dist;
-    let spawnZ = centerZ + Math.sin(angle) * dist;
-
-    // Ensure we don't spawn inside a bounding box
+    // Ensure we don't spawn inside a bounding box — nudge outward along spawn angle
     const spawnRadius = isGiga ? 1.5 : (isBoss ? 0.7 : 0.5);
     for (let attempts = 0; attempts < 10; attempts++) {
         if (!checkZombieCollision(new THREE.Vector3(spawnX, 1, spawnZ), spawnRadius)) break;
-        dist += 2;
-        spawnX = centerX + Math.cos(angle) * dist;
-        spawnZ = centerZ + Math.sin(angle) * dist;
+        spawnX += Math.cos(angle) * 2;
+        spawnZ += Math.sin(angle) * 2;
     }
 
-    group.position.set(spawnX, 0, spawnZ);
+    const _zRay = new THREE.Raycaster(new THREE.Vector3(spawnX, 200, spawnZ), new THREE.Vector3(0, -1, 0));
+    const _zMeshes = obstacles.filter(o => o.mesh && !o.passThrough).map(o => o.mesh).concat(gameState.slopeMeshes || []);
+    const _zHits = _zRay.intersectObjects(_zMeshes);
+    const spawnY = _zHits.length > 0 ? _zHits[0].point.y : 0;
+    group.position.set(spawnX, spawnY, spawnZ);
 
     const canvas = document.createElement('canvas');
     canvas.width = 64; canvas.height = 16;
@@ -457,15 +471,24 @@ export function updateZombies(dt) {
             const zHits = _floorRay.intersectObjects(zRayMeshes);
             z._cachedFloorY = zHits.length > 0 ? zHits[0].point.y : 0;
         }
-        // Apply floor snap every frame using cached value
+        // Apply floor snap / jump physics
         const cachedFloor = z._cachedFloorY ?? 0;
-        if (z.mesh.position.y > cachedFloor + 0.05) {
-            z.mesh.position.y -= 15 * dt;
-            if (z.mesh.position.y < cachedFloor) z.mesh.position.y = cachedFloor;
+        if (z._airborne) {
+            z.vy -= 30 * dt;
+            z.mesh.position.y += z.vy * dt;
+            if (z.mesh.position.y <= cachedFloor) {
+                z.mesh.position.y = cachedFloor;
+                z.vy = 0;
+                z._airborne = false;
+            }
         } else {
-            z.mesh.position.y += (cachedFloor - z.mesh.position.y) * Math.min(1, dt * 10);
+            if (z.mesh.position.y > cachedFloor + 0.05) {
+                z.mesh.position.y -= 15 * dt;
+                if (z.mesh.position.y < cachedFloor) z.mesh.position.y = cachedFloor;
+            } else {
+                z.mesh.position.y += (cachedFloor - z.mesh.position.y) * Math.min(1, dt * 10);
+            }
         }
-        // Hard clamp — prevents staying underground if raycast is stale
         if (z.mesh.position.y < cachedFloor) z.mesh.position.y = cachedFloor;
 
         // AI state — always player-focused (no "cover" toward buildings)
@@ -536,26 +559,53 @@ export function updateZombies(dt) {
             }
 
             const step = z.speed * dt;
-            const steer = computeZombieSteer(
-                z.mesh.position.x, z.mesh.position.z,
-                playerPos.x, playerPos.z,
-                moveAngle, zombieRadius, step
-            );
-            z.mesh.position.x += steer.mx;
-            z.mesh.position.z += steer.mz;
 
-            // Dead-end escape: briefly sidestep along walls if fully blocked
-            const movedSq = steer.mx * steer.mx + steer.mz * steer.mz;
-            if (movedSq < 1e-10) {
-                z.stuckTimer = (z.stuckTimer || 0) + dt;
-                if (z.stuckTimer > 0.2) {
-                    z.flankAngle = (Math.random() > 0.5 ? 1 : -1) * (Math.PI / 2 + Math.random() * 0.35);
-                    z.aiState = 'flank';
-                    z.aiTimer = 0.4;
+            if (z._airborne) {
+                // Airborne — move freely toward player, no horizontal collision check
+                z.mesh.position.x += Math.sin(moveAngle) * step;
+                z.mesh.position.z += Math.cos(moveAngle) * step;
+            } else {
+                const steer = computeZombieSteer(
+                    z.mesh.position.x, z.mesh.position.z,
+                    playerPos.x, playerPos.z,
+                    moveAngle, zombieRadius, step
+                );
+                z.mesh.position.x += steer.mx;
+                z.mesh.position.z += steer.mz;
+
+                // Dead-end escape: jump if obstacle is low enough, else flank
+                const movedSq = steer.mx * steer.mx + steer.mz * steer.mz;
+                if (movedSq < 1e-10) {
+                    z.stuckTimer = (z.stuckTimer || 0) + dt;
+                    if (z.stuckTimer > 0.15) {
+                        const checkX = z.mesh.position.x + Math.sin(moveAngle) * 1.5;
+                        const checkZ = z.mesh.position.z + Math.cos(moveAngle) * 1.5;
+                        const zombieFeet = z.mesh.position.y;
+                        let blockTop = -1;
+                        for (const obs of obstacles) {
+                            if (obs.isSlope || obs.isRimRubble || !obs.box) continue;
+                            const b = obs.box;
+                            if (checkX + zombieRadius > b.min.x && checkX - zombieRadius < b.max.x &&
+                                checkZ + zombieRadius > b.min.z && checkZ - zombieRadius < b.max.z &&
+                                b.max.y > zombieFeet && b.min.y < zombieFeet + 2.5) {
+                                blockTop = Math.max(blockTop, b.max.y);
+                            }
+                        }
+                        if (blockTop > zombieFeet && blockTop - zombieFeet <= 2.5) {
+                            const clearH = blockTop - zombieFeet + 0.5;
+                            z.vy = Math.sqrt(2 * 30 * clearH);
+                            z._airborne = true;
+                            z.stuckTimer = 0;
+                        } else if (z.stuckTimer > 0.2) {
+                            z.flankAngle = (Math.random() > 0.5 ? 1 : -1) * (Math.PI / 2 + Math.random() * 0.35);
+                            z.aiState = 'flank';
+                            z.aiTimer = 0.4;
+                            z.stuckTimer = 0;
+                        }
+                    }
+                } else {
                     z.stuckTimer = 0;
                 }
-            } else {
-                z.stuckTimer = 0;
             }
 
             z.mesh.rotation.y = Math.atan2(dx, dz);
