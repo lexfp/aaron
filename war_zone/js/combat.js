@@ -136,7 +136,9 @@ function calculateDamage(def, hit) {
         const entityHeight = hitEntity.isBoss ? 2.2 : 1.8;
         if (localY > entityHeight * 0.75) {
             const hasActiveScope = def.hasScope || hasScope(wid);
-            dmg += (hasActiveScope && isZoomed) ? 40 : 10;
+            const damageStats = playerData.stats?.damage || 0;
+            const headshotBase = (hasActiveScope && isZoomed) ? 40 : 10;
+            dmg += headshotBase * (1 + damageStats * 0.05);
             addKillFeed('HEADSHOT!', '#ff4444');
         } else if (localY > entityHeight * 0.5 && (hit.point.x - hitEntity.mesh.position.x) > 0.2) {
             dmg = Math.max(0, dmg - 5);
@@ -184,7 +186,7 @@ function applyDamageToEnemy(hit, dmg) {
 export function damagePlayer(amount, attackerPos = null) {
     if (playerState.godMode) return;
     const { def } = getCurrentWeapon();
-    
+
     let bypassShield = false;
     if (def.damageReduction && attackerPos) {
         const facingYaw = gameState.playerFacingYaw ?? 0;

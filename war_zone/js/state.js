@@ -19,7 +19,7 @@ function defaultPlayerData() {
         level: 1,
         xp: 0,
         statPoints: 0,
-        stats: { health: 0, speed: 0, damage: 0, stamina: 0, jump: 0, reload: 0 }
+        stats: { health: 0, speed: 0, damage: 0, stamina: 0, staminaRegen: 0, jump: 0, reload: 0 }
     };
 }
 

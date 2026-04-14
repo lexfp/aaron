@@ -714,14 +714,19 @@ export function updateDesertChunks(px, pz) {
 }
 
 function buildFortressMap(obs) {
-    const stoneMat     = new THREE.MeshStandardMaterial({ color: 0x887868, roughness: 0.9 });
+    const stoneMat = new THREE.MeshStandardMaterial({ color: 0x887868, roughness: 0.9 });
     const darkStoneMat = new THREE.MeshStandardMaterial({ color: 0x5a4a3c, roughness: 0.9 });
-    const mossStoneMat = new THREE.MeshStandardMaterial({ color: 0x6b7a54, roughness: 0.95 }); // mossy stone for keep towers
-    const woodMat      = new THREE.MeshStandardMaterial({ color: 0x6b4c2a, roughness: 1.0 });
-    const darkWoodMat  = new THREE.MeshStandardMaterial({ color: 0x2e1a0a, roughness: 1.0 }); // wooden gate door
-    const torchMat     = new THREE.MeshStandardMaterial({ color: 0x3a2010, roughness: 1.0 });
-    const flameMat     = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0xff4400, emissiveIntensity: 2.5 });
-    const slitMat      = new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 1.0 }); // arrow slit darkness
+    const mossStoneMat = new THREE.MeshStandardMaterial({ color: 0x6b7a54, roughness: 0.95 });
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x6b4c2a, roughness: 1.0 });
+    const darkWoodMat = new THREE.MeshStandardMaterial({ color: 0x2e1a0a, roughness: 1.0 });
+    const torchMat = new THREE.MeshStandardMaterial({ color: 0x3a2010, roughness: 1.0 });
+    const flameMat = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0xff4400, emissiveIntensity: 2.5 });
+    const slitMat = new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 1.0 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x3d2b1a, roughness: 1.0 });
+
+    // All heights 50% of original. Outer walls: 6 (was 12). Inner keep: 10 (was 20).
+    // Outer towers: 10 (was 20). Inner towers: 13 (was 26). Gatehouse: 9 (was 18).
+    // Barracks: 5.5 (was 11). Watchtower: 18 (was 36).
 
     function addTorch(x, y, z) {
         const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4, 6), torchMat);
@@ -778,169 +783,289 @@ function buildFortressMap(obs) {
     // Paved stone path material for wall walkway tops
     const pathMat = new THREE.MeshStandardMaterial({ color: 0x5c4e40, roughness: 0.8 });
 
-    // Staircase rising in direction 'N'/'S'/'E'/'W'. Each step 0.5 tall, 0.8 deep, 3.5 wide.
-    // 24 steps → total rise 12. The starting coord (x0/z0) is at the base of the first step.
+    // Outer wall staircase: 12 steps × 0.5h × 0.8d = 6 rise (halved from 24 steps)
     function addStaircase(x0, z0, dir) {
-        const steps = 24, stepH = 0.5, stepD = 0.8, stairW = 3.5;
+        const steps = 12, stepH = 0.5, stepD = 0.8, stairW = 3.5;
         for (let i = 0; i < steps; i++) {
-            const cH = (i + 1) * stepH;            // cumulative height (solid from y=0 up)
-            const offset = (i + 0.5) * stepD;      // centre of this step along travel axis
+            const cH = (i + 1) * stepH;
+            const offset = (i + 0.5) * stepD;
             const sx = (dir === 'E') ? x0 + offset : (dir === 'W') ? x0 - offset : x0;
             const sz = (dir === 'N') ? z0 - offset : (dir === 'S') ? z0 + offset : z0;
-            const w  = (dir === 'N' || dir === 'S') ? stairW : stepD;
-            const d  = (dir === 'E' || dir === 'W') ? stairW : stepD;
+            const w = (dir === 'N' || dir === 'S') ? stairW : stepD;
+            const d = (dir === 'E' || dir === 'W') ? stairW : stepD;
             addObstacle(obs, stoneMat, w, cH, d, sx, cH / 2, sz);
         }
     }
 
-    // --- Outer perimeter walls (±85, 12 tall, 4 thick) ---
-    // North (z=-85) — passage gap at x=33→37
-    addObstacle(obs, stoneMat, 118, 12, 4, -26,  6, -85);
-    addPassage(35, 6, -85, 4, 12, 4);
-    addObstacle(obs, stoneMat,  48, 12, 4,  61,  6, -85);
-    // South (z=+85) — gate gap at x=-12→+12
-    addObstacle(obs, darkStoneMat, 73, 12, 4, -48.5, 6,  85);
-    addObstacle(obs, darkStoneMat, 73, 12, 4,  48.5, 6,  85);
-    // East (x=+85) — passage gap at z=8→12
-    addObstacle(obs, stoneMat, 4, 12,  93,  85, 6, -38.5);
-    addPassage(85, 6, 10, 4, 12, 4);
-    addObstacle(obs, stoneMat, 4, 12,  73,  85, 6,  48.5);
-    // West (x=-85) — passage gap at z=-37→-33
-    addObstacle(obs, stoneMat, 4, 12,  48, -85, 6, -61);
-    addPassage(-85, 6, -35, 4, 12, 4);
-    addObstacle(obs, stoneMat, 4, 12, 118, -85, 6,  26);
+    // --- Outer perimeter walls (±85, now 6 tall, 4 thick) ---
+    addObstacle(obs, stoneMat, 118, 6, 4, -26, 3, -85);
+    addPassage(35, 1.5, -85, 2, 3, 4);
+    addObstacle(obs, stoneMat, 48, 6, 4, 61, 3, -85);
+    addObstacle(obs, darkStoneMat, 73, 6, 4, -48.5, 3, 85);
+    addObstacle(obs, darkStoneMat, 73, 6, 4, 48.5, 3, 85);
+    addObstacle(obs, stoneMat, 4, 6, 93, 85, 3, -38.5);
+    addPassage(85, 1.5, 10, 4, 3, 2);
+    addObstacle(obs, stoneMat, 4, 6, 73, 85, 3, 48.5);
+    addObstacle(obs, stoneMat, 4, 6, 48, -85, 3, -61);
+    addPassage(-85, 1.5, -35, 4, 3, 2);
+    addObstacle(obs, stoneMat, 4, 6, 118, -85, 3, 26);
 
-    // --- Walkway path on top of outer walls (decorative paved slabs, noCollide) ---
-    addObstacle(obs, pathMat, 148, 0.15, 3.6,    0, 12.075, -85, {noCollide: true}); // N
-    addObstacle(obs, pathMat,  71, 0.15, 3.6, -46.5, 12.075, 85, {noCollide: true}); // S left
-    addObstacle(obs, pathMat,  71, 0.15, 3.6,  46.5, 12.075, 85, {noCollide: true}); // S right
-    addObstacle(obs, pathMat, 3.6, 0.15, 148,   85, 12.075,   0, {noCollide: true}); // E
-    addObstacle(obs, pathMat, 3.6, 0.15, 148,  -85, 12.075,   0, {noCollide: true}); // W
+    // Walkway on top of outer walls (y=6)
+    addObstacle(obs, pathMat, 148, 0.15, 3.6, 0, 6.075, -85, { noCollide: true });
+    addObstacle(obs, pathMat, 71, 0.15, 3.6, -46.5, 6.075, 85, { noCollide: true });
+    addObstacle(obs, pathMat, 71, 0.15, 3.6, 46.5, 6.075, 85, { noCollide: true });
+    addObstacle(obs, pathMat, 3.6, 0.15, 148, 85, 6.075, 0, { noCollide: true });
+    addObstacle(obs, pathMat, 3.6, 0.15, 148, -85, 6.075, 0, { noCollide: true });
 
-    // --- Staircases to wall tops (one per side, inside the fortress) ---
-    // 24 steps × 0.5 h × 0.8 d = 12 rise over 19.2 run; last step front face at inner wall face (±83)
-    addStaircase(-55, -63.8, 'N'); // North wall — rises toward z=-85
-    addStaircase( 55,  63.8, 'S'); // South wall — rises toward z=+85
-    addStaircase( 63.8,  50, 'E'); // East  wall — rises toward x=+85
-    addStaircase(-63.8, -50, 'W'); // West  wall — rises toward x=-85
+    // Staircases to outer wall tops (12 steps, rise 6)
+    addStaircase(-55, -73.4, 'N');
+    addStaircase(55, 73.4, 'S');
+    addStaircase(73.4, 50, 'E');
+    addStaircase(-73.4, -50, 'W');
 
-    // --- Outer wall battlements (mw=2, mh=2.5, md=4, top y=12) ---
-    addMerlonsX(stoneMat,     -85, -77,  31, 12, 2, 2.5, 4); // N left of passage
-    addMerlonsX(stoneMat,     -85,  39,  77, 12, 2, 2.5, 4); // N right of passage
-    addMerlonsZ(stoneMat,      85, -77,   6, 12, 4, 2.5, 2); // E above passage
-    addMerlonsZ(stoneMat,      85,  14,  77, 12, 4, 2.5, 2); // E below passage
-    addMerlonsZ(stoneMat,     -85, -77, -39, 12, 4, 2.5, 2); // W left of passage
-    addMerlonsZ(stoneMat,     -85, -31,  77, 12, 4, 2.5, 2); // W right of passage
-    addMerlonsX(darkStoneMat,  85, -77, -14, 12, 2, 2.5, 4); // S left of gate
-    addMerlonsX(darkStoneMat,  85,  14,  77, 12, 2, 2.5, 4); // S right of gate
+    // --- Outer wall battlements (top y=6, mh=1.2) ---
+    addMerlonsX(stoneMat, -85, -77, 31, 6, 2, 1.2, 4);
+    addMerlonsX(stoneMat, -85, 39, 77, 6, 2, 1.2, 4);
+    addMerlonsZ(stoneMat, 85, -77, 6, 6, 4, 1.2, 2);
+    addMerlonsZ(stoneMat, 85, 14, 77, 6, 4, 1.2, 2);
+    addMerlonsZ(stoneMat, -85, -77, -39, 6, 4, 1.2, 2);
+    addMerlonsZ(stoneMat, -85, -31, 77, 6, 4, 1.2, 2);
+    addMerlonsX(darkStoneMat, 85, -77, -14, 6, 2, 1.2, 4);
+    addMerlonsX(darkStoneMat, 85, 14, 77, 6, 2, 1.2, 4);
 
-    // --- Corner towers (cylindrical, r=9, h=20) ---
-    addCylinder(darkStoneMat, 9, 20, -85, 10, -85); // NW
-    addCylinder(darkStoneMat, 9, 20,  85, 10, -85); // NE
-    addCylinder(darkStoneMat, 9, 20, -85, 10,  85); // SW
-    addCylinder(darkStoneMat, 9, 20,  85, 10,  85); // SE
+    // Corner towers (r=9, h=10, centre y=5)
+    addCylinder(darkStoneMat, 9, 10, -85, 5, -85);
+    addCylinder(darkStoneMat, 9, 10, 85, 5, -85);
+    addCylinder(darkStoneMat, 9, 10, -85, 5, 85);
+    addCylinder(darkStoneMat, 9, 10, 85, 5, 85);
 
-    // Merlon ring on top of each outer corner tower (y=21.25)
-    for (const [cx, cz] of [[-85,-85],[85,-85],[-85,85],[85,85]]) {
+    for (const [cx, cz] of [[-85, -85], [85, -85], [-85, 85], [85, 85]]) {
         for (let a = 0; a < Math.PI * 2; a += Math.PI / 5) {
-            const m = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.5, 2.5), darkStoneMat);
-            m.position.set(cx + Math.cos(a) * 7.5, 21.25, cz + Math.sin(a) * 7.5);
+            const m = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.5, 2.5), darkStoneMat);
+            m.position.set(cx + Math.cos(a) * 7.5, 11.25, cz + Math.sin(a) * 7.5);
             scene.add(m);
         }
     }
 
-    // --- Gatehouse towers flanking south gate (x=±18, z=85, h=18) ---
-    addObstacle(obs, darkStoneMat, 12, 18, 12, -18,  9, 85);
-    addObstacle(obs, darkStoneMat, 12, 18, 12,  18,  9, 85);
-    addMerlonsX(darkStoneMat, 85, -24, -12, 18, 2, 2.5, 4);
-    addMerlonsX(darkStoneMat, 85,  12,  24, 18, 2, 2.5, 4);
+    // Gatehouse towers (h=9, was 18)
+    addObstacle(obs, darkStoneMat, 12, 9, 12, -18, 4.5, 85);
+    addObstacle(obs, darkStoneMat, 12, 9, 12, 18, 4.5, 85);
+    addMerlonsX(darkStoneMat, 85, -24, -12, 9, 2, 1.2, 4);
+    addMerlonsX(darkStoneMat, 85, 12, 24, 9, 2, 1.2, 4);
 
-    // Outer gate portcullis frame (south entrance, scaled to h=12 gate)
+    // Portcullis frame (scaled to h=6 gate)
     const portMat = new THREE.MeshStandardMaterial({ color: 0x1a0f05, roughness: 1.0 });
-    const pTop = new THREE.Mesh(new THREE.BoxGeometry(24, 2.5, 1.2), portMat);
-    pTop.position.set(0, 10.75, 84.4);
+    const pTop = new THREE.Mesh(new THREE.BoxGeometry(24, 1.5, 1.2), portMat);
+    pTop.position.set(0, 5.75, 84.4);
     scene.add(pTop);
-    const pLeft = new THREE.Mesh(new THREE.BoxGeometry(2, 10.5, 1.2), portMat);
-    pLeft.position.set(-11, 5.25, 84.4);
+    const pLeft = new THREE.Mesh(new THREE.BoxGeometry(2, 5.5, 1.2), portMat);
+    pLeft.position.set(-11, 2.75, 84.4);
     scene.add(pLeft);
-    const pRight = new THREE.Mesh(new THREE.BoxGeometry(2, 10.5, 1.2), portMat);
-    pRight.position.set(11, 5.25, 84.4);
+    const pRight = new THREE.Mesh(new THREE.BoxGeometry(2, 5.5, 1.2), portMat);
+    pRight.position.set(11, 2.75, 84.4);
     scene.add(pRight);
 
-    // --- Inner keep walls (40×40, 4 thick, 20 tall, 3-unit doorways N/S/E/W) ---
-    addObstacle(obs, darkStoneMat, 18.5, 20, 4, -10.75, 10, -20); // N left
-    addObstacle(obs, darkStoneMat, 18.5, 20, 4,  10.75, 10, -20); // N right
-    addObstacle(obs, darkStoneMat, 18.5, 20, 4, -10.75, 10,  20); // S left
-    addObstacle(obs, darkStoneMat, 18.5, 20, 4,  10.75, 10,  20); // S right
-    addObstacle(obs, darkStoneMat, 4, 20, 18.5,  20, 10, -10.75); // E top
-    addObstacle(obs, darkStoneMat, 4, 20, 18.5,  20, 10,  10.75); // E bottom
-    addObstacle(obs, darkStoneMat, 4, 20, 18.5, -20, 10, -10.75); // W top
-    addObstacle(obs, darkStoneMat, 4, 20, 18.5, -20, 10,  10.75); // W bottom
+    // --- Inner keep walls (40×40, 4 thick, now 10 tall) ---
+    // North wall — sealed (no doorway)
+    addObstacle(obs, darkStoneMat, 40, 10, 4, 0, 5, -20); // N sealed
+    addObstacle(obs, darkStoneMat, 18.5, 10, 4, -10.75, 5, 20); // S left
+    addObstacle(obs, darkStoneMat, 18.5, 10, 4, 10.75, 5, 20); // S right
+    addObstacle(obs, darkStoneMat, 4, 10, 40, 20, 5, 0); // E sealed
+    addObstacle(obs, darkStoneMat, 4, 10, 40, -20, 5, 0); // W sealed
 
-    // --- Inner keep corner towers (cylindrical, mossy stone, r=3.5, h=26) ---
-    addCylinder(mossStoneMat, 3.5, 26, -20, 13, -20); // NW
-    addCylinder(mossStoneMat, 3.5, 26,  20, 13, -20); // NE
-    addCylinder(mossStoneMat, 3.5, 26, -20, 13,  20); // SW
-    addCylinder(mossStoneMat, 3.5, 26,  20, 13,  20); // SE
+    // Inner keep corner towers (r=3.5, h=13, centre y=6.5)
+    addCylinder(mossStoneMat, 3.5, 13, -20, 6.5, -20);
+    addCylinder(mossStoneMat, 3.5, 13, 20, 6.5, -20);
+    addCylinder(mossStoneMat, 3.5, 13, -20, 6.5, 20);
+    addCylinder(mossStoneMat, 3.5, 13, 20, 6.5, 20);
 
-    // Merlon ring on top of each inner keep tower
-    for (const [cx, cz] of [[-20,-20],[20,-20],[-20,20],[20,20]]) {
-        for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
-            const m = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2, 1.6), mossStoneMat);
-            m.position.set(cx + Math.cos(a) * 3, 27, cz + Math.sin(a) * 3);
+    // Conical roofs on inner keep towers
+    const slateMat = new THREE.MeshStandardMaterial({ color: 0x3a3d42, roughness: 0.7 });
+    for (const [cx, cz] of [[-20, -20], [20, -20], [-20, 20], [20, 20]]) {
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(4.2, 5, 16), slateMat);
+        cone.position.set(cx, 13 + 2.5, cz);
+        scene.add(cone);
+    }
+
+    // Merlon ring on inner keep towers (at y=13)
+    for (const [cx, cz] of [[-20, -20], [20, -20], [-20, 20], [20, 20]]) {
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 5) {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 1.4), mossStoneMat);
+            m.position.set(cx + Math.cos(a) * 3.2, 13.6, cz + Math.sin(a) * 3.2);
             scene.add(m);
         }
     }
 
-    // --- Keep wall battlements (mw=2, mh=2.5, top y=20) ---
-    addMerlonsX(darkStoneMat, -20, -19.5,  -1.5, 20, 2, 2.5, 3.5); // N left
-    addMerlonsX(darkStoneMat, -20,   1.5,  19.5, 20, 2, 2.5, 3.5); // N right
-    addMerlonsX(darkStoneMat,  20, -19.5,  -1.5, 20, 2, 2.5, 3.5); // S left
-    addMerlonsX(darkStoneMat,  20,   1.5,  19.5, 20, 2, 2.5, 3.5); // S right
-    addMerlonsZ(darkStoneMat,  20, -19.5,  -1.5, 20, 3.5, 2.5, 2); // E top
-    addMerlonsZ(darkStoneMat,  20,   1.5,  19.5, 20, 3.5, 2.5, 2); // E bottom
-    addMerlonsZ(darkStoneMat, -20, -19.5,  -1.5, 20, 3.5, 2.5, 2); // W top
-    addMerlonsZ(darkStoneMat, -20,   1.5,  19.5, 20, 3.5, 2.5, 2); // W bottom
+    // Keep wall walkway — continuous loop (top y=10, wall 4 thick)
+    const keepWalkMat = new THREE.MeshStandardMaterial({ color: 0x5a4e3c, roughness: 0.85 });
+    addObstacle(obs, keepWalkMat, 40, 0.4, 4, 0, 10.2, -20); // N
+    addObstacle(obs, keepWalkMat, 40, 0.4, 4, 0, 10.2, 20); // S
+    addObstacle(obs, keepWalkMat, 4, 0.4, 40, 20, 10.2, 0); // E
+    addObstacle(obs, keepWalkMat, 4, 0.4, 40, -20, 10.2, 0); // W
 
-    // --- Arrow slits on inner keep exterior faces (decorative dark panels) ---
+    // Outer merlons on walkway (top y=10)
+    addMerlonsX(darkStoneMat, -22, -18, 18, 10, 1.5, 1.8, 2);
+    addMerlonsX(darkStoneMat, 22, -18, 18, 10, 1.5, 1.8, 2);
+    addMerlonsZ(darkStoneMat, 22, -18, 18, 10, 2, 1.8, 1.5);
+    addMerlonsZ(darkStoneMat, -22, -18, 18, 10, 2, 1.8, 1.5);
+
+    // Inner parapet lip (courtyard side, y=10)
+    addMerlonsX(darkStoneMat, -18, -18, 18, 10, 1.5, 0.8, 2);
+    addMerlonsX(darkStoneMat, 18, -18, 18, 10, 1.5, 0.8, 2);
+    addMerlonsZ(darkStoneMat, 18, -18, 18, 10, 2, 0.8, 1.5);
+    addMerlonsZ(darkStoneMat, -18, -18, 18, 10, 2, 0.8, 1.5);
+
+    // Single staircase to keep wall top — NW corner, rises southward along W wall inside
+    // 20 steps × 0.5h × 0.8d = 10 rise, 16 run. Starts at (-17, 0, -8), ends at (-17, 10, +8)
+    {
+        const steps = 20, stepH = 0.5, stepD = 0.8, stairW = 2.5;
+        for (let i = 0; i < steps; i++) {
+            const cH = (i + 1) * stepH;
+            const sz = -8 + (i + 0.5) * stepD;
+            addObstacle(obs, stoneMat, stairW, cH, stepD, -17, cH / 2, sz);
+        }
+        addObstacle(obs, keepWalkMat, 2.5, 0.4, 2, -18.75, 10.2, 8);
+    }
+
+    // Walkway torches (y=11)
+    for (const tx of [-12, -4, 4, 12]) {
+        addTorch(tx, 11, -22);
+        addTorch(tx, 11, 22);
+    }
+    for (const tz of [-12, -4, 4, 12]) {
+        addTorch(22, 11, tz);
+        addTorch(-22, 11, tz);
+    }
+
+    // Arrow slits on inner keep exterior (scaled to new height)
     for (const sx of [-14, -7, 7, 14]) {
-        const s = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.5, 0.2), slitMat);
-        s.position.set(sx, 12, -22.1); // N exterior
+        const s = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.2), slitMat);
+        s.position.set(sx, 6, -22.1);
         scene.add(s);
-        const s2 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.5, 0.2), slitMat);
-        s2.position.set(sx, 12, 22.1); // S exterior
+        const s2 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.2), slitMat);
+        s2.position.set(sx, 6, 22.1);
         scene.add(s2);
     }
     for (const sz of [-14, -7, 7, 14]) {
-        const s = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.5, 0.5), slitMat);
-        s.position.set(22.1, 12, sz); // E exterior
+        const s = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.5, 0.5), slitMat);
+        s.position.set(22.1, 6, sz);
         scene.add(s);
-        const s2 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.5, 0.5), slitMat);
-        s2.position.set(-22.1, 12, sz); // W exterior
+        const s2 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.5, 0.5), slitMat);
+        s2.position.set(-22.1, 6, sz);
         scene.add(s2);
     }
 
-    // --- Wooden gate at south keep entrance ---
-    const gatePanel = new THREE.Mesh(new THREE.BoxGeometry(3, 8, 0.5), darkWoodMat);
-    gatePanel.position.set(0, 4, 20.3);
+    // Wooden gate at south keep entrance (scaled to h=5 gate)
+    const gatePanel = new THREE.Mesh(new THREE.BoxGeometry(3, 4, 0.5), darkWoodMat);
+    gatePanel.position.set(0, 2, 20.3);
     scene.add(gatePanel);
-    // Horizontal planks as trim
-    for (const gy of [1.5, 4, 6.5]) {
-        const plank = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.35, 0.6), woodMat);
+    for (const gy of [0.8, 2, 3.2]) {
+        const plank = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.3, 0.6), woodMat);
         plank.position.set(0, gy, 20.3);
         scene.add(plank);
     }
 
-    // --- Barracks (4 quadrant buildings) ---
-    addObstacle(obs, woodMat, 24, 11, 10, -50, 5.5, -50);
-    addObstacle(obs, woodMat, 24, 11, 10,  50, 5.5, -50);
-    addObstacle(obs, woodMat, 24, 11, 10, -50, 5.5,  50);
-    addObstacle(obs, woodMat, 24, 11, 10,  50, 5.5,  50);
+    // --- Barracks (4 quadrant buildings — hollowed, roofed, furnished) ---
+    // 24w × 5.5h × 10d, walls 0.6 thick to prevent phasing
+    function addBarracks(cx, cz, facingSouth) {
+        const wallT = 0.6;
+        const bw = 24, bh = 5.5, bd = 10;
+        const doorW = 3, doorH = 3.5;
+        const fy = bh / 2;
+        const backZ = facingSouth ? cz + bd / 2 : cz - bd / 2;
+        const frontZ = facingSouth ? cz - bd / 2 : cz + bd / 2;
 
-    // --- Watchtower (NE interior) ---
-    addObstacle(obs, darkStoneMat, 7, 36, 7, 62, 18, -62);
+        // Walls
+        addObstacle(obs, woodMat, bw, bh, wallT, cx, fy, backZ);
+        const panelW = (bw - doorW) / 2;
+        addObstacle(obs, woodMat, panelW, bh, wallT, cx - (doorW / 2 + panelW / 2), fy, frontZ);
+        addObstacle(obs, woodMat, panelW, bh, wallT, cx + (doorW / 2 + panelW / 2), fy, frontZ);
+        addObstacle(obs, woodMat, doorW, bh - doorH, wallT, cx, doorH + (bh - doorH) / 2, frontZ);
+        addObstacle(obs, woodMat, wallT, bh, bd, cx - bw / 2, fy, cz);
+        addObstacle(obs, woodMat, wallT, bh, bd, cx + bw / 2, fy, cz);
 
-    // --- Stone rubble in courtyard ---
+        // Gabled roof
+        const roofAngle = Math.atan2(1.5, bd / 2);
+        const ridgeY = bh + 1.5;
+        const ridge = new THREE.Mesh(new THREE.BoxGeometry(bw + 0.4, 0.25, 0.25), roofMat);
+        ridge.position.set(cx, ridgeY, cz);
+        scene.add(ridge);
+        for (const side of [-1, 1]) {
+            const panel = new THREE.Mesh(
+                new THREE.BoxGeometry(bw + 0.4, 0.2, Math.sqrt((bd / 2) ** 2 + 1.5 ** 2) + 0.3),
+                roofMat
+            );
+            panel.rotation.x = side * roofAngle;
+            panel.position.set(cx, bh + 0.75, cz + side * bd / 4);
+            scene.add(panel);
+        }
+        // Gable end caps
+        for (const gz of [backZ, frontZ]) {
+            const cap = new THREE.Mesh(new THREE.ConeGeometry(bd / 2 * 0.72, 1.6, 4), roofMat);
+            cap.rotation.y = Math.PI / 4;
+            cap.position.set(cx, bh + 0.8, gz);
+            scene.add(cap);
+        }
+
+        // Furniture
+        const bedMat = darkWoodMat;
+        const bedZ = backZ + (facingSouth ? -1.2 : 1.2);
+        for (const bx of [-8, 0, 8]) {
+            const lower = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.2, 0.9), bedMat);
+            lower.position.set(cx + bx, 0.5, bedZ);
+            scene.add(lower);
+            const upper = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.2, 0.9), bedMat);
+            upper.position.set(cx + bx, 1.6, bedZ);
+            scene.add(upper);
+            for (const px of [-0.8, 0.8]) for (const pz of [-0.35, 0.35]) {
+                const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.8, 0.1), bedMat);
+                post.position.set(cx + bx + px, 0.9, bedZ + pz);
+                scene.add(post);
+            }
+        }
+        const tableTop = new THREE.Mesh(new THREE.BoxGeometry(4, 0.15, 1.5), woodMat);
+        tableTop.position.set(cx, 2.0, cz);
+        scene.add(tableTop);
+        for (const lx of [-1.7, 1.7]) for (const lz of [-0.55, 0.55]) {
+            const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.0, 0.12), woodMat);
+            leg.position.set(cx + lx, 1.0, cz + lz);
+            scene.add(leg);
+        }
+        for (const sx of [-1.5, 0, 1.5]) {
+            const st = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.1, 0.55), woodMat);
+            st.position.set(cx + sx, 1.2, cz + (facingSouth ? 1.3 : -1.3));
+            scene.add(st);
+            for (const slx of [-0.18, 0.18]) for (const slz of [-0.18, 0.18]) {
+                const sl = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.2, 0.07), woodMat);
+                sl.position.set(cx + sx + slx, 0.6, cz + (facingSouth ? 1.3 : -1.3) + slz);
+                scene.add(sl);
+            }
+        }
+        const rackX = cx + bw / 2 - 0.8;
+        const rackZ = cz + (facingSouth ? -1.5 : 1.5);
+        const rackBar = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 2.5), woodMat);
+        rackBar.position.set(rackX, 2.8, rackZ);
+        scene.add(rackBar);
+        for (const rz of [rackZ - 1.0, rackZ + 1.0]) {
+            const rp = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.0, 0.1), woodMat);
+            rp.position.set(rackX, 2.3, rz);
+            scene.add(rp);
+        }
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.9, 10), woodMat);
+        barrel.position.set(cx - bw / 2 + 0.8, 0.45, frontZ + (facingSouth ? 0.8 : -0.8));
+        scene.add(barrel);
+        addTorch(cx, bh - 0.5, cz);
+    }
+
+    addBarracks(-50, -50, true);
+    addBarracks(50, -50, true);
+    addBarracks(-50, 50, false);
+    addBarracks(50, 50, false);
+
+    // Watchtower (h=18, was 36)
+    addObstacle(obs, darkStoneMat, 7, 18, 7, 62, 9, -62);
+
+    // Stone rubble
     const rng = mulberry32(0xf047be55);
     for (let i = 0; i < 30; i++) {
         const rx = (rng() - 0.5) * 140;
@@ -951,16 +1076,11 @@ function buildFortressMap(obs) {
         addObstacle(obs, stoneMat, w, h, d, rx, h / 2, rz);
     }
 
-    // --- Torches along inner wall faces ---
-    for (const tx of [-60, -30, 0, 30, 65]) addTorch(tx, 8, -81); // N inner
-    for (const tx of [-60, -30, 0, 30, 60]) addTorch(tx, 8,  81); // S inner
-    for (const tz of [-60, -30, -5, 30, 60]) addTorch( 81, 8, tz); // E inner
-    for (const tz of [-65, 0, 30, 60])        addTorch(-81, 8, tz); // W inner
-    // Keep wall torches
-    addTorch(-12, 9.5, -20); addTorch(12, 9.5, -20);
-    addTorch(-12, 9.5,  20); addTorch(12, 9.5,  20);
-    addTorch( 20, 9.5, -12); addTorch(20, 9.5,  12);
-    addTorch(-20, 9.5, -12); addTorch(-20, 9.5,  12);
+    // Torches along inner wall faces (y=4 for new wall height)
+    for (const tx of [-60, -30, 0, 30, 65]) addTorch(tx, 4, -81);
+    for (const tx of [-60, -30, 0, 30, 60]) addTorch(tx, 4, 81);
+    for (const tz of [-60, -30, -5, 30, 60]) addTorch(81, 4, tz);
+    for (const tz of [-65, 0, 30, 60]) addTorch(-81, 4, tz);
 }
 
 export function buildMap(mapId) {
@@ -1118,11 +1238,11 @@ export function buildMap(mapId) {
         _desertChunks.clear();
         _desertObs = obs;
         _desertMats = {
-            cactusMat:  new THREE.MeshStandardMaterial({ color: 0x3a8c3a, roughness: 0.85 }),
+            cactusMat: new THREE.MeshStandardMaterial({ color: 0x3a8c3a, roughness: 0.85 }),
             sandRockMat: new THREE.MeshStandardMaterial({ color: 0xb89050, roughness: 0.95 }),
-            debrisMat:  new THREE.MeshStandardMaterial({ color: 0x7a5a30, roughness: 0.9 }),
-            duneMat:    new THREE.MeshStandardMaterial({ color: 0xd4a855, roughness: 1.0 }),
-            ruinMat:    new THREE.MeshStandardMaterial({ color: 0x9a8060, roughness: 0.95 }),
+            debrisMat: new THREE.MeshStandardMaterial({ color: 0x7a5a30, roughness: 0.9 }),
+            duneMat: new THREE.MeshStandardMaterial({ color: 0xd4a855, roughness: 1.0 }),
+            ruinMat: new THREE.MeshStandardMaterial({ color: 0x9a8060, roughness: 0.95 }),
         };
         const halfD = Math.ceil(size * 1.1 / DESERT_CHUNK_SIZE) * DESERT_CHUNK_SIZE;
         _desertChunkCenters = [];
@@ -1459,9 +1579,9 @@ export function buildMap(mapId) {
         _mountainChunks.clear();
         _mountainObs = obs;
         _mountainMats = {
-            rockMat:  new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.95 }),
+            rockMat: new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.95 }),
             rockMat2: new THREE.MeshStandardMaterial({ color: 0x3d3d3d, roughness: 0.98 }),
-            snowMat:  new THREE.MeshStandardMaterial({ color: 0xf2f4f8, roughness: 0.88 }),
+            snowMat: new THREE.MeshStandardMaterial({ color: 0xf2f4f8, roughness: 0.88 }),
         };
         const halfM = Math.ceil(size * 1.1 / MOUNTAIN_TILE_STEP) * MOUNTAIN_TILE_STEP;
         _mountainChunkCenters = [];
@@ -1479,11 +1599,11 @@ export function buildMap(mapId) {
         _forestChunks.clear();
         _forestObs = obs;
         _forestMats = {
-            treeMat:     new THREE.MeshStandardMaterial({ color: 0x3d2b1f }),
-            leafMats:    [0x113a11, 0x0d3010, 0x1a4a1a, 0x0a2a0a].map(c => new THREE.MeshStandardMaterial({ color: c })),
-            mossMats:    [0x2a4a1a, 0x3a5a2a].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 1.0 })),
-            boulderMat:  new THREE.MeshStandardMaterial({ color: 0x606258, roughness: 0.96 }),
-            shroomMat:   new THREE.MeshStandardMaterial({ color: 0xbb3311, roughness: 0.8 }),
+            treeMat: new THREE.MeshStandardMaterial({ color: 0x3d2b1f }),
+            leafMats: [0x113a11, 0x0d3010, 0x1a4a1a, 0x0a2a0a].map(c => new THREE.MeshStandardMaterial({ color: c })),
+            mossMats: [0x2a4a1a, 0x3a5a2a].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 1.0 })),
+            boulderMat: new THREE.MeshStandardMaterial({ color: 0x606258, roughness: 0.96 }),
+            shroomMat: new THREE.MeshStandardMaterial({ color: 0xbb3311, roughness: 0.8 }),
             shroomCapMat: new THREE.MeshStandardMaterial({ color: 0xdd6633, roughness: 0.7 }),
         };
         const halfF = Math.ceil(size * 1.1 / FOREST_CHUNK_SIZE) * FOREST_CHUNK_SIZE;

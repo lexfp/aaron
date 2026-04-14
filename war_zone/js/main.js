@@ -211,9 +211,9 @@ window.addEventListener('resize', () => {
 // Builds detailed fist meshes into `group` with fist centre at (cx, cy, cz).
 // thumbDir: +1 = thumb on +x side (left hand), -1 = thumb on -x side (right hand).
 function _buildDetailedFistMeshes(group, thumbDir, cx, cy, cz) {
-    const skinMat    = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 });
     const knuckleMat = new THREE.MeshStandardMaterial({ color: 0xc49060, roughness: 0.45 });
-    const grooveMat  = new THREE.MeshStandardMaterial({ color: 0xb07050, roughness: 0.8 });
+    const grooveMat = new THREE.MeshStandardMaterial({ color: 0xb07050, roughness: 0.8 });
 
     // Main fist body — wider than tall
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.10), skinMat);
@@ -1113,7 +1113,7 @@ function animate() {
                 playerState.stamina -= dt * 20;
                 if (playerState.stamina < 0) playerState.stamina = 0;
             } else if (!keys.shift) {
-                playerState.stamina += dt * 10;
+                playerState.stamina += dt * 10 * (1 + (playerData.stats?.staminaRegen || 0) * 0.1);
                 if (playerState.stamina > playerState.maxStamina) playerState.stamina = playerState.maxStamina;
             }
 
@@ -1179,12 +1179,24 @@ function animate() {
             moveVec.addScaledVector(forwardDir, -velocity.z * dt);
 
             const origX = camera.position.x;
-            camera.position.x += moveVec.x;
-            if (checkCollision(camera.position)) camera.position.x = origX;
-
             const origZ = camera.position.z;
-            camera.position.z += moveVec.z;
-            if (checkCollision(camera.position)) camera.position.z = origZ;
+
+            // Swept collision: sub-step movement so thin walls can't be tunneled through
+            const STEP = 0.15; // max units per sub-step (smaller than thinnest wall = 0.5)
+            const totalDist = Math.sqrt(moveVec.x * moveVec.x + moveVec.z * moveVec.z);
+            if (totalDist > 0) {
+                const steps = Math.ceil(totalDist / STEP);
+                const dx = moveVec.x / steps;
+                const dz = moveVec.z / steps;
+                for (let _s = 0; _s < steps; _s++) {
+                    const px = camera.position.x;
+                    camera.position.x += dx;
+                    if (checkCollision(camera.position)) camera.position.x = px;
+                    const pz = camera.position.z;
+                    camera.position.z += dz;
+                    if (checkCollision(camera.position)) camera.position.z = pz;
+                }
+            }
 
             // Side-entry slope check: raycast in move direction (only when actually moving)
             if (gameState.currentMap === 'mountain') {

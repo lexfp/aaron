@@ -138,9 +138,9 @@ function renderAttachmentShop() {
 }
 
 const XP_PACKAGES = [
-    { xp: 100,  cost: 2500 },
-    { xp: 300,  cost: 6000 },
-    { xp: 750,  cost: 12500 },
+    { xp: 100, cost: 2500 },
+    { xp: 300, cost: 6000 },
+    { xp: 750, cost: 12500 },
     { xp: 2000, cost: 25000 },
     { xp: 6000, cost: 50000 },
 ];
@@ -507,14 +507,15 @@ export function showLoadout() {
         <h3 style="color:#ffdd00;font-size:22px;text-align:center;margin-bottom:6px">Stats</h3>
         <div style="text-align:center;color:#aaa;font-size:13px;margin-bottom:14px">
             LVL ${playerData.level} &nbsp; ${xpBar} &nbsp; ${playerData.xp}/${needed} XP
-            ${playerData.statPoints > 0 ? `<span style="color:#ffdd00;margin-left:10px">${playerData.statPoints} point${playerData.statPoints !== 1 ? 's' : ''} to spend</span>` : ''}
+            <span data-pts-label style="color:#ffdd00;margin-left:10px">${playerData.statPoints > 0 ? `${playerData.statPoints} point${playerData.statPoints !== 1 ? 's' : ''} to spend` : ''}</span>
         </div>`;
 
     const statDefs = [
         { key: 'health', label: 'Health', color: '#00ff88', desc: '+5 max HP per point' },
         { key: 'speed', label: 'Speed', color: '#00aaff', desc: '+2% move speed per point' },
-        { key: 'damage', label: 'Damage', color: '#ff4444', desc: '+2% damage per point' },
+        { key: 'damage', label: 'Damage', color: '#ff4444', desc: '+2% damage & +5% headshot bonus per point' },
         { key: 'stamina', label: 'Stamina', color: '#ffaa00', desc: '+10 max stamina per point' },
+        { key: 'staminaRegen', label: 'Stamina Regen', color: '#ffcc44', desc: '+10% regen rate per point' },
         { key: 'jump', label: 'Jump Height', color: '#aa66ff', desc: '+5% jump height per point' },
         { key: 'reload', label: 'Reload Time', color: '#00ddff', desc: '-5% reload time per point' }
     ];
@@ -533,20 +534,59 @@ export function showLoadout() {
         card.style.cssText = `background:rgba(0,0,0,0.5);border:2px solid ${color};border-radius:10px;padding:18px 28px;text-align:center;min-width:170px;`;
         card.innerHTML = `
             <div style="font-size:11px;color:#888;letter-spacing:1px;margin-bottom:6px">${label.toUpperCase()}</div>
-            <div style="font-size:28px;font-weight:700;color:${color}">${pts}</div>
+            <div data-stat-val style="font-size:28px;font-weight:700;color:${color}">${pts}</div>
             <div style="font-size:11px;color:#666;margin:4px 0 6px">${desc}</div>
             ${effectiveLine}
-            <button data-stat="${key}" ${playerData.statPoints < 1 ? 'disabled' : ''}
-                style="background:${playerData.statPoints > 0 ? color : '#333'};color:${playerData.statPoints > 0 ? '#000' : '#555'};border:none;border-radius:5px;padding:6px 18px;font-size:14px;font-weight:700;cursor:${playerData.statPoints > 0 ? 'pointer' : 'default'}">
-                + Add Point
-            </button>`;
+            <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;">
+                <input data-stat-input="${key}" type="number" min="1" max="${Math.max(1, playerData.statPoints)}" value="1"
+                    ${playerData.statPoints < 1 ? 'disabled' : ''}
+                    style="width:52px;padding:4px 6px;border-radius:5px;border:1px solid ${color};background:#111;color:#fff;font-size:14px;font-weight:700;text-align:center;">
+                <button data-stat="${key}" ${playerData.statPoints < 1 ? 'disabled' : ''}
+                    style="background:${playerData.statPoints > 0 ? color : '#333'};color:${playerData.statPoints > 0 ? '#000' : '#555'};border:none;border-radius:5px;padding:6px 14px;font-size:14px;font-weight:700;cursor:${playerData.statPoints > 0 ? 'pointer' : 'default'}">
+                    + Add
+                </button>
+            </div>`;
         const btn = card.querySelector('[data-stat]');
+        const input = card.querySelector(`[data-stat-input="${key}"]`);
+        const ptDisplay = card.querySelector('[data-stat-pts]');
         if (btn && playerData.statPoints > 0) {
             btn.onclick = () => {
-                playerData.statPoints--;
-                playerData.stats[key]++;
+                const amount = Math.min(Math.max(1, parseInt(input.value) || 1), playerData.statPoints);
+                playerData.statPoints -= amount;
+                playerData.stats[key] += amount;
                 savePlayerData();
-                showLoadout();
+
+                // Update this card in-place
+                card.querySelector('[data-stat-val]').textContent = playerData.stats[key];
+                input.max = Math.max(1, playerData.statPoints);
+                if (playerData.statPoints < 1) {
+                    input.disabled = true;
+                    btn.disabled = true;
+                    btn.style.background = '#333';
+                    btn.style.color = '#555';
+                    btn.style.cursor = 'default';
+                }
+
+                // Update the reload effective line if needed
+                if (key === 'reload') {
+                    const mult = Math.max(0.2, 1 - playerData.stats[key] * 0.05);
+                    let el = card.querySelector('[data-reload-eff]');
+                    if (!el) {
+                        el = document.createElement('div');
+                        el.dataset.reloadEff = '1';
+                        el.style.cssText = `font-size:11px;color:${color};margin-bottom:4px`;
+                        card.querySelector('[data-stat-val]').after(el);
+                    }
+                    el.textContent = `${Math.round((1 - mult) * 100)}% faster (${(mult * 100).toFixed(0)}% of base)`;
+                }
+
+                // Update the global points-to-spend label
+                const header = document.querySelector('#loadout-stats-section [data-pts-label]');
+                if (header) {
+                    header.textContent = playerData.statPoints > 0
+                        ? `${playerData.statPoints} point${playerData.statPoints !== 1 ? 's' : ''} to spend`
+                        : '';
+                }
             };
         }
         statGrid.appendChild(card);
