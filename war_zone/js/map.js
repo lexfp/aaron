@@ -323,7 +323,7 @@ function _buildForestChunkMeshes(cx, cz) {
     const seed = Math.abs(Math.imul(Math.round(cx) | 0, 73856093) ^ Math.imul(Math.round(cz) | 0, 19349663));
     const rng = mulberry32((seed % 0x7fffffff) + 1);
     const meshes = [], chunkObs = [];
-    const { treeMat, leafMats, mossMats } = _forestMats;
+    const { treeMat, leafMats, mossMats, boulderMat, shroomMat, shroomCapMat } = _forestMats;
 
     const treePositions = [];
     const minDist = 2.5;
@@ -395,6 +395,49 @@ function _buildForestChunkMeshes(cx, cz) {
         chunkObs.push({ mesh: log, box: new THREE.Box3().setFromObject(log) });
     }
 
+    // Boulders — large mossy stones for cover and navigation variety
+    const boulderCount = 1 + Math.floor(rng() * 3);
+    for (let i = 0; i < boulderCount; i++) {
+        const bx = cx + (rng() - 0.5) * FOREST_CHUNK_SIZE;
+        const bz = cz + (rng() - 0.5) * FOREST_CHUNK_SIZE;
+        if (Math.abs(bx) < 8 && Math.abs(bz) < 8) continue;
+        const bs = 1.2 + rng() * 2.2;
+        const boulder = new THREE.Mesh(new THREE.BoxGeometry(bs * 1.3, bs * 0.85, bs * 1.1), boulderMat);
+        boulder.rotation.y = rng() * Math.PI;
+        boulder.rotation.x = (rng() - 0.5) * 0.25;
+        boulder.position.set(bx, bs * 0.38, bz);
+        boulder.castShadow = true; scene.add(boulder); meshes.push(boulder);
+        chunkObs.push({ mesh: boulder, box: new THREE.Box3().setFromObject(boulder) });
+        // Occasional moss patch on top of boulder
+        if (rng() < 0.5) {
+            const mossMat2 = mossMats[Math.floor(rng() * mossMats.length)];
+            const mossCap = new THREE.Mesh(new THREE.BoxGeometry(bs * 0.9, 0.12, bs * 0.85), mossMat2);
+            mossCap.position.set(bx, bs * 0.85 + 0.06, bz);
+            mossCap.rotation.y = rng() * Math.PI;
+            scene.add(mossCap); meshes.push(mossCap);
+        }
+    }
+
+    // Mushroom clusters — atmospheric floor detail, no collision
+    if (rng() < 0.55) {
+        const mx = cx + (rng() - 0.5) * FOREST_CHUNK_SIZE;
+        const mz = cz + (rng() - 0.5) * FOREST_CHUNK_SIZE;
+        if (!(Math.abs(mx) < 8 && Math.abs(mz) < 8)) {
+            const count = 3 + Math.floor(rng() * 5);
+            for (let j = 0; j < count; j++) {
+                const msx = mx + (rng() - 0.5) * 2.5, msz = mz + (rng() - 0.5) * 2.5;
+                const mh = 0.25 + rng() * 0.45;
+                const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.06, mh, 5), shroomMat);
+                stem.position.set(msx, mh / 2, msz);
+                scene.add(stem); meshes.push(stem);
+                const cap = new THREE.Mesh(new THREE.SphereGeometry(0.1 + rng() * 0.09, 6, 4), shroomCapMat);
+                cap.scale.y = 0.45;
+                cap.position.set(msx, mh + 0.05, msz);
+                scene.add(cap); meshes.push(cap);
+            }
+        }
+    }
+
     return { meshes, chunkObs };
 }
 
@@ -425,7 +468,7 @@ function _buildMountainChunkMeshes(cx, cz) {
     const seed = Math.abs(Math.imul(Math.round(cx) | 0, 73856093) ^ Math.imul(Math.round(cz) | 0, 19349663));
     const rng = mulberry32((seed % 0x7fffffff) + 1);
     const meshes = [], chunkObs = [], chunkSlopes = [];
-    const { rockMat, rockMat2 } = _mountainMats;
+    const { rockMat, rockMat2, snowMat } = _mountainMats;
 
     // One terrain tile per chunk (skip flat spawn zone)
     if (Math.abs(cx) >= 22 || Math.abs(cz) >= 22) {
@@ -497,6 +540,21 @@ function _buildMountainChunkMeshes(cx, cz) {
         meshes.push(slope);
         chunkObs.push({ mesh: slope, isSlope: true, box: new THREE.Box3().setFromObject(slope) });
         chunkSlopes.push(slope);
+
+        // Snow cap on tall peaks (h > 22)
+        if (h > 22) {
+            const capH = 2.5 + rng() * 3.5;
+            const snow = new THREE.Mesh(new THREE.BoxGeometry(w * 0.6, capH, d * 0.6), snowMat);
+            snow.position.set(bx + (rng() - 0.5) * 2, h + capH / 2 - 1.5, bz + (rng() - 0.5) * 2);
+            scene.add(snow); meshes.push(snow);
+            // Small snow drift at base of peak
+            if (rng() < 0.5) {
+                const drift = new THREE.Mesh(new THREE.BoxGeometry(w * 0.9, 0.8, d * 0.9), snowMat);
+                drift.rotation.x = (rng() - 0.5) * 0.3; drift.rotation.z = (rng() - 0.5) * 0.2;
+                drift.position.set(bx, h * 0.7, bz);
+                scene.add(drift); meshes.push(drift);
+            }
+        }
     }
 
     return { meshes, chunkObs, chunkSlopes };
@@ -534,7 +592,7 @@ function _buildDesertChunkMeshes(cx, cz) {
     const seed = Math.abs(Math.imul(Math.round(cx) | 0, 73856093) ^ Math.imul(Math.round(cz) | 0, 19349663));
     const rng = mulberry32((seed % 0x7fffffff) + 1);
     const meshes = [], chunkObs = [];
-    const { cactusMat, sandRockMat, debrisMat } = _desertMats;
+    const { cactusMat, sandRockMat, debrisMat, duneMat, ruinMat } = _desertMats;
 
     // Cacti
     const cactiCount = 3 + Math.floor(rng() * 4);
@@ -591,6 +649,45 @@ function _buildDesertChunkMeshes(cx, cz) {
         }
     }
 
+    // Sand dunes — sweeping low mounds for cover and atmosphere
+    const duneCount = 3 + Math.floor(rng() * 4);
+    for (let i = 0; i < duneCount; i++) {
+        const dunex = cx + (rng() - 0.5) * DESERT_CHUNK_SIZE;
+        const dunez = cz + (rng() - 0.5) * DESERT_CHUNK_SIZE;
+        if (Math.abs(dunex) < 8 && Math.abs(dunez) < 8) continue;
+        const dw = 10 + rng() * 16, dd = 8 + rng() * 12, dh = 0.5 + rng() * 1.6;
+        const dune = new THREE.Mesh(new THREE.BoxGeometry(dw, dh, dd), duneMat);
+        dune.rotation.y = rng() * Math.PI;
+        dune.rotation.x = (rng() - 0.5) * 0.18;
+        dune.position.set(dunex, dh * 0.22, dunez);
+        dune.castShadow = true;
+        scene.add(dune); meshes.push(dune);
+        chunkObs.push({ mesh: dune, box: new THREE.Box3().setFromObject(dune), isSlope: true });
+    }
+
+    // Ruined outpost wall fragments — 30% chance per chunk
+    if (rng() < 0.30) {
+        const rwx = cx + (rng() - 0.5) * DESERT_CHUNK_SIZE * 0.7;
+        const rwz = cz + (rng() - 0.5) * DESERT_CHUNK_SIZE * 0.7;
+        if (!(Math.abs(rwx) < 10 && Math.abs(rwz) < 10)) {
+            const wh = 1.2 + rng() * 2.0, wlen = 4 + rng() * 6;
+            const wall1 = new THREE.Mesh(new THREE.BoxGeometry(wlen, wh, 0.65), ruinMat);
+            wall1.position.set(rwx, wh / 2, rwz);
+            wall1.rotation.y = rng() * Math.PI;
+            wall1.castShadow = true; scene.add(wall1); meshes.push(wall1);
+            chunkObs.push({ mesh: wall1, box: new THREE.Box3().setFromObject(wall1) });
+            // 50% chance: second wall segment at right angle forming an L-corner
+            if (rng() < 0.5) {
+                const wh2 = 0.9 + rng() * 1.4, wlen2 = 3 + rng() * 4;
+                const wall2 = new THREE.Mesh(new THREE.BoxGeometry(0.65, wh2, wlen2), ruinMat);
+                const angle = wall1.rotation.y;
+                wall2.position.set(rwx + Math.cos(angle) * wlen / 2, wh2 / 2, rwz + Math.sin(angle) * wlen / 2);
+                wall2.castShadow = true; scene.add(wall2); meshes.push(wall2);
+                chunkObs.push({ mesh: wall2, box: new THREE.Box3().setFromObject(wall2) });
+            }
+        }
+    }
+
     return { meshes, chunkObs };
 }
 
@@ -616,6 +713,256 @@ export function updateDesertChunks(px, pz) {
     }
 }
 
+function buildFortressMap(obs) {
+    const stoneMat     = new THREE.MeshStandardMaterial({ color: 0x887868, roughness: 0.9 });
+    const darkStoneMat = new THREE.MeshStandardMaterial({ color: 0x5a4a3c, roughness: 0.9 });
+    const mossStoneMat = new THREE.MeshStandardMaterial({ color: 0x6b7a54, roughness: 0.95 }); // mossy stone for keep towers
+    const woodMat      = new THREE.MeshStandardMaterial({ color: 0x6b4c2a, roughness: 1.0 });
+    const darkWoodMat  = new THREE.MeshStandardMaterial({ color: 0x2e1a0a, roughness: 1.0 }); // wooden gate door
+    const torchMat     = new THREE.MeshStandardMaterial({ color: 0x3a2010, roughness: 1.0 });
+    const flameMat     = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0xff4400, emissiveIntensity: 2.5 });
+    const slitMat      = new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 1.0 }); // arrow slit darkness
+
+    function addTorch(x, y, z) {
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4, 6), torchMat);
+        handle.position.set(x, y, z);
+        scene.add(handle);
+        const flame = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), flameMat);
+        flame.position.set(x, y + 0.28, z);
+        scene.add(flame);
+        const light = new THREE.PointLight(0xff8833, 1.8, 14);
+        light.position.set(x, y + 0.3, z);
+        scene.add(light);
+    }
+
+    // Cylindrical tower with AABB collision
+    function addCylinder(mat, radius, height, x, y, z) {
+        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, 16), mat);
+        mesh.position.set(x, y, z);
+        mesh.castShadow = true;
+        scene.add(mesh);
+        obs.push({ mesh, box: new THREE.Box3().setFromObject(mesh) });
+    }
+
+    // Decorative battlements along X-running wall face
+    function addMerlonsX(mat, zPos, xFrom, xTo, topY, mw, mh, md) {
+        const step = mw * 2;
+        for (let x = xFrom + mw / 2; x <= xTo - mw / 2 + 0.01; x += step) {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(mw, mh, md), mat);
+            m.position.set(x, topY + mh / 2, zPos);
+            scene.add(m);
+        }
+    }
+
+    // Decorative battlements along Z-running wall face
+    function addMerlonsZ(mat, xPos, zFrom, zTo, topY, mw, mh, md) {
+        const step = md * 2;
+        for (let z = zFrom + md / 2; z <= zTo - md / 2 + 0.01; z += step) {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(mw, mh, md), mat);
+            m.position.set(xPos, topY + mh / 2, z);
+            scene.add(m);
+        }
+    }
+
+    // Secret passage obstacle
+    function addPassage(x, y, z, w, h, d) {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), stoneMat);
+        mesh.position.set(x, y, z);
+        mesh.castShadow = true;
+        scene.add(mesh);
+        const passage = { mesh, box: new THREE.Box3().setFromObject(mesh), passThrough: false, isSecretPassage: true };
+        obs.push(passage);
+        gameState.secretPassages.push(passage);
+    }
+
+    // Paved stone path material for wall walkway tops
+    const pathMat = new THREE.MeshStandardMaterial({ color: 0x5c4e40, roughness: 0.8 });
+
+    // Staircase rising in direction 'N'/'S'/'E'/'W'. Each step 0.5 tall, 0.8 deep, 3.5 wide.
+    // 24 steps → total rise 12. The starting coord (x0/z0) is at the base of the first step.
+    function addStaircase(x0, z0, dir) {
+        const steps = 24, stepH = 0.5, stepD = 0.8, stairW = 3.5;
+        for (let i = 0; i < steps; i++) {
+            const cH = (i + 1) * stepH;            // cumulative height (solid from y=0 up)
+            const offset = (i + 0.5) * stepD;      // centre of this step along travel axis
+            const sx = (dir === 'E') ? x0 + offset : (dir === 'W') ? x0 - offset : x0;
+            const sz = (dir === 'N') ? z0 - offset : (dir === 'S') ? z0 + offset : z0;
+            const w  = (dir === 'N' || dir === 'S') ? stairW : stepD;
+            const d  = (dir === 'E' || dir === 'W') ? stairW : stepD;
+            addObstacle(obs, stoneMat, w, cH, d, sx, cH / 2, sz);
+        }
+    }
+
+    // --- Outer perimeter walls (±85, 12 tall, 4 thick) ---
+    // North (z=-85) — passage gap at x=33→37
+    addObstacle(obs, stoneMat, 118, 12, 4, -26,  6, -85);
+    addPassage(35, 6, -85, 4, 12, 4);
+    addObstacle(obs, stoneMat,  48, 12, 4,  61,  6, -85);
+    // South (z=+85) — gate gap at x=-12→+12
+    addObstacle(obs, darkStoneMat, 73, 12, 4, -48.5, 6,  85);
+    addObstacle(obs, darkStoneMat, 73, 12, 4,  48.5, 6,  85);
+    // East (x=+85) — passage gap at z=8→12
+    addObstacle(obs, stoneMat, 4, 12,  93,  85, 6, -38.5);
+    addPassage(85, 6, 10, 4, 12, 4);
+    addObstacle(obs, stoneMat, 4, 12,  73,  85, 6,  48.5);
+    // West (x=-85) — passage gap at z=-37→-33
+    addObstacle(obs, stoneMat, 4, 12,  48, -85, 6, -61);
+    addPassage(-85, 6, -35, 4, 12, 4);
+    addObstacle(obs, stoneMat, 4, 12, 118, -85, 6,  26);
+
+    // --- Walkway path on top of outer walls (decorative paved slabs, noCollide) ---
+    addObstacle(obs, pathMat, 148, 0.15, 3.6,    0, 12.075, -85, {noCollide: true}); // N
+    addObstacle(obs, pathMat,  71, 0.15, 3.6, -46.5, 12.075, 85, {noCollide: true}); // S left
+    addObstacle(obs, pathMat,  71, 0.15, 3.6,  46.5, 12.075, 85, {noCollide: true}); // S right
+    addObstacle(obs, pathMat, 3.6, 0.15, 148,   85, 12.075,   0, {noCollide: true}); // E
+    addObstacle(obs, pathMat, 3.6, 0.15, 148,  -85, 12.075,   0, {noCollide: true}); // W
+
+    // --- Staircases to wall tops (one per side, inside the fortress) ---
+    // 24 steps × 0.5 h × 0.8 d = 12 rise over 19.2 run; last step front face at inner wall face (±83)
+    addStaircase(-55, -63.8, 'N'); // North wall — rises toward z=-85
+    addStaircase( 55,  63.8, 'S'); // South wall — rises toward z=+85
+    addStaircase( 63.8,  50, 'E'); // East  wall — rises toward x=+85
+    addStaircase(-63.8, -50, 'W'); // West  wall — rises toward x=-85
+
+    // --- Outer wall battlements (mw=2, mh=2.5, md=4, top y=12) ---
+    addMerlonsX(stoneMat,     -85, -77,  31, 12, 2, 2.5, 4); // N left of passage
+    addMerlonsX(stoneMat,     -85,  39,  77, 12, 2, 2.5, 4); // N right of passage
+    addMerlonsZ(stoneMat,      85, -77,   6, 12, 4, 2.5, 2); // E above passage
+    addMerlonsZ(stoneMat,      85,  14,  77, 12, 4, 2.5, 2); // E below passage
+    addMerlonsZ(stoneMat,     -85, -77, -39, 12, 4, 2.5, 2); // W left of passage
+    addMerlonsZ(stoneMat,     -85, -31,  77, 12, 4, 2.5, 2); // W right of passage
+    addMerlonsX(darkStoneMat,  85, -77, -14, 12, 2, 2.5, 4); // S left of gate
+    addMerlonsX(darkStoneMat,  85,  14,  77, 12, 2, 2.5, 4); // S right of gate
+
+    // --- Corner towers (cylindrical, r=9, h=20) ---
+    addCylinder(darkStoneMat, 9, 20, -85, 10, -85); // NW
+    addCylinder(darkStoneMat, 9, 20,  85, 10, -85); // NE
+    addCylinder(darkStoneMat, 9, 20, -85, 10,  85); // SW
+    addCylinder(darkStoneMat, 9, 20,  85, 10,  85); // SE
+
+    // Merlon ring on top of each outer corner tower (y=21.25)
+    for (const [cx, cz] of [[-85,-85],[85,-85],[-85,85],[85,85]]) {
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 5) {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.5, 2.5), darkStoneMat);
+            m.position.set(cx + Math.cos(a) * 7.5, 21.25, cz + Math.sin(a) * 7.5);
+            scene.add(m);
+        }
+    }
+
+    // --- Gatehouse towers flanking south gate (x=±18, z=85, h=18) ---
+    addObstacle(obs, darkStoneMat, 12, 18, 12, -18,  9, 85);
+    addObstacle(obs, darkStoneMat, 12, 18, 12,  18,  9, 85);
+    addMerlonsX(darkStoneMat, 85, -24, -12, 18, 2, 2.5, 4);
+    addMerlonsX(darkStoneMat, 85,  12,  24, 18, 2, 2.5, 4);
+
+    // Outer gate portcullis frame (south entrance, scaled to h=12 gate)
+    const portMat = new THREE.MeshStandardMaterial({ color: 0x1a0f05, roughness: 1.0 });
+    const pTop = new THREE.Mesh(new THREE.BoxGeometry(24, 2.5, 1.2), portMat);
+    pTop.position.set(0, 10.75, 84.4);
+    scene.add(pTop);
+    const pLeft = new THREE.Mesh(new THREE.BoxGeometry(2, 10.5, 1.2), portMat);
+    pLeft.position.set(-11, 5.25, 84.4);
+    scene.add(pLeft);
+    const pRight = new THREE.Mesh(new THREE.BoxGeometry(2, 10.5, 1.2), portMat);
+    pRight.position.set(11, 5.25, 84.4);
+    scene.add(pRight);
+
+    // --- Inner keep walls (40×40, 4 thick, 20 tall, 3-unit doorways N/S/E/W) ---
+    addObstacle(obs, darkStoneMat, 18.5, 20, 4, -10.75, 10, -20); // N left
+    addObstacle(obs, darkStoneMat, 18.5, 20, 4,  10.75, 10, -20); // N right
+    addObstacle(obs, darkStoneMat, 18.5, 20, 4, -10.75, 10,  20); // S left
+    addObstacle(obs, darkStoneMat, 18.5, 20, 4,  10.75, 10,  20); // S right
+    addObstacle(obs, darkStoneMat, 4, 20, 18.5,  20, 10, -10.75); // E top
+    addObstacle(obs, darkStoneMat, 4, 20, 18.5,  20, 10,  10.75); // E bottom
+    addObstacle(obs, darkStoneMat, 4, 20, 18.5, -20, 10, -10.75); // W top
+    addObstacle(obs, darkStoneMat, 4, 20, 18.5, -20, 10,  10.75); // W bottom
+
+    // --- Inner keep corner towers (cylindrical, mossy stone, r=3.5, h=26) ---
+    addCylinder(mossStoneMat, 3.5, 26, -20, 13, -20); // NW
+    addCylinder(mossStoneMat, 3.5, 26,  20, 13, -20); // NE
+    addCylinder(mossStoneMat, 3.5, 26, -20, 13,  20); // SW
+    addCylinder(mossStoneMat, 3.5, 26,  20, 13,  20); // SE
+
+    // Merlon ring on top of each inner keep tower
+    for (const [cx, cz] of [[-20,-20],[20,-20],[-20,20],[20,20]]) {
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2, 1.6), mossStoneMat);
+            m.position.set(cx + Math.cos(a) * 3, 27, cz + Math.sin(a) * 3);
+            scene.add(m);
+        }
+    }
+
+    // --- Keep wall battlements (mw=2, mh=2.5, top y=20) ---
+    addMerlonsX(darkStoneMat, -20, -19.5,  -1.5, 20, 2, 2.5, 3.5); // N left
+    addMerlonsX(darkStoneMat, -20,   1.5,  19.5, 20, 2, 2.5, 3.5); // N right
+    addMerlonsX(darkStoneMat,  20, -19.5,  -1.5, 20, 2, 2.5, 3.5); // S left
+    addMerlonsX(darkStoneMat,  20,   1.5,  19.5, 20, 2, 2.5, 3.5); // S right
+    addMerlonsZ(darkStoneMat,  20, -19.5,  -1.5, 20, 3.5, 2.5, 2); // E top
+    addMerlonsZ(darkStoneMat,  20,   1.5,  19.5, 20, 3.5, 2.5, 2); // E bottom
+    addMerlonsZ(darkStoneMat, -20, -19.5,  -1.5, 20, 3.5, 2.5, 2); // W top
+    addMerlonsZ(darkStoneMat, -20,   1.5,  19.5, 20, 3.5, 2.5, 2); // W bottom
+
+    // --- Arrow slits on inner keep exterior faces (decorative dark panels) ---
+    for (const sx of [-14, -7, 7, 14]) {
+        const s = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.5, 0.2), slitMat);
+        s.position.set(sx, 12, -22.1); // N exterior
+        scene.add(s);
+        const s2 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.5, 0.2), slitMat);
+        s2.position.set(sx, 12, 22.1); // S exterior
+        scene.add(s2);
+    }
+    for (const sz of [-14, -7, 7, 14]) {
+        const s = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.5, 0.5), slitMat);
+        s.position.set(22.1, 12, sz); // E exterior
+        scene.add(s);
+        const s2 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.5, 0.5), slitMat);
+        s2.position.set(-22.1, 12, sz); // W exterior
+        scene.add(s2);
+    }
+
+    // --- Wooden gate at south keep entrance ---
+    const gatePanel = new THREE.Mesh(new THREE.BoxGeometry(3, 8, 0.5), darkWoodMat);
+    gatePanel.position.set(0, 4, 20.3);
+    scene.add(gatePanel);
+    // Horizontal planks as trim
+    for (const gy of [1.5, 4, 6.5]) {
+        const plank = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.35, 0.6), woodMat);
+        plank.position.set(0, gy, 20.3);
+        scene.add(plank);
+    }
+
+    // --- Barracks (4 quadrant buildings) ---
+    addObstacle(obs, woodMat, 24, 11, 10, -50, 5.5, -50);
+    addObstacle(obs, woodMat, 24, 11, 10,  50, 5.5, -50);
+    addObstacle(obs, woodMat, 24, 11, 10, -50, 5.5,  50);
+    addObstacle(obs, woodMat, 24, 11, 10,  50, 5.5,  50);
+
+    // --- Watchtower (NE interior) ---
+    addObstacle(obs, darkStoneMat, 7, 36, 7, 62, 18, -62);
+
+    // --- Stone rubble in courtyard ---
+    const rng = mulberry32(0xf047be55);
+    for (let i = 0; i < 30; i++) {
+        const rx = (rng() - 0.5) * 140;
+        const rz = (rng() - 0.5) * 140;
+        if (Math.abs(rx) < 25 && Math.abs(rz) < 25) continue;
+        if (Math.abs(rx) > 80 || Math.abs(rz) > 80) continue;
+        const w = 0.4 + rng() * 1.2, h = 0.2 + rng() * 0.7, d = 0.4 + rng() * 1.2;
+        addObstacle(obs, stoneMat, w, h, d, rx, h / 2, rz);
+    }
+
+    // --- Torches along inner wall faces ---
+    for (const tx of [-60, -30, 0, 30, 65]) addTorch(tx, 8, -81); // N inner
+    for (const tx of [-60, -30, 0, 30, 60]) addTorch(tx, 8,  81); // S inner
+    for (const tz of [-60, -30, -5, 30, 60]) addTorch( 81, 8, tz); // E inner
+    for (const tz of [-65, 0, 30, 60])        addTorch(-81, 8, tz); // W inner
+    // Keep wall torches
+    addTorch(-12, 9.5, -20); addTorch(12, 9.5, -20);
+    addTorch(-12, 9.5,  20); addTorch(12, 9.5,  20);
+    addTorch( 20, 9.5, -12); addTorch(20, 9.5,  12);
+    addTorch(-20, 9.5, -12); addTorch(-20, 9.5,  12);
+}
+
 export function buildMap(mapId) {
     while (scene.children.length) scene.remove(scene.children[0]);
     const obs = [];
@@ -625,6 +972,7 @@ export function buildMap(mapId) {
     gameState.craterPits = [];
     gameState.streetLamps = [];
     gameState.warehouseLights = [];
+    gameState.secretPassages = [];
 
     // Clear streaming chunk state from previous map
     _forestChunks.clear(); _forestObs = null; _forestChunkCenters = []; _forestMats = null;
@@ -770,9 +1118,11 @@ export function buildMap(mapId) {
         _desertChunks.clear();
         _desertObs = obs;
         _desertMats = {
-            cactusMat: new THREE.MeshStandardMaterial({ color: 0x3a8c3a, roughness: 0.85 }),
+            cactusMat:  new THREE.MeshStandardMaterial({ color: 0x3a8c3a, roughness: 0.85 }),
             sandRockMat: new THREE.MeshStandardMaterial({ color: 0xb89050, roughness: 0.95 }),
-            debrisMat: new THREE.MeshStandardMaterial({ color: 0x7a5a30, roughness: 0.9 }),
+            debrisMat:  new THREE.MeshStandardMaterial({ color: 0x7a5a30, roughness: 0.9 }),
+            duneMat:    new THREE.MeshStandardMaterial({ color: 0xd4a855, roughness: 1.0 }),
+            ruinMat:    new THREE.MeshStandardMaterial({ color: 0x9a8060, roughness: 0.95 }),
         };
         const halfD = Math.ceil(size * 1.1 / DESERT_CHUNK_SIZE) * DESERT_CHUNK_SIZE;
         _desertChunkCenters = [];
@@ -1109,8 +1459,9 @@ export function buildMap(mapId) {
         _mountainChunks.clear();
         _mountainObs = obs;
         _mountainMats = {
-            rockMat: new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.95 }),
+            rockMat:  new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.95 }),
             rockMat2: new THREE.MeshStandardMaterial({ color: 0x3d3d3d, roughness: 0.98 }),
+            snowMat:  new THREE.MeshStandardMaterial({ color: 0xf2f4f8, roughness: 0.88 }),
         };
         const halfM = Math.ceil(size * 1.1 / MOUNTAIN_TILE_STEP) * MOUNTAIN_TILE_STEP;
         _mountainChunkCenters = [];
@@ -1118,6 +1469,8 @@ export function buildMap(mapId) {
             for (let mz = -halfM; mz <= halfM; mz += MOUNTAIN_TILE_STEP)
                 _mountainChunkCenters.push(mx, mz);
         updateMountainChunks(0, 0);
+    } else if (mapId === 'fortress') {
+        buildFortressMap(obs);
     } else if (mapId === 'forest') {
         scene.fog = new THREE.Fog(0x060402, 80, 190);
         scene.background = new THREE.Color(0x030201);
@@ -1126,9 +1479,12 @@ export function buildMap(mapId) {
         _forestChunks.clear();
         _forestObs = obs;
         _forestMats = {
-            treeMat: new THREE.MeshStandardMaterial({ color: 0x3d2b1f }),
-            leafMats: [0x113a11, 0x0d3010, 0x1a4a1a, 0x0a2a0a].map(c => new THREE.MeshStandardMaterial({ color: c })),
-            mossMats: [0x2a4a1a, 0x3a5a2a].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 1.0 })),
+            treeMat:     new THREE.MeshStandardMaterial({ color: 0x3d2b1f }),
+            leafMats:    [0x113a11, 0x0d3010, 0x1a4a1a, 0x0a2a0a].map(c => new THREE.MeshStandardMaterial({ color: c })),
+            mossMats:    [0x2a4a1a, 0x3a5a2a].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 1.0 })),
+            boulderMat:  new THREE.MeshStandardMaterial({ color: 0x606258, roughness: 0.96 }),
+            shroomMat:   new THREE.MeshStandardMaterial({ color: 0xbb3311, roughness: 0.8 }),
+            shroomCapMat: new THREE.MeshStandardMaterial({ color: 0xdd6633, roughness: 0.7 }),
         };
         const halfF = Math.ceil(size * 1.1 / FOREST_CHUNK_SIZE) * FOREST_CHUNK_SIZE;
         _forestChunkCenters = [];

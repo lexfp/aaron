@@ -14,90 +14,111 @@ export const WEAPONS = {
         cost: 0, reach: 0, starter: true
     },
     fists: {
-        name: 'Fists', type: 'melee', range: 'close', damage: 3, fireRate: 0.5,
+        // Free starter — DPS ~13
+        name: 'Fists', type: 'melee', range: 'close', damage: 6, fireRate: 0.45,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
         cost: 0, starter: true, reach: 2.5
     },
     glock: {
-        name: 'Glock', type: 'gun', range: 'middle', damage: 2, fireRate: 0.5,
-        ammo: 10, maxAmmo: 10, reserveAmmo: 100, reloadTime: 3,
+        // Free starter — DPS ~34. Now genuinely better than fists.
+        name: 'Glock', type: 'gun', range: 'middle', damage: 12, fireRate: 0.35,
+        ammo: 15, maxAmmo: 15, reserveAmmo: 120, reloadTime: 2.0,
         cost: 0, starter: true, makesNoise: true
     },
-    sniper: {
-        name: 'Sniper', type: 'gun', range: 'long', damage: 15, zoomedDamage: 75,
-        fireRate: 1, ammo: 5, maxAmmo: 5, reserveAmmo: 30, reloadTime: 7,
-        cost: 100000, hasScope: true, makesNoise: true
-    },
-    assault_rifle: {
-        name: 'Assault Rifle', type: 'gun', range: 'long', damage: 2, fireRate: 0.1,
-        ammo: 40, maxAmmo: 40, reserveAmmo: 200, reloadTime: 2.5,
-        cost: 10000, makesNoise: true
-    },
-    crossbow: {
-        name: 'Crossbow', type: 'gun', range: 'long', damage: 5, zoomedDamage: 40,
-        fireRate: 2, ammo: 1, maxAmmo: 1, reserveAmmo: 20, reloadTime: 2,
-        cost: 4750, hasScope: true, makesNoise: false
-    },
     revolver: {
-        name: 'Revolver', type: 'gun', range: 'middle', damage: 15, fireRate: 0.6,
-        ammo: 6, maxAmmo: 6, reserveAmmo: 60, reloadTime: 2.5,
+        // Budget — high damage per shot, slow. DPS ~43.
+        name: 'Revolver', type: 'gun', range: 'middle', damage: 28, fireRate: 0.65,
+        ammo: 8, maxAmmo: 8, reserveAmmo: 64, reloadTime: 2.5,
         cost: 750, makesNoise: true
     },
+    molotov: {
+        name: 'Molotov', type: 'throwable', range: 'middle', damage: 12,
+        fireRate: 1.5, ammo: 2, maxAmmo: 2, reserveAmmo: 6, reloadTime: 0,
+        cost: 750, fire: true, radius: 5, duration: 6, makesNoise: true
+    },
+    grenade: {
+        name: 'Grenade', type: 'throwable', range: 'middle', damage: 80,
+        fireRate: 1.5, ammo: 3, maxAmmo: 3, reserveAmmo: 9, reloadTime: 0,
+        cost: 1000, explosive: true, radius: 6, makesNoise: true
+    },
     shotgun: {
-        name: 'Shotgun', type: 'gun', range: 'middle', damage: 10, closeDamageBonus: 50,
-        fireRate: 0.8, ammo: 5, maxAmmo: 5, reserveAmmo: 40, reloadTime: 3,
+        // Close-range devastator. Point-blank DPS ~93; mid-range ~17.
+        name: 'Shotgun', type: 'gun', range: 'middle', damage: 14, closeDamageBonus: 70,
+        fireRate: 0.9, ammo: 6, maxAmmo: 6, reserveAmmo: 36, reloadTime: 2.5,
         cost: 2500, makesNoise: true
     },
     axe: {
-        name: 'Axe', type: 'melee', range: 'close', damage: 5, fireRate: 0.7,
+        // Budget melee — DPS ~22.
+        name: 'Axe', type: 'melee', range: 'close', damage: 14, fireRate: 0.65,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
-        cost: 4000, reach: 2.5
+        cost: 4000, reach: 2.8
+    },
+    crossbow: {
+        // Silent precision — low DPS but quiet and deadly when zoomed.
+        name: 'Crossbow', type: 'gun', range: 'long', damage: 20, zoomedDamage: 80,
+        fireRate: 2.2, ammo: 1, maxAmmo: 1, reserveAmmo: 20, reloadTime: 2.0,
+        cost: 4750, hasScope: true, makesNoise: false
     },
     knife: {
-        name: 'Knife', type: 'melee', range: 'close', damage: 5, fireRate: 0.1, headshot: 60,
+        // Fast slasher — DPS ~67. Devastating headshots at 90 bonus damage.
+        name: 'Knife', type: 'melee', range: 'close', damage: 10, fireRate: 0.15, headshot: 90,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
         cost: 5000, reach: 2.2
     },
-    katana: {
-        name: 'Katana', type: 'melee', range: 'close', damage: 8, fireRate: 0.4,
+    shield: {
+        // Defensive tool — low offense, blocks significant damage. DPS ~11.
+        name: 'Shield', type: 'melee', range: 'close', damage: 8, fireRate: 0.75,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
-        cost: 7500, reach: 3.0
+        cost: 6000, reach: 2.2, damageReduction: 1.0
+    },
+    smg: {
+        // Mid-tier spray weapon — higher ammo count, fast reload. DPS ~63.
+        name: 'SMG', type: 'gun', range: 'middle', damage: 5, fireRate: 0.08,
+        ammo: 30, maxAmmo: 30, reserveAmmo: 210, reloadTime: 1.6,
+        cost: 6000, makesNoise: true
+    },
+    katana: {
+        // Swift samurai blade — DPS ~51. Good reach.
+        name: 'Katana', type: 'melee', range: 'close', damage: 18, fireRate: 0.35,
+        ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
+        cost: 7500, reach: 3.2
+    },
+    assault_rifle: {
+        // Reliable workhorse — DPS ~67, long range. Needs aim.
+        name: 'Assault Rifle', type: 'gun', range: 'long', damage: 6, fireRate: 0.09,
+        ammo: 40, maxAmmo: 40, reserveAmmo: 200, reloadTime: 2.0,
+        cost: 10000, makesNoise: true
     },
     longsword: {
-        name: 'Longsword', type: 'melee', range: 'close', damage: 10, fireRate: 0.8,
+        // Heavy hitter — DPS ~29, massive reach.
+        name: 'Longsword', type: 'melee', range: 'close', damage: 22, fireRate: 0.75,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
-        cost: 10000, reach: 3.5
+        cost: 10000, reach: 3.8
     },
     chainsaw: {
-        name: 'Chainsaw', type: 'melee', range: 'close', damage: 4, fireRate: 0.1,
+        // Highest melee DPS ~114. Never stops.
+        name: 'Chainsaw', type: 'melee', range: 'close', damage: 8, fireRate: 0.07,
         ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
         cost: 15000, reach: 2.8, makesNoise: true
     },
-    shield: {
-        name: 'Shield', type: 'melee', range: 'close', damage: 1, fireRate: 0.8,
-        ammo: Infinity, maxAmmo: Infinity, reserveAmmo: Infinity, reloadTime: 0,
-        cost: 6000, reach: 2.0, damageReduction: 1.0
+    rpg: {
+        // Area devastation — DPS irrelevant. Radius 8, damage 150.
+        name: 'RPG', type: 'gun', range: 'middle', damage: 150, fireRate: 2.5,
+        ammo: 1, maxAmmo: 1, reserveAmmo: 5, reloadTime: 4,
+        cost: 25000, explosive: true, radius: 8, makesNoise: true
+    },
+    sniper: {
+        // Extreme range specialist — 150 damage zoomed, 1.2s between shots.
+        name: 'Sniper', type: 'gun', range: 'long', damage: 30, zoomedDamage: 150,
+        fireRate: 1.2, ammo: 5, maxAmmo: 5, reserveAmmo: 30, reloadTime: 5.0,
+        cost: 100000, hasScope: true, makesNoise: true
     },
     minigun: {
-        name: 'Minigun', type: 'gun', range: 'long', damage: 1, fireRate: 0.03,
+        // Unstoppable — DPS ~160. Melts everything.
+        name: 'Minigun', type: 'gun', range: 'long', damage: 4, fireRate: 0.025,
         ammo: 900, maxAmmo: 900, reserveAmmo: 2700, reloadTime: 5,
         cost: 110000, makesNoise: true
     },
-    grenade: {
-        name: 'Grenade', type: 'throwable', range: 'middle', damage: 60,
-        fireRate: 1.5, ammo: 3, maxAmmo: 3, reserveAmmo: 9, reloadTime: 0,
-        cost: 1000, explosive: true, radius: 5, makesNoise: true
-    },
-    molotov: {
-        name: 'Molotov', type: 'throwable', range: 'middle', damage: 8,
-        fireRate: 1.5, ammo: 2, maxAmmo: 2, reserveAmmo: 6, reloadTime: 0,
-        cost: 750, fire: true, radius: 4, duration: 5, makesNoise: true
-    },
-    rpg: {
-        name: 'RPG', type: 'gun', range: 'middle', damage: 100, fireRate: 2.5,
-        ammo: 1, maxAmmo: 1, reserveAmmo: 5, reloadTime: 4,
-        cost: 25000, explosive: true, radius: 6, makesNoise: true
-    }
 };
 
 export const EQUIPMENT = {
@@ -130,23 +151,27 @@ export const ATTACHMENTS = {
 
 export const MAPS = {
     warehouse: {
-        name: 'Warehouse', description: 'Close quarters combat in a dark warehouse',
-        size: 120, color: 0x444444, wallColor: 0x555555, ambientLight: 0.3
+        name: 'Warehouse', description: 'Pitch-dark industrial labyrinth. Every shadow hides a threat.',
+        size: 120, color: 0x3a3a3a, wallColor: 0x505050, ambientLight: 0.22
     },
     desert: {
-        name: 'Desert Outpost', description: 'Open terrain with scattered cover',
-        size: 480, color: 0xc2a645, wallColor: 0x8b7332, ambientLight: 0.8
+        name: 'Desert Outpost', description: 'Burning sun, zero mercy. Open ground and deadly sightlines.',
+        size: 480, color: 0xc8a840, wallColor: 0x8b7332, ambientLight: 0.88
     },
     city: {
-        name: 'City Ruins', description: 'Urban combat with buildings and streets',
-        size: 480, color: 0x666666, wallColor: 0x888888, ambientLight: 0.05
+        name: 'City Ruins', description: 'Shattered skyline and ash-grey streets. Something lurks in every ruin.',
+        size: 480, color: 0x555555, wallColor: 0x777777, ambientLight: 0.08
     },
     forest: {
-        name: 'Dark Forest', description: 'Dense forest with limited visibility',
-        size: 480, color: 0x2d5a1e, wallColor: 0x3d6a2e, ambientLight: 0.2
+        name: 'Dark Forest', description: 'The trees close in. By the time you hear them, it\'s too late.',
+        size: 480, color: 0x263d18, wallColor: 0x344f22, ambientLight: 0.14
     },
     mountain: {
-        name: 'Rocky Mountains', description: 'Uneven terrain with valleys and peaks',
-        size: 480, color: 0x555555, wallColor: 0x444444, ambientLight: 0.5
+        name: 'Rocky Mountains', description: 'Brutal peaks, no cover. High ground is everything.',
+        size: 480, color: 0x4e4e4e, wallColor: 0x3c3c3c, ambientLight: 0.55
+    },
+    fortress: {
+        name: 'Fortress', description: 'A crumbling stone fortress. Thick walls hide more than they reveal.',
+        size: 250, color: 0x887868, wallColor: 0x5a4a3c, ambientLight: 0.35
     }
 };

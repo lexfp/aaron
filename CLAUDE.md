@@ -18,6 +18,8 @@ A collection of independent browser games and tools, each in its own directory. 
 No build step. Open `war_zone/war_zone.html` directly in a browser. Three.js is loaded from CDN. All game logic lives in `js/`.
 Don't rely on console debug statements. The cursor is locked, so use alerts instead.
 
+**Feature documentation:** `war_zone/FEATURES.md` is the authoritative reference for every game system (weapons, maps, modes, combat, progression, controls, rendering, etc.). **Update `war_zone/FEATURES.md` every time any war_zone feature is added, changed, or removed** — it must stay in sync with the code.
+
 ### tic-tac-toe-bot/ — Bot with Minimax AI (Vanilla JS + Jest)
 ```bash
 npm install --prefix tic-tac-toe-bot   # first time only
@@ -60,6 +62,8 @@ Nine JS modules loaded in order via `<script>` tags in `war_zone.html`. No bundl
 
 Map types: city (grid roads/sidewalks), mountain (all-slope terrain), crater (pit terrain). Game modes: Zombie Apocalypse, Rescue Mission, PvP Arena. Weapons: Fists, Glock, Assault Rifle, Sniper, RPG, Minigun, and melee weapons.
 
+Update tutorial every time a new important feature/concept is added.
+
 ### tic-tac-toe-bot — Logic/UI Separation
 - `game.js`: Pure functions only — no DOM access. Contains minimax algorithm (`getBotMoveHard`) and random AI (`getBotMoveEasy`). Exports to `window` for testability.
 - `ui.js`: IIFE managing all DOM interaction, event listeners, and game state (`playerSymbol`, `botSymbol`, `difficulty`, `cells`).
@@ -86,7 +90,8 @@ Runs entirely in an 800×580px popup. `game.js` + `game.css` are self-contained 
 
 ## Recent Features (war_zone)
 - **Day/Night cycle**: 7.5-min cycle; references stored in `gameState.sunLight` / `gameState.ambientLightRef` set in `map.js`, updated in `animate()` in `main.js`
-- **Fly mode cheat**: type `fly` in cheat console; `playerState.flyMode` flag; Space=up, Ctrl=down
+- **Chat system**: `` ` `` opens chat input (input.js); plain text → `#chat-bubble` div (5s); `` `admin `` → prompt for code (`zone`) → sets `cheatUnlocked=true`; `` `cheatName `` runs cheat if unlocked; input turns green (`cheat-mode` CSS class) when cheats are unlocked
+- **Fly mode cheat**: type `` `fly `` in chat (after unlocking with `` `admin ``); `playerState.flyMode` flag; Space=up, Shift=down
 - **Damage threshold**: `DAMAGE_THRESHOLD=10` in `data.js`; tracked via `playerData.weaponUsage` (incremented on game-over); repair $50
 - **Owned armor**: `playerData.ownedArmor[]` tracks purchased armor separately from equipped slots; drag-drop in loadout
 - **Debris collision**: `noStep:true` flag on debris obstacles skips step-over check in `checkCollision()`
@@ -97,9 +102,13 @@ Runs entirely in an 800×580px popup. `game.js` + `game.css` are self-contained 
 - **Sun arc**: `sunAngle = dn * 2PI - PI/2` so noon (dn=0.5, dayFactor=1.0) places sun overhead (+Y)
 - **City ground**: ShapeGeometry with `rotateX(-PI/2)` uses `side: THREE.DoubleSide` to ensure visibility regardless of winding order
 - **Fly mode**: cheat console closing calls resumeGameFn() to re-engage pointer lock; shift=down, space=up
+- **Fortress map**: static map (size=250) in map.js `buildFortressMap(obs)`; outer walls at ±85 (h=12, reduced from 18) with 3 secret passage walls (E press to open 3s); inner keep walls (h=20) with 3-unit doorways N/S/E/W; cylindrical corner towers (outer r=9 h=20, inner keep r=3.5 h=26 mossy stone); battlements via `addMerlonsX`/`addMerlonsZ` helpers on all wall tops; arrow slits on keep exterior faces; wooden gate panel at south keep entrance; portcullis frame at outer south gate; `gameState.secretPassages[]` + `passThrough` flag skips player collision (main.js:58) but NOT zombie collision; torches = CylinderGeometry + SphereGeometry + PointLight(0xff8833); **wall walkways**: paved path slabs on outer wall tops (noCollide, decorative); **wall staircases**: `addStaircase(x0,z0,dir)` helper adds 24 stacked box steps (stepH=0.5, stepD=0.8, stairW=3.5) — one staircase per outer wall side (N at x=-55, S at x=55, E at z=50, W at z=-50); step-over logic (≤0.6 per step) lets player climb; top step at y=12 lets player step onto wall top
 - **Chunk streaming (forest/mountain/desert)**: all three maps size=480, streamed via `updateForestChunks`/`updateMountainChunks`/`updateDesertChunks` (TERRAIN_LOAD_DIST=150, UNLOAD=240); chunk builders `_buildForestChunkMeshes`, `_buildMountainChunkMeshes`, `_buildDesertChunkMeshes` in map.js; called every 0.5s in animate() like city; mountain slopeMeshes added/removed from `gameState.slopeMeshes` on chunk load/unload
+- **Weapon rebalance**: Glock buffed (damage 2→12, DPS now 34 vs fists 13); SMG added at $6,000 (damage=5 fireRate=0.08 DPS≈63); all melee/gun stats tuned for clear cost-to-power curve; sniper zoomedDamage 75→150; minigun DPS ≈160; RPG damage 100→150 radius 6→8
+- **Map improvements**: desert chunks add sand dunes (tilted BoxGeometry, isSlope) + ruined outpost walls (30% per chunk); forest chunks add boulders (with optional moss cap) + mushroom clusters; mountain chunks add snow caps + drifts on formations h>22; maps have updated descriptions and tweaked colors/ambient light
 
 ## Applied Learning
 When something fails repeatedly or there is a workaround/easier way to do something, add a one-line bullet point less than 15 words mentioning it to save time in the future
 
   - Don't rely on console debug statements. The cursor is locked, so use alerts instead.
+  - Zombie spawn distance must stay under TERRAIN_LOAD_DIST (150) or they spawn in empty unloaded chunks.

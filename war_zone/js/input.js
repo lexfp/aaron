@@ -8,21 +8,32 @@ import { addKillFeed, updateConsumablesPanel } from './ui.js';
 import { camera } from './engine.js';
 import { WEAPONS } from './data.js';
 
-let cheatOpen = false;
+let chatOpen = false;
+let cheatUnlocked = false;
+let adminPromptOpen = false;
+const ADMIN_CODE = 'zone';
 let mouseDown = false;
 
 export function setupInput(CHEATS, resumeGameFn) {
     document.addEventListener('keydown', (e) => {
         if (e.key === '`' || e.key === '~') {
             if (gameState.active) {
-                cheatOpen = !cheatOpen;
+                chatOpen = !chatOpen;
                 const el = document.getElementById('cheat-console');
-                el.style.display = cheatOpen ? 'block' : 'none';
-                if (cheatOpen) document.getElementById('cheat-input').focus();
+                const input = document.getElementById('cheat-input');
+                el.style.display = chatOpen ? 'block' : 'none';
+                if (chatOpen) {
+                    input.value = '';
+                    input.className = cheatUnlocked ? 'cheat-mode' : '';
+                    input.placeholder = cheatUnlocked
+                        ? 'Chat or `cheatName to use cheats'
+                        : 'Say something... (type `admin for cheats)';
+                    input.focus();
+                }
             }
             return;
         }
-        if (cheatOpen) return;
+        if (chatOpen) return;
 
         const key = e.key.toLowerCase();
         if (key in keys) keys[key] = true;
@@ -89,18 +100,52 @@ export function setupInput(CHEATS, resumeGameFn) {
         if (key === ' ') keys.space = false;
     });
 
-    // Cheat input
+    // Chat / cheat input
     document.getElementById('cheat-input').addEventListener('keydown', (e) => {
         e.stopPropagation();
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            if (gameState.active) window._toggleThirdPerson && window._toggleThirdPerson();
+            return;
+        }
+        if (e.key === 'Escape') {
+            closeChatInput(resumeGameFn);
+            return;
+        }
         if (e.key === 'Enter') {
-            const cmd = e.target.value.toLowerCase().trim();
-            if (CHEATS[cmd]) CHEATS[cmd]();
-            e.target.value = '';
-            cheatOpen = false;
-            document.getElementById('cheat-console').style.display = 'none';
-            e.target.blur();
-            // Re-engage pointer lock (may have been released when input was focused)
-            if (gameState.active) resumeGameFn();
+            const raw = e.target.value.trim();
+            if (raw) {
+                if (raw.startsWith('`')) {
+                    const cmd = raw.slice(1).toLowerCase().trim();
+                    if (cmd === 'admin') {
+                        closeChatInput(resumeGameFn);
+                        adminPromptOpen = true;
+                        const code = prompt('Enter access code:');
+                        adminPromptOpen = false;
+                        if (code === ADMIN_CODE) {
+                            cheatUnlocked = true;
+                            showCheatFeedback('Cheat access granted. Type `cheatName to use cheats.');
+                        } else if (code !== null) {
+                            showCheatFeedback('Wrong code.');
+                        }
+                    } else if (cheatUnlocked) {
+                        if (CHEATS[cmd]) {
+                            CHEATS[cmd]();
+                        } else {
+                            showCheatFeedback(`Unknown cheat: ${cmd}`);
+                        }
+                        closeChatInput(resumeGameFn);
+                    } else {
+                        showCheatFeedback('No cheat access. Type `admin first.');
+                        closeChatInput(resumeGameFn);
+                    }
+                } else {
+                    showChatBubble(raw);
+                    closeChatInput(resumeGameFn);
+                }
+            } else {
+                closeChatInput(resumeGameFn);
+            }
         }
     });
 
@@ -128,14 +173,51 @@ export function setupInput(CHEATS, resumeGameFn) {
         }
     });
     controls.addEventListener('unlock', () => {
-        if (gameState.active && !gameState.paused && !window._isThirdPerson?.()) {
+        if (gameState.active && !gameState.paused && !chatOpen && !adminPromptOpen && !window._isThirdPerson?.()) {
             gameState.paused = true;
             document.getElementById('pause-menu').style.display = 'flex';
         }
     });
 }
 
+function closeChatInput(resumeGameFn) {
+    chatOpen = false;
+    const el = document.getElementById('cheat-console');
+    el.style.display = 'none';
+    document.getElementById('cheat-input').blur();
+    if (gameState.active && !window._isThirdPerson?.()) resumeGameFn();
+}
+
+let _chatBubbleTimer = null;
+function showChatBubble(text) {
+    const el = document.getElementById('chat-bubble');
+    el.textContent = text;
+    el.style.display = 'block';
+    if (_chatBubbleTimer) clearTimeout(_chatBubbleTimer);
+    _chatBubbleTimer = setTimeout(() => { el.style.display = 'none'; }, 5000);
+}
+
+let _cheatFeedbackTimer = null;
+function showCheatFeedback(msg) {
+    const el = document.getElementById('cheat-msg');
+    el.textContent = msg;
+    el.style.display = 'block';
+    if (_cheatFeedbackTimer) clearTimeout(_cheatFeedbackTimer);
+    _cheatFeedbackTimer = setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+
 function tryPickup() {
+    for (const passage of gameState.secretPassages) {
+        if (passage.passThrough) continue;
+        const dx = camera.position.x - passage.mesh.position.x;
+        const dz = camera.position.z - passage.mesh.position.z;
+        if (Math.sqrt(dx * dx + dz * dz) < 4) {
+            passage.mesh.visible = false;
+            passage.passThrough = true;
+            setTimeout(() => { passage.mesh.visible = true; passage.passThrough = false; }, 3000);
+            return true;
+        }
+    }
     if (gameState.mode === 'rescue' && gameState.hostage && !gameState.hostage.rescued) {
         if (camera.position.distanceTo(gameState.hostage.mesh.position) < 5) {
             // Hostage rescue handled by weapons.js callback; returning true suppresses consumables panel
@@ -154,7 +236,18 @@ function tryPickup() {
 export function checkInteractionPrompt() {
     let showPrompt = false;
 
-    if (gameState.mode === 'rescue' && gameState.hostage && !gameState.hostage.rescued) {
+    for (const passage of gameState.secretPassages) {
+        if (passage.passThrough) continue;
+        const dx = camera.position.x - passage.mesh.position.x;
+        const dz = camera.position.z - passage.mesh.position.z;
+        if (Math.sqrt(dx * dx + dz * dz) < 4) {
+            document.getElementById('interaction-prompt').textContent = 'Press [E] to open passage';
+            showPrompt = true;
+            break;
+        }
+    }
+
+    if (!showPrompt && gameState.mode === 'rescue' && gameState.hostage && !gameState.hostage.rescued) {
         if (camera.position.distanceTo(gameState.hostage.mesh.position) < 5) {
             document.getElementById('interaction-prompt').textContent = `Press [E] to Rescue Hostage`;
             showPrompt = true;

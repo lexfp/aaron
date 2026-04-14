@@ -20,13 +20,13 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
         spawnX = gameState.extractionZone.x + Math.cos(angle) * d;
         spawnZ = gameState.extractionZone.z + Math.sin(angle) * d;
     } else {
-        // Spawn anywhere in unloaded area — at least 160 units from player, within map bounds
+        // Spawn within loaded chunk range (50–130 units) so terrain/obstacles exist
         const px = camera.position.x, pz = camera.position.z;
         const bound = mapSize * 0.9;
         spawnX = null;
         for (let t = 0; t < 20; t++) {
             const a = Math.random() * Math.PI * 2;
-            const d = 160 + Math.random() * mapSize * 0.5;
+            const d = 50 + Math.random() * 80;
             const sx = px + Math.cos(a) * d;
             const sz = pz + Math.sin(a) * d;
             if (Math.abs(sx) <= bound && Math.abs(sz) <= bound) {
@@ -34,8 +34,8 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
             }
         }
         if (spawnX === null) {
-            spawnX = Math.cos(angle) * mapSize * 0.85;
-            spawnZ = Math.sin(angle) * mapSize * 0.85;
+            spawnX = px + Math.cos(angle) * 90;
+            spawnZ = pz + Math.sin(angle) * 90;
         }
     }
 
@@ -422,6 +422,12 @@ export function updateZombies(dt) {
     }
     const zRayMeshes = updateZombies._rayMeshes;
 
+    // Night scaling: dayFactor=1 at noon, 0 at midnight. Up to +50% speed and +40% damage at night.
+    const dayFactor = Math.max(0, Math.sin(gameState.dayTime * Math.PI * 2 - Math.PI / 2));
+    const nightFactor = 1 - dayFactor;
+    const nightSpeedMult = 1 + nightFactor * 0.5;
+    const nightDamageMult = 1 + nightFactor * 0.4;
+
     for (let i = gameState.zombieEntities.length - 1; i >= 0; i--) {
         const z = gameState.zombieEntities[i];
         if (z.dead) {
@@ -558,7 +564,7 @@ export function updateZombies(dt) {
                 moveAngle = moveAngle * (1 - blendFactor) + perpAngle * blendFactor;
             }
 
-            const step = z.speed * dt;
+            const step = z.speed * nightSpeedMult * dt;
 
             if (z._airborne) {
                 // Airborne — move freely toward player, no horizontal collision check
@@ -671,13 +677,13 @@ export function updateZombies(dt) {
                 const eyePos = new THREE.Vector3(z.mesh.position.x, z.mesh.position.y + 1.5, z.mesh.position.z);
                 if (useWeapon && wDef.type === 'gun') {
                     if (hasLineOfSight(eyePos, camera.position)) {
-                        damagePlayer(Math.floor(weaponDamage * (0.8 + Math.random() * 0.4)), z.mesh.position);
+                        damagePlayer(Math.floor(weaponDamage * nightDamageMult * (0.8 + Math.random() * 0.4)), z.mesh.position);
                         playGunshot();
                         z.attackCooldown = 1 / (wDef.fireRate || 0.5);
                     }
                 } else {
                     if (hasLineOfSight(eyePos, camera.position)) {
-                        damagePlayer(weaponDamage, z.mesh.position);
+                        damagePlayer(Math.floor(weaponDamage * nightDamageMult), z.mesh.position);
                     }
                     z.attackCooldown = useWeapon && wDef.type === 'melee' ? (1 / (wDef.fireRate || 0.5)) : 1;
                 }

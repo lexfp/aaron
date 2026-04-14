@@ -595,9 +595,13 @@ export function reload() {
     const { id, def, state } = getCurrentWeapon();
     if (def.type === 'melee' || state.reloading) return;
     if (state.ammo === def.maxAmmo || state.reserveAmmo <= 0) return;
+    const reloadMult = Math.max(0.2, 1 - (playerData.stats?.reload || 0) * 0.05);
     state.reloading = true;
     state.reloadStart = performance.now() / 1000;
     document.querySelector('#weapon-hud .reload-text').style.display = 'block';
+    const wrap = document.getElementById('reload-bar-wrap');
+    const fill = document.getElementById('reload-bar-fill');
+    if (wrap && fill) { wrap.style.display = 'block'; fill.style.width = '100%'; }
 }
 
 export function updateReload() {
@@ -606,7 +610,13 @@ export function updateReload() {
         if (!state.reloading) continue;
         const def = WEAPONS[wid];
         const reloadMult = Math.max(0.2, 1 - (playerData.stats?.reload || 0) * 0.05);
-        if (performance.now() / 1000 - state.reloadStart >= def.reloadTime * reloadMult) {
+        const effectiveDuration = def.reloadTime * reloadMult;
+        const elapsed = performance.now() / 1000 - state.reloadStart;
+        if (wid === playerState.weapons[playerState.currentWeaponIndex]) {
+            const fill = document.getElementById('reload-bar-fill');
+            if (fill) fill.style.width = Math.max(0, (1 - elapsed / effectiveDuration) * 100) + '%';
+        }
+        if (elapsed >= effectiveDuration) {
             const needed = def.maxAmmo - state.ammo;
             const available = Math.min(needed, state.reserveAmmo);
             state.ammo += available;
@@ -614,6 +624,8 @@ export function updateReload() {
             state.reloading = false;
             if (wid === playerState.weapons[playerState.currentWeaponIndex]) {
                 document.querySelector('#weapon-hud .reload-text').style.display = 'none';
+                const wrap = document.getElementById('reload-bar-wrap');
+                if (wrap) wrap.style.display = 'none';
             }
             updateHUD();
         }

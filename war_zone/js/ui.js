@@ -1,7 +1,7 @@
 // Screen management, shop, loadout, HUD, overlays, cheats
 
 import { WEAPONS, EQUIPMENT, ATTACHMENTS, MAPS, DAMAGE_THRESHOLD } from './data.js';
-import { playerData, playerState, savePlayerData, gameState, xpToNextLevel, setAwardXPImpl } from './state.js';
+import { playerData, playerState, savePlayerData, gameState, xpToNextLevel, setAwardXPImpl, awardXP } from './state.js';
 import { cb } from './callbacks.js';
 
 // Wire up level-up notification (avoids circular dep: state -> ui)
@@ -42,6 +42,7 @@ export function showShop() {
     renderWeaponShop();
     renderEquipmentShop();
     renderAttachmentShop();
+    renderXPShop();
 }
 window.showShop = showShop;
 
@@ -135,6 +136,43 @@ function renderAttachmentShop() {
         grid.appendChild(item);
     }
 }
+
+const XP_PACKAGES = [
+    { xp: 100,  cost: 2500 },
+    { xp: 300,  cost: 6000 },
+    { xp: 750,  cost: 12500 },
+    { xp: 2000, cost: 25000 },
+    { xp: 6000, cost: 50000 },
+];
+
+function renderXPShop() {
+    const grid = document.getElementById('xp-shop');
+    grid.innerHTML = '';
+    const needed = xpToNextLevel(playerData.level);
+    const header = document.createElement('p');
+    header.style.cssText = 'color:#aaa;font-size:13px;width:100%;margin:0 0 10px;';
+    header.textContent = `LVL ${playerData.level} — ${playerData.xp}/${needed} XP to next level`;
+    grid.appendChild(header);
+    for (const pkg of XP_PACKAGES) {
+        const canAfford = playerData.money >= pkg.cost;
+        const item = document.createElement('div');
+        item.className = 'shop-item';
+        item.innerHTML = `
+            <h3>+${pkg.xp} XP</h3>
+            <div class="price">$${pkg.cost.toLocaleString()}</div>
+            <div class="stats">Instantly grants ${pkg.xp} XP</div>
+            <button class="buy-btn" ${!canAfford ? 'disabled' : ''} onclick="buyXP(${pkg.xp},${pkg.cost})">${canAfford ? 'BUY' : 'Too expensive'}</button>
+        `;
+        grid.appendChild(item);
+    }
+}
+
+window.buyXP = function (xp, cost) {
+    if (playerData.money < cost) return;
+    playerData.money -= cost;
+    awardXP(xp);
+    showShop();
+};
 
 window.buyWeapon = function (id) {
     const w = WEAPONS[id];
@@ -486,12 +524,18 @@ export function showLoadout() {
 
     for (const { key, label, color, desc } of statDefs) {
         const pts = playerData.stats[key];
+        let effectiveLine = '';
+        if (key === 'reload' && pts > 0) {
+            const mult = Math.max(0.2, 1 - pts * 0.05);
+            effectiveLine = `<div style="font-size:11px;color:${color};margin-bottom:4px">${Math.round((1 - mult) * 100)}% faster (${(mult * 100).toFixed(0)}% of base)</div>`;
+        }
         const card = document.createElement('div');
         card.style.cssText = `background:rgba(0,0,0,0.5);border:2px solid ${color};border-radius:10px;padding:18px 28px;text-align:center;min-width:170px;`;
         card.innerHTML = `
             <div style="font-size:11px;color:#888;letter-spacing:1px;margin-bottom:6px">${label.toUpperCase()}</div>
             <div style="font-size:28px;font-weight:700;color:${color}">${pts}</div>
-            <div style="font-size:11px;color:#666;margin:4px 0 10px">${desc}</div>
+            <div style="font-size:11px;color:#666;margin:4px 0 6px">${desc}</div>
+            ${effectiveLine}
             <button data-stat="${key}" ${playerData.statPoints < 1 ? 'disabled' : ''}
                 style="background:${playerData.statPoints > 0 ? color : '#333'};color:${playerData.statPoints > 0 ? '#000' : '#555'};border:none;border-radius:5px;padding:6px 18px;font-size:14px;font-weight:700;cursor:${playerData.statPoints > 0 ? 'pointer' : 'default'}">
                 + Add Point
@@ -528,6 +572,7 @@ export function renderMapScreen(startGameFn) {
         else if (id === 'city') bgUrl = 'linear-gradient(135deg, #555, #888)';
         else if (id === 'forest') bgUrl = 'linear-gradient(135deg, #1d3a1e, #2d5a2e)';
         else if (id === 'mountain') bgUrl = 'linear-gradient(135deg, #444, #777)';
+        else if (id === 'fortress') bgUrl = 'linear-gradient(135deg, #5a4a3c, #887868)';
 
         card.style.background = bgUrl;
 
@@ -632,14 +677,14 @@ function showCheatMsg(msg) {
 export function buildCheats() {
     return {
         'godmode': () => { playerState.godMode = true; showCheatMsg('God Mode ON'); },
-        'money': () => { playerData.money += 10000; showCheatMsg('+$10,000'); },
+        'money': () => { const amt = parseInt(prompt('How much money?', '10000')); if (!isNaN(amt) && amt > 0) { playerData.money += amt; showCheatMsg('+$' + amt.toLocaleString()); } },
         'ammo': () => { cb.refillAllAmmo(); showCheatMsg('Ammo refilled'); },
         'noclip': () => { playerState.noClip = !playerState.noClip; showCheatMsg('NoClip ' + (playerState.noClip ? 'ON' : 'OFF')); },
         'fly': () => { playerState.flyMode = !playerState.flyMode; showCheatMsg('Fly Mode ' + (playerState.flyMode ? 'ON (Space=up, Shift=down)' : 'OFF')); },
         'kill': () => { cb.killAllEnemies(); showCheatMsg('All enemies killed'); },
         'heal': () => { playerState.hp = playerState.maxHp; showCheatMsg('Healed'); },
         'speed': () => { playerState.speedMult = playerState.speedMult === 1 ? 2 : 1; showCheatMsg('Speed x' + playerState.speedMult); },
-        'levelup': () => { playerData.level++; playerData.statPoints += 5; savePlayerData(); showCheatMsg(`Level Up! Now LVL ${playerData.level} (+5 pts)`); },
+        'levelup': () => { const lvls = parseInt(prompt('How many levels?', '1')); if (!isNaN(lvls) && lvls > 0) { playerData.level += lvls; playerData.statPoints += lvls * 5; savePlayerData(); showCheatMsg(`+${lvls} Levels! Now LVL ${playerData.level} (+${lvls * 5} pts)`); } },
         'reset': () => { window.startGame(gameState.mode, gameState.currentMap); showCheatMsg('Game Reset!'); }
     };
 }

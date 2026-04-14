@@ -3,24 +3,15 @@ remake starcraft?
 make warzone multiplayer
 
 add cave map
-add castle map
 
+add pictures to choose map screen(screenshots taken from ingame)
 add escape mode
 add new map for it
+Create new file that documents all features in depth and detail
 
 add tower defense gamemode
 
-make zombies stronger and faster at night
-
 add a magic element to the game(zombie mages, magic spells)
 
-make money cheat allow you to choose how much
-
-allow you to choose how much to level up using cheat
-
-make '`' not give cheat codes but instead open up chat system: things normally typed just display above your head for 5secs, 
-typing '`admin' asks for access code to give access to cheats, then typing '`cheatName' activates cheats
-
-/plugin install frontend-design@claude-plugins-official
-
 /resume
+claude --resume 1a57d3f6-6304-4f13-9644-4f2c69772ef5

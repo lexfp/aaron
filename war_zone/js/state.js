@@ -95,6 +95,7 @@ export const gameState = {
     craterPits: [],
     streetLamps: [],     // { mat, phase } entries for flickering city lamps
     warehouseLights: [], // { mat, light, phase } entries for flickering warehouse ceiling lights
+    secretPassages: [],  // fortress passage obstacles: { mesh, box, passThrough, isSecretPassage }
     playerFacingYaw: 0,  // player body/camera yaw for shield direction check
     tpShootNDC: null,    // THREE.Vector2 set in 3rd person mode
     tpShootCamera: null, // tpCamera ref set in 3rd person mode

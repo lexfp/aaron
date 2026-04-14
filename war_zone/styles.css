@@ -714,13 +714,17 @@ canvas {
 #cheat-input {
     width: 400px;
     padding: 10px 16px;
-    background: rgba(0, 0, 0, 0.9);
-    border: 2px solid #00ff00;
-    color: #00ff00;
+    background: rgba(0, 0, 0, 0.85);
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    color: #fff;
     font-family: monospace;
     font-size: 16px;
-    border-radius: 6px;
+    border-radius: 20px;
     outline: none;
+}
+#cheat-input.cheat-mode {
+    border-color: #00ff00;
+    color: #00ff00;
 }
 
 #cheat-msg {

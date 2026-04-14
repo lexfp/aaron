@@ -888,7 +888,7 @@ function startGame(mode, mapId) {
     if (mode === 'zombie') {
         gameState.wave = 1;
         gameState.zombiesAlive = 0;
-        gameState.zombiesToSpawn = 20;
+        gameState.zombiesToSpawn = 100;
         gameState.zombieSpawnTimer = 0;
         gameState.zombieKillCredit = 0;
         gameState.zombieTotalKills = 0;
