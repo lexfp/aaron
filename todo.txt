@@ -4,10 +4,8 @@ make warzone multiplayer
 
 add cave map
 
-add pictures to choose map screen(screenshots taken from ingame)
 add escape mode
 add new map for it
-Create new file that documents all features in depth and detail
 
 add tower defense gamemode
 

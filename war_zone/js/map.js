@@ -713,6 +713,76 @@ export function updateDesertChunks(px, pz) {
     }
 }
 
+function buildHallwayMap(obs) {
+    // A single corridor: 8 units wide, 4 units tall, 380 units long along Z axis.
+    // Player spawns at z=+180 (south end). Zombies spawn at z=-180 (north end).
+    // The map size is 200, so boundary walls sit at ±200.
+
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.9 });
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.95 });
+    const ceilMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1.0 });
+    const lightMat = new THREE.MeshStandardMaterial({ color: 0xffffcc, emissive: 0xffffaa, emissiveIntensity: 2.0 });
+    const torchMat = new THREE.MeshStandardMaterial({ color: 0x3a2010, roughness: 1.0 });
+    const flameMat = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0xff4400, emissiveIntensity: 2.5 });
+
+    const LENGTH = 380; // total hallway length along Z
+    const WIDTH = 8;   // interior width (X)
+    const HEIGHT = 4;   // interior height
+    const THICK = 1.0; // wall/floor thickness
+    const CEIL_THICK = 10; // thick ceiling — prevents phasing through top
+
+    // Floor
+    addObstacle(obs, floorMat, WIDTH + THICK * 2, THICK, LENGTH, 0, -THICK / 2, 0);
+    // Ceiling — thick slab, bottom at y=HEIGHT; noStep so floor-snap never teleports player on top
+    addObstacle(obs, ceilMat, WIDTH + THICK * 2, CEIL_THICK, LENGTH, 0, HEIGHT + CEIL_THICK / 2, 0, { noStep: true });
+    // Left wall (x = -WIDTH/2 - THICK/2)
+    addObstacle(obs, wallMat, THICK, HEIGHT + THICK * 2, LENGTH, -(WIDTH / 2 + THICK / 2), HEIGHT / 2, 0);
+    // Right wall (x = +WIDTH/2 + THICK/2)
+    addObstacle(obs, wallMat, THICK, HEIGHT + THICK * 2, LENGTH, (WIDTH / 2 + THICK / 2), HEIGHT / 2, 0);
+    // South end wall (player spawn side, z = +LENGTH/2)
+    addObstacle(obs, wallMat, WIDTH + THICK * 2, HEIGHT + THICK * 2, THICK, 0, HEIGHT / 2, LENGTH / 2 + THICK / 2);
+    // North end wall (zombie spawn side, z = -LENGTH/2)
+    addObstacle(obs, wallMat, WIDTH + THICK * 2, HEIGHT + THICK * 2, THICK, 0, HEIGHT / 2, -LENGTH / 2 - THICK / 2);
+
+    // Ceiling light strips every 20 units — bright white lights
+    for (let lz = -LENGTH / 2 + 10; lz < LENGTH / 2; lz += 20) {
+        const fixture = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.15, 3), lightMat);
+        fixture.position.set(0, HEIGHT - 0.08, lz);
+        scene.add(fixture);
+        const ptLight = new THREE.PointLight(0xffffff, 4.0, 30);
+        ptLight.position.set(0, HEIGHT - 0.3, lz);
+        scene.add(ptLight);
+    }
+
+    // Wall torches near the zombie end (atmosphere)
+    for (let tz = -LENGTH / 2 + 5; tz < -LENGTH / 2 + 60; tz += 15) {
+        for (const tx of [-(WIDTH / 2 - 0.3), (WIDTH / 2 - 0.3)]) {
+            const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.35, 6), torchMat);
+            handle.position.set(tx, HEIGHT * 0.65, tz);
+            scene.add(handle);
+            const flame = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), flameMat);
+            flame.position.set(tx, HEIGHT * 0.65 + 0.25, tz);
+            scene.add(flame);
+            const tLight = new THREE.PointLight(0xff6600, 1.2, 10);
+            tLight.position.set(tx, HEIGHT * 0.65 + 0.3, tz);
+            scene.add(tLight);
+        }
+    }
+
+    // A few low cover crates scattered along the hallway for gameplay variety
+    const crateMat = new THREE.MeshStandardMaterial({ color: 0x5a3a1a, roughness: 0.9 });
+    const coverPositions = [
+        [-2, -60], [2, -40], [-2.5, -10], [2.5, 30], [-2, 70], [2, 110]
+    ];
+    for (const [cx, cz] of coverPositions) {
+        addObstacle(obs, crateMat, 1.2, 1.0, 1.2, cx, 0.5, cz);
+    }
+
+    // Store spawn ends on gameState so entities.js can read them
+    gameState.hallwayPlayerSpawnZ = LENGTH / 2 - 3;  // +187
+    gameState.hallwayZombieSpawnZ = -LENGTH / 2 + 3;  // -187
+}
+
 function buildFortressMap(obs) {
     const stoneMat = new THREE.MeshStandardMaterial({ color: 0x887868, roughness: 0.9 });
     const darkStoneMat = new THREE.MeshStandardMaterial({ color: 0x5a4a3c, roughness: 0.9 });
@@ -984,22 +1054,23 @@ function buildFortressMap(obs) {
         addObstacle(obs, woodMat, wallT, bh, bd, cx - bw / 2, fy, cz);
         addObstacle(obs, woodMat, wallT, bh, bd, cx + bw / 2, fy, cz);
 
-        // Gabled roof
-        const roofAngle = Math.atan2(1.5, bd / 2);
-        const ridgeY = bh + 1.5;
-        const ridge = new THREE.Mesh(new THREE.BoxGeometry(bw + 0.4, 0.25, 0.25), roofMat);
-        ridge.position.set(cx, ridgeY, cz);
-        scene.add(ridge);
+        // Gabled roof — solid stepped slabs (AABB-collidable, approximate the slope)
+        // Each side: 5 slabs stepping up toward the ridge. Rise 1.5 over half-depth (5 units).
+        // Slab thickness 0.4, so they overlap and leave no gap.
+        const roofSteps = 5;
+        const halfD = bd / 2;
         for (const side of [-1, 1]) {
-            const panel = new THREE.Mesh(
-                new THREE.BoxGeometry(bw + 0.4, 0.2, Math.sqrt((bd / 2) ** 2 + 1.5 ** 2) + 0.3),
-                roofMat
-            );
-            panel.rotation.x = side * roofAngle;
-            panel.position.set(cx, bh + 0.75, cz + side * bd / 4);
-            scene.add(panel);
+            for (let i = 0; i < roofSteps; i++) {
+                const t = (i + 0.5) / roofSteps;           // 0.1 → 0.9
+                const slabZ = cz + side * halfD * (1 - t);  // moves inward toward ridge
+                const slabY = bh + 1.5 * t;                 // rises toward ridge height
+                const slabD = (halfD / roofSteps) + 0.15;   // slightly overlapping depth
+                addObstacle(obs, roofMat, bw + 0.4, 0.4, slabD, cx, slabY, slabZ);
+            }
         }
-        // Gable end caps
+        // Ridge cap
+        addObstacle(obs, roofMat, bw + 0.4, 0.4, 0.5, cx, bh + 1.5, cz);
+        // Gable end caps (decorative only — too thin to phase through)
         for (const gz of [backZ, frontZ]) {
             const cap = new THREE.Mesh(new THREE.ConeGeometry(bd / 2 * 0.72, 1.6, 4), roofMat);
             cap.rotation.y = Math.PI / 4;
@@ -1093,6 +1164,8 @@ export function buildMap(mapId) {
     gameState.streetLamps = [];
     gameState.warehouseLights = [];
     gameState.secretPassages = [];
+    gameState.hallwayPlayerSpawnZ = null;
+    gameState.hallwayZombieSpawnZ = null;
 
     // Clear streaming chunk state from previous map
     _forestChunks.clear(); _forestObs = null; _forestChunkCenters = []; _forestMats = null;
@@ -1591,6 +1664,8 @@ export function buildMap(mapId) {
         updateMountainChunks(0, 0);
     } else if (mapId === 'fortress') {
         buildFortressMap(obs);
+    } else if (mapId === 'hallway') {
+        buildHallwayMap(obs);
     } else if (mapId === 'forest') {
         scene.fog = new THREE.Fog(0x060402, 80, 190);
         scene.background = new THREE.Color(0x030201);

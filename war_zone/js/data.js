@@ -173,5 +173,9 @@ export const MAPS = {
     fortress: {
         name: 'Fortress', description: 'A crumbling stone fortress. Thick walls hide more than they reveal.',
         size: 250, color: 0x887868, wallColor: 0x5a4a3c, ambientLight: 0.35
+    },
+    hallway: {
+        name: 'The Hallway', description: 'One long corridor. You spawn at one end. They come from the other.',
+        size: 200, color: 0x2a2a2a, wallColor: 0x444444, ambientLight: 1.2
     }
 };

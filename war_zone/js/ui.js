@@ -613,6 +613,7 @@ export function renderMapScreen(startGameFn) {
         else if (id === 'forest') bgUrl = 'linear-gradient(135deg, #1d3a1e, #2d5a2e)';
         else if (id === 'mountain') bgUrl = 'linear-gradient(135deg, #444, #777)';
         else if (id === 'fortress') bgUrl = 'linear-gradient(135deg, #5a4a3c, #887868)';
+        else if (id === 'hallway') bgUrl = 'linear-gradient(135deg, #111, #222)';
 
         card.style.background = bgUrl;
 
@@ -623,6 +624,7 @@ export function renderMapScreen(startGameFn) {
             forest: 'Pictures/forest.png',
             mountain: 'Pictures/mountains.png',
             fortress: 'Pictures/fortress.png',
+            hallway: 'Pictures/hallway.png',
         };
         const imgHtml = mapImages[id]
             ? `<img src="${mapImages[id]}" alt="${m.name}" style="width:100%; border-radius:5px; margin-top:10px; display:block; object-fit:cover; max-height:120px;">`

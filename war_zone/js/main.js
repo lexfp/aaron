@@ -849,6 +849,11 @@ function startGame(mode, mapId) {
     camera.position.set(0, 1.7, 0);
     camera.rotation.set(0, 0, 0); // reset look direction
     velocity.set(0, 0, 0);
+    // Hallway map: spawn at the south end, facing north (toward zombies)
+    if (gameState.currentMap === 'hallway' && gameState.hallwayPlayerSpawnZ != null) {
+        camera.position.set(0, 1.7, gameState.hallwayPlayerSpawnZ);
+        camera.rotation.set(0, Math.PI, 0); // face north (-z)
+    }
     const spawnFloor = getFloorHeight(camera.position);
     camera.position.y = spawnFloor + 1.7;
     scene.add(controls.getObject());
@@ -1245,6 +1250,24 @@ function animate() {
 
             const prevCamY = camera.position.y;
             camera.position.y += velocity.y * dt;
+
+            // Ceiling collision — stop upward movement if head hits a solid obstacle from below
+            if (velocity.y > 0) {
+                const pHead = camera.position.y + 0.2;
+                for (const obs of obstacles) {
+                    if (obs.passThrough || obs.isSlope) continue;
+                    if (!obs.box) continue;
+                    const b = obs.box;
+                    if (camera.position.x + 0.3 < b.min.x || camera.position.x - 0.3 > b.max.x) continue;
+                    if (camera.position.z + 0.3 < b.min.z || camera.position.z - 0.3 > b.max.z) continue;
+                    // Head entered the bottom of this box from below
+                    if (pHead > b.min.y && (prevCamY + 0.2) <= b.min.y) {
+                        camera.position.y = b.min.y - 0.2;
+                        velocity.y = 0;
+                        break;
+                    }
+                }
+            }
 
             // CCD: if falling on mountain map, sweep the full vertical path for slope surfaces
             // so the player can't phase through them when moving fast

@@ -19,6 +19,10 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
         const d = 8 + Math.random() * 20;
         spawnX = gameState.extractionZone.x + Math.cos(angle) * d;
         spawnZ = gameState.extractionZone.z + Math.sin(angle) * d;
+    } else if (gameState.currentMap === 'hallway' && gameState.hallwayZombieSpawnZ != null) {
+        // Hallway: always spawn at the far (north) end, random X within corridor width
+        spawnX = (Math.random() - 0.5) * 4;
+        spawnZ = gameState.hallwayZombieSpawnZ + (Math.random() - 0.5) * 2;
     } else {
         // Spawn within loaded chunk range (50–130 units) so terrain/obstacles exist
         const px = camera.position.x, pz = camera.position.z;
@@ -146,17 +150,24 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
     }
 
     // Ensure we don't spawn inside a bounding box — nudge outward along spawn angle
+    // (skip for hallway — nudging would push zombies through the end wall)
     const spawnRadius = isGiga ? 1.5 : (isBoss ? 0.7 : 0.5);
-    for (let attempts = 0; attempts < 10; attempts++) {
-        if (!checkZombieCollision(new THREE.Vector3(spawnX, 1, spawnZ), spawnRadius)) break;
-        spawnX += Math.cos(angle) * 2;
-        spawnZ += Math.sin(angle) * 2;
+    if (gameState.currentMap !== 'hallway') {
+        for (let attempts = 0; attempts < 10; attempts++) {
+            if (!checkZombieCollision(new THREE.Vector3(spawnX, 1, spawnZ), spawnRadius)) break;
+            spawnX += Math.cos(angle) * 2;
+            spawnZ += Math.sin(angle) * 2;
+        }
     }
 
-    const _zRay = new THREE.Raycaster(new THREE.Vector3(spawnX, 200, spawnZ), new THREE.Vector3(0, -1, 0));
-    const _zMeshes = obstacles.filter(o => o.mesh && !o.passThrough).map(o => o.mesh).concat(gameState.slopeMeshes || []);
-    const _zHits = _zRay.intersectObjects(_zMeshes);
-    const spawnY = _zHits.length > 0 ? _zHits[0].point.y : 0;
+    // For hallway, place directly on floor — raycaster would hit boundary walls or ceiling
+    let spawnY = 0;
+    if (gameState.currentMap !== 'hallway') {
+        const _zRay = new THREE.Raycaster(new THREE.Vector3(spawnX, 200, spawnZ), new THREE.Vector3(0, -1, 0));
+        const _zMeshes = obstacles.filter(o => o.mesh && !o.passThrough && !o.noStep).map(o => o.mesh).concat(gameState.slopeMeshes || []);
+        const _zHits = _zRay.intersectObjects(_zMeshes);
+        spawnY = _zHits.length > 0 ? _zHits[0].point.y : 0;
+    }
     group.position.set(spawnX, spawnY, spawnZ);
 
     const canvas = document.createElement('canvas');
@@ -175,7 +186,7 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
     gameState.zombieEntities.push({
         mesh: group, hp, maxHp: hp, damage, dropMoney, isBoss, isGiga,
         weaponId, speed: speedOverride != null ? speedOverride : defaultSpeed,
-        attackCooldown: 0, lastNoiseCheck: 0, attracted: false, dead: false,
+        attackCooldown: 0, lastNoiseCheck: 0, attracted: gameState.currentMap === 'hallway', dead: false,
         hpCtx: ctx, hpTex: tex,
         zombieRadius: isGiga ? 1.5 : (isBoss ? 0.7 : 0.5),
         attackDist: isGiga ? 4 : 2,
