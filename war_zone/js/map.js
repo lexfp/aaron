@@ -328,7 +328,7 @@ function _buildForestChunkMeshes(cx, cz) {
     const treePositions = [];
     const minDist = 2.5;
     let attempts = 0;
-    while (treePositions.length < 28 && attempts < 2000) {
+    while (treePositions.length < 84 && attempts < 2000) {
         attempts++;
         const tx = cx + (rng() - 0.5) * FOREST_CHUNK_SIZE;
         const tz = cz + (rng() - 0.5) * FOREST_CHUNK_SIZE;
@@ -714,20 +714,20 @@ export function updateDesertChunks(px, pz) {
 }
 
 function buildHallwayMap(obs) {
-    // A single corridor: 8 units wide, 4 units tall, 380 units long along Z axis.
+    // A single corridor: 8 units wide, 10 units tall, 380 units long along Z axis.
     // Player spawns at z=+180 (south end). Zombies spawn at z=-180 (north end).
     // The map size is 200, so boundary walls sit at ±200.
 
     const wallMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.9 });
     const floorMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.95 });
     const ceilMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1.0 });
-    const lightMat = new THREE.MeshStandardMaterial({ color: 0xffffcc, emissive: 0xffffaa, emissiveIntensity: 2.0 });
+    const lightMat = new THREE.MeshStandardMaterial({ color: 0xffffcc, emissive: 0xffffaa, emissiveIntensity: 3.0 });
     const torchMat = new THREE.MeshStandardMaterial({ color: 0x3a2010, roughness: 1.0 });
     const flameMat = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0xff4400, emissiveIntensity: 2.5 });
 
     const LENGTH = 380; // total hallway length along Z
     const WIDTH = 8;   // interior width (X)
-    const HEIGHT = 4;   // interior height
+    const HEIGHT = 10;  // interior height — tall enough to see giga zombie heads (~8 units)
     const THICK = 1.0; // wall/floor thickness
     const CEIL_THICK = 10; // thick ceiling — prevents phasing through top
 
@@ -749,7 +749,7 @@ function buildHallwayMap(obs) {
         const fixture = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.15, 3), lightMat);
         fixture.position.set(0, HEIGHT - 0.08, lz);
         scene.add(fixture);
-        const ptLight = new THREE.PointLight(0xffffff, 4.0, 30);
+        const ptLight = new THREE.PointLight(0xffffff, 12.0, 30);
         ptLight.position.set(0, HEIGHT - 0.3, lz);
         scene.add(ptLight);
     }
@@ -763,7 +763,7 @@ function buildHallwayMap(obs) {
             const flame = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), flameMat);
             flame.position.set(tx, HEIGHT * 0.65 + 0.25, tz);
             scene.add(flame);
-            const tLight = new THREE.PointLight(0xff6600, 1.2, 10);
+            const tLight = new THREE.PointLight(0xff6600, 3.6, 10);
             tLight.position.set(tx, HEIGHT * 0.65 + 0.3, tz);
             scene.add(tLight);
         }
@@ -997,14 +997,14 @@ function buildFortressMap(obs) {
         addObstacle(obs, keepWalkMat, 2.5, 0.4, 2, -18.75, 10.2, 8);
     }
 
-    // Walkway torches (y=11)
+    // Walkway torches (y=10.2, sitting on walkway top)
     for (const tx of [-12, -4, 4, 12]) {
-        addTorch(tx, 11, -22);
-        addTorch(tx, 11, 22);
+        addTorch(tx, 10.2, -22);
+        addTorch(tx, 10.2, 22);
     }
     for (const tz of [-12, -4, 4, 12]) {
-        addTorch(22, 11, tz);
-        addTorch(-22, 11, tz);
+        addTorch(22, 10.2, tz);
+        addTorch(-22, 10.2, tz);
     }
 
     // Arrow slits on inner keep exterior (scaled to new height)

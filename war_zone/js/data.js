@@ -176,6 +176,6 @@ export const MAPS = {
     },
     hallway: {
         name: 'The Hallway', description: 'One long corridor. You spawn at one end. They come from the other.',
-        size: 200, color: 0x2a2a2a, wallColor: 0x444444, ambientLight: 1.2
+        size: 200, color: 0x2a2a2a, wallColor: 0x444444, ambientLight: 3.6
     }
 };

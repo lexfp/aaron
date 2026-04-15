@@ -1078,7 +1078,8 @@ function animate() {
             ambR = 1.0; ambG = 1.0; ambB = 1.0; // full day
         }
         const mapAmbBase = MAPS[gameState.currentMap]?.ambientLight || 0.5;
-        const ambIntensity = mapAmbBase * 0.15 + dayFactor * mapAmbBase * 1.3;
+        const indoorMap = gameState.currentMap === 'warehouse' || gameState.currentMap === 'hallway';
+        const ambIntensity = indoorMap ? mapAmbBase : (mapAmbBase * 0.15 + dayFactor * mapAmbBase * 1.3);
         gameState.ambientLightRef.color.setRGB(ambR, ambG, ambB);
         gameState.ambientLightRef.intensity = ambIntensity;
 
@@ -1087,7 +1088,7 @@ function animate() {
         const mapSize = MAPS[gameState.currentMap]?.size || 150;
         const sunAngle = dn * Math.PI * 2 - Math.PI / 2;
         gameState.sunLight.position.set(Math.cos(sunAngle) * mapSize, Math.sin(sunAngle) * mapSize, mapSize / 3);
-        gameState.sunLight.intensity = dayFactor < 0.08 ? 0 : dayFactor * 0.85;
+        gameState.sunLight.intensity = indoorMap ? 0 : (dayFactor < 0.08 ? 0 : dayFactor * 0.85);
         // Sun colour: orange at horizon, white at zenith
         const isHorizon = dayFactor < 0.35 || dayFactor > 0.65;
         gameState.sunLight.color.setRGB(1.0, isHorizon ? 0.55 : 1.0, isHorizon ? 0.2 : 1.0);
@@ -1294,7 +1295,7 @@ function animate() {
             let targetFloorY = getFloorHeight(camera.position) + 1.7;
 
             if (!playerState.flyMode && camera.position.y < targetFloorY) {
-                if (velocity.y < -15) {
+                if (velocity.y < -15 && !(playerData.stats?.jump > 0)) {
                     damagePlayer(Math.floor((-velocity.y - 15) * 1.5));
                 }
                 camera.position.y = targetFloorY;
