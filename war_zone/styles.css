@@ -601,6 +601,18 @@ canvas {
     left: 50%;
 }
 
+#scope-overlay .scope-dot {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    background: #ff2222;
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 3px rgba(255, 0, 0, 0.8);
+}
+
 #interaction-prompt {
     position: absolute;
     bottom: 200px;

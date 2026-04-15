@@ -616,10 +616,22 @@ export function renderMapScreen(startGameFn) {
 
         card.style.background = bgUrl;
 
+        const mapImages = {
+            warehouse: 'Pictures/warehouse.png',
+            desert: 'Pictures/desert.png',
+            city: 'Pictures/city.png',
+            forest: 'Pictures/forest.png',
+            mountain: 'Pictures/mountains.png',
+            fortress: 'Pictures/fortress.png',
+        };
+        const imgHtml = mapImages[id]
+            ? `<img src="${mapImages[id]}" alt="${m.name}" style="width:100%; border-radius:5px; margin-top:10px; display:block; object-fit:cover; max-height:120px;">`
+            : '';
         card.innerHTML = `
             <div style="background:rgba(0,0,0,0.6); padding: 15px; border-radius: 8px; height: 100%;">
                 <h3 style="color:#fff; text-shadow: 1px 1px 2px #000;">${m.name}</h3>
                 <p style="color:#ddd;">${m.description}</p>
+                ${imgHtml}
             </div>
         `;
         card.onclick = () => startGameFn(gameState.pendingMode, id);
