@@ -105,7 +105,10 @@ export const gameState = {
     sunLight: null,
     ambientLightRef: null,
     fogNearBase: 0,
-    fogFarBase: 0
+    fogFarBase: 0,
+    // Cave map
+    zombieSpawnCavern: null,  // { cx, cz, radius } — set by buildCaveMap, read by spawnZombie
+    caveAmbientNode: null     // AudioNode reference for cave ambient sound; null if Web Audio unavailable
 };
 
 // --- Leveling ---

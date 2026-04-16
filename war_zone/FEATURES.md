@@ -20,9 +20,11 @@
 | Rocky Mountains | 480 | Chunk-streamed slopes; raycaster-based floor snapping |
 | Desert Outpost | 480 | Chunk-streamed dunes (isSlope), ruined walls (30% chunk chance) |
 | Fortress | 250 | Static; outer walls h=12 with staircases to walk tops; inner keep h=20; 3 secret passages (E to open 3s); towers, battlements, torches |
+| Cave | 200 | Enclosed underground labyrinth; glowing crystal PointLights; zombie spawn restricted to designated cavern |
 
 **Day/night cycle** (City/Forest/Mountain/Desert): 7.5-min loop. Noon = sun overhead. Daytime fog is sky-blue horizon haze; night switches to close dark fog.  
-**Chunk streaming:** load within 150 units, unload beyond 240. Updated every 0.5s. Zombie spawns must stay under 130 units or they appear in unloaded terrain.
+**Chunk streaming:** load within 150 units, unload beyond 240. Updated every 0.5s. Zombie spawns must stay under 130 units or they appear in unloaded terrain.  
+**Zombie spawn cavern** (Cave): All zombies in Zombie Apocalypse mode spawn within a single designated cavern (`gameState.zombieSpawnCavern`), creating a clear threat origin point.
 
 ## Weapons
 | Name | Cost | Type | Damage | Fire Rate | Ammo | DPS / Notes |

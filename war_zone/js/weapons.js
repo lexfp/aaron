@@ -65,7 +65,7 @@ function buildMeleeModel(group, weaponId, w) {
     const skinMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 });
     if (weaponId === 'fists') {
         const knuckleMat = new THREE.MeshStandardMaterial({ color: 0xc49060, roughness: 0.45 });
-        const grooveMat  = new THREE.MeshStandardMaterial({ color: 0xb07050, roughness: 0.8 });
+        const grooveMat = new THREE.MeshStandardMaterial({ color: 0xb07050, roughness: 0.8 });
         // Right fist (+x), left fist (-x); thumbDir toward centre for each hand
         [[0.15, -1], [-0.15, 1]].forEach(([fx, thumbDir]) => {
             // Main body — wider than a cube
@@ -638,6 +638,17 @@ export function refillAllAmmo() {
         const state = playerState.weaponStates[wid];
         state.ammo = def.maxAmmo;
         state.reserveAmmo = def.reserveAmmo;
+    }
+    updateHUD();
+}
+
+export function setAllAmmo(amount) {
+    for (const wid of playerState.weapons) {
+        const def = WEAPONS[wid];
+        if (def.ammo === Infinity) continue; // skip melee/utility
+        const state = playerState.weaponStates[wid];
+        state.ammo = Math.min(amount, def.maxAmmo);
+        state.reserveAmmo = amount;
     }
     updateHUD();
 }

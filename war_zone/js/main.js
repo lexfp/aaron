@@ -15,7 +15,7 @@ import {
     renderMapScreen, updateHUD, renderWeaponSlots,
     showRoundOverlay, buildCheats, initTutorial
 } from './ui.js';
-import { createWeaponModel, getCurrentWeapon, switchWeapon, updateReload, refillAllAmmo } from './weapons.js';
+import { createWeaponModel, getCurrentWeapon, switchWeapon, updateReload, refillAllAmmo, setAllAmmo } from './weapons.js';
 import { spawnPvPEnemy, updatePvPEnemy, killZombie, spawnZombie, updateZombies, spawnHostage } from './entities.js';
 import { shoot, updateFireZones, checkPvPEnd, damagePlayer, updateTracers } from './combat.js';
 import { setupInput, checkInteractionPrompt, isMouseDown } from './input.js';
@@ -880,7 +880,10 @@ function startGame(mode, mapId) {
         const _flMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, emissive: 0xffaa00, emissiveIntensity: 0.6 });
         const _flMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.45, 8), _flMat);
         _flMesh.rotation.z = Math.PI / 2;
-        _flMesh.position.set(4, 0.5, 2);
+        const _flSpawnZ = (gameState.currentMap === 'hallway' && gameState.hallwayPlayerSpawnZ != null)
+            ? gameState.hallwayPlayerSpawnZ
+            : 2;
+        _flMesh.position.set(1, 0.5, _flSpawnZ);
         scene.add(_flMesh);
         gameState.droppedWeapons.push({ mesh: _flMesh, weaponId: 'flashlight' });
     }

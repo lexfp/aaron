@@ -732,7 +732,7 @@ export function buildCheats() {
     return {
         'godmode': () => { playerState.godMode = true; showCheatMsg('God Mode ON'); },
         'money': () => { const amt = parseInt(prompt('How much money?', '10000')); if (!isNaN(amt) && amt > 0) { playerData.money += amt; showCheatMsg('+$' + amt.toLocaleString()); } },
-        'ammo': () => { cb.refillAllAmmo(); showCheatMsg('Ammo refilled'); },
+        'ammo': () => { const amt = prompt('How much ammo? (leave blank for full refill)', ''); if (amt === null) return; const n = parseInt(amt); if (!isNaN(n) && n > 0) { setAllAmmo(n); showCheatMsg('Ammo set to ' + n); } else { cb.refillAllAmmo(); showCheatMsg('Ammo refilled'); } },
         'noclip': () => { playerState.noClip = !playerState.noClip; showCheatMsg('NoClip ' + (playerState.noClip ? 'ON' : 'OFF')); },
         'fly': () => { playerState.flyMode = !playerState.flyMode; showCheatMsg('Fly Mode ' + (playerState.flyMode ? 'ON (Space=up, Shift=down)' : 'OFF')); },
         'kill': () => { cb.killAllEnemies(); showCheatMsg('All enemies killed'); },

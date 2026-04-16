@@ -177,5 +177,13 @@ export const MAPS = {
     hallway: {
         name: 'The Hallway', description: 'One long corridor. You spawn at one end. They come from the other.',
         size: 200, color: 0x2a2a2a, wallColor: 0x444444, ambientLight: 3.6
+    },
+    cave: {
+        name: 'Cave',
+        description: 'A dripping underground labyrinth. Tight tunnels, glowing crystals, and nowhere to run.',
+        size: 200,
+        color: 0x3a3a3a,      // dark stone floor, range 0x2a2a2a–0x4a4a4a
+        wallColor: 0x252525,  // near-black rock walls, range 0x1a1a1a–0x3a3a3a
+        ambientLight: 0.08
     }
 };

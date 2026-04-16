@@ -23,6 +23,18 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
         // Hallway: always spawn at the far (north) end, random X within corridor width
         spawnX = (Math.random() - 0.5) * 4;
         spawnZ = gameState.hallwayZombieSpawnZ + (Math.random() - 0.5) * 2;
+    } else if (gameState.currentMap === 'cave' && gameState.mode === 'zombie' && gameState.zombieSpawnCavern) {
+        const sc = gameState.zombieSpawnCavern;
+        const spawnAngle = Math.random() * Math.PI * 2;
+        const spawnDist = Math.random() * (sc.radius - 1.0);
+        spawnX = sc.cx + Math.cos(spawnAngle) * spawnDist;
+        spawnZ = sc.cz + Math.sin(spawnAngle) * spawnDist;
+        const distFromOrigin = Math.hypot(spawnX, spawnZ);
+        if (distFromOrigin > 130) {
+            const scale = 130 / distFromOrigin;
+            spawnX *= scale;
+            spawnZ *= scale;
+        }
     } else {
         // Spawn within loaded chunk range (50–130 units) so terrain/obstacles exist
         const px = camera.position.x, pz = camera.position.z;

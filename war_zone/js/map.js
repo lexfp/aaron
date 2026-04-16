@@ -14,6 +14,142 @@ function mulberry32(seed) {
     };
 }
 
+/**
+ * generateCaveLayout(rng) — pure data function, no Three.js objects.
+ * Returns { caverns: [...], tunnels: [...] }
+ *
+ * Cavern: { id, cx, cz, radius, isSpawnCavern }
+ * Tunnel: { fromId, toId, width, height }
+ */
+export function generateCaveLayout(rng) {
+    const TARGET_COUNT = 5;
+    const MIN_RADIUS = 12;
+    const MAX_RADIUS = 22;
+    const MAP_RANGE = 80; // cavern centers within ±80 of origin
+    const MAX_ATTEMPTS = 200;
+
+    // --- Fallback grid positions (used if random placement fails) ---
+    const FALLBACK_POSITIONS = [
+        [0, 0],
+        [55, 55],
+        [-55, 55],
+        [55, -55],
+        [-55, -55],
+    ];
+
+    // --- Place caverns with minimum separation ---
+    const caverns = [];
+    for (let i = 0; i < TARGET_COUNT; i++) {
+        const radius = MIN_RADIUS + rng() * (MAX_RADIUS - MIN_RADIUS);
+        let placed = false;
+        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+            const cx = (rng() * 2 - 1) * MAP_RANGE;
+            const cz = (rng() * 2 - 1) * MAP_RANGE;
+            let tooClose = false;
+            for (const c of caverns) {
+                const minSep = c.radius + radius + 8;
+                if (Math.hypot(cx - c.cx, cz - c.cz) < minSep) {
+                    tooClose = true;
+                    break;
+                }
+            }
+            if (!tooClose) {
+                caverns.push({ id: i, cx, cz, radius, isSpawnCavern: false });
+                placed = true;
+                break;
+            }
+        }
+        if (!placed) {
+            // Fall back to fixed grid position for this cavern
+            const [fcx, fcz] = FALLBACK_POSITIONS[i] || [i * 40 - 80, 0];
+            caverns.push({ id: i, cx: fcx, cz: fcz, radius, isSpawnCavern: false });
+        }
+    }
+
+    // --- Designate spawn cavern: largest radius ---
+    let spawnIdx = 0;
+    for (let i = 1; i < caverns.length; i++) {
+        if (caverns[i].radius > caverns[spawnIdx].radius) spawnIdx = i;
+    }
+    caverns[spawnIdx].isSpawnCavern = true;
+
+    // --- Build Minimum Spanning Tree (Prim's algorithm, Euclidean distance) ---
+    const n = caverns.length;
+    const inMST = new Array(n).fill(false);
+    const minEdge = new Array(n).fill(Infinity);
+    const parent = new Array(n).fill(-1);
+    minEdge[0] = 0;
+
+    for (let iter = 0; iter < n; iter++) {
+        // Pick the vertex with minimum edge weight not yet in MST
+        let u = -1;
+        for (let v = 0; v < n; v++) {
+            if (!inMST[v] && (u === -1 || minEdge[v] < minEdge[u])) u = v;
+        }
+        inMST[u] = true;
+        // Update neighbors
+        for (let v = 0; v < n; v++) {
+            if (!inMST[v]) {
+                const dist = Math.hypot(caverns[u].cx - caverns[v].cx, caverns[u].cz - caverns[v].cz);
+                if (dist < minEdge[v]) {
+                    minEdge[v] = dist;
+                    parent[v] = u;
+                }
+            }
+        }
+    }
+
+    // Collect MST edges as tunnels
+    const tunnels = [];
+    const tunnelSet = new Set();
+    for (let v = 1; v < n; v++) {
+        const u = parent[v];
+        const key = `${Math.min(u, v)}-${Math.max(u, v)}`;
+        if (!tunnelSet.has(key)) {
+            tunnelSet.add(key);
+            tunnels.push({
+                fromId: u,
+                toId: v,
+                width: 4 + rng() * 4,   // 4–8 units
+                height: 5 + rng() * 3,  // 5–8 units
+            });
+        }
+    }
+
+    // --- Add 1–2 extra tunnels (loops) ---
+    const extraCount = 1 + Math.floor(rng() * 2); // 1 or 2
+    let extraAdded = 0;
+    // Collect all possible non-MST pairs
+    const candidates = [];
+    for (let a = 0; a < n; a++) {
+        for (let b = a + 1; b < n; b++) {
+            const key = `${a}-${b}`;
+            if (!tunnelSet.has(key)) candidates.push([a, b]);
+        }
+    }
+    // Shuffle candidates using rng
+    for (let i = candidates.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    }
+    for (const [a, b] of candidates) {
+        if (extraAdded >= extraCount) break;
+        const key = `${a}-${b}`;
+        if (!tunnelSet.has(key)) {
+            tunnelSet.add(key);
+            tunnels.push({
+                fromId: a,
+                toId: b,
+                width: 4 + rng() * 4,
+                height: 5 + rng() * 3,
+            });
+            extraAdded++;
+        }
+    }
+
+    return { caverns, tunnels };
+}
+
 let _noShadowMap = false; // set true for maps where shadows are disabled
 
 function addObstacle(obstacleList, mat, w, h, d, x, y, z, opts = {}) {
@@ -1154,6 +1290,241 @@ function buildFortressMap(obs) {
     for (const tz of [-65, 0, 30, 60]) addTorch(-81, 4, tz);
 }
 
+// ─── Cave map ─────────────────────────────────────────────────────────────────
+const CAVE_HEIGHT = 12; // interior ceiling height (floor y=0, ceiling bottom at CAVE_HEIGHT)
+
+export function buildCaveMap(obs) {
+    const map = MAPS['cave'];
+    const size = map.size;
+    const seed = 0xCA1E1234; // deterministic seed for cave map
+    const rng = mulberry32(seed >>> 0);
+
+    const { caverns, tunnels } = generateCaveLayout(rng);
+
+    // --- Materials ---
+    const floorMat = new THREE.MeshStandardMaterial({ color: map.color, roughness: 0.95 });
+    const wallMat = new THREE.MeshStandardMaterial({ color: map.wallColor, roughness: 0.9 });
+    const ceilMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 1.0 });
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x2a2520, roughness: 1.0 });
+    const rockMat2 = new THREE.MeshStandardMaterial({ color: 0x1e1c18, roughness: 1.0 });
+    const stalMat = new THREE.MeshStandardMaterial({ color: 0x2e2a26, roughness: 0.9 });
+    const poolMat = new THREE.MeshStandardMaterial({
+        color: 0x1a2a3a, transparent: true, opacity: 0.65, roughness: 0.1, metalness: 0.3
+    });
+
+    // --- Floor ---
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(size * 2, size * 2), floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // --- Ceiling slab (noStep so floor-snap never teleports player on top) ---
+    {
+        const ceilGeo = new THREE.BoxGeometry(size * 2, 2, size * 2);
+        const ceilMesh = new THREE.Mesh(ceilGeo, ceilMat);
+        ceilMesh.position.set(0, CAVE_HEIGHT + 1, 0);
+        scene.add(ceilMesh);
+        obs.push({ mesh: ceilMesh, box: new THREE.Box3().setFromObject(ceilMesh), noStep: true });
+    }
+
+    // --- Tunnel walls ---
+    for (const tunnel of tunnels) {
+        const fromC = caverns[tunnel.fromId];
+        const toC = caverns[tunnel.toId];
+        const dx = toC.cx - fromC.cx;
+        const dz = toC.cz - fromC.cz;
+        const len = Math.hypot(dx, dz);
+        if (len < 0.001) continue;
+        const angle = Math.atan2(dx, dz); // rotation around Y axis
+
+        const cx = (fromC.cx + toC.cx) / 2;
+        const cz = (fromC.cz + toC.cz) / 2;
+        const w = tunnel.width;
+        const h = tunnel.height;
+        const wallThick = 1.5;
+
+        // Left wall
+        const lwMesh = new THREE.Mesh(new THREE.BoxGeometry(wallThick, h, len), wallMat);
+        lwMesh.position.set(cx - Math.cos(angle) * (w / 2 + wallThick / 2), h / 2, cz + Math.sin(angle) * (w / 2 + wallThick / 2));
+        lwMesh.rotation.y = angle;
+        lwMesh.userData.isTunnelWall = true;
+        scene.add(lwMesh);
+        obs.push({ mesh: lwMesh, box: new THREE.Box3().setFromObject(lwMesh) });
+
+        // Right wall
+        const rwMesh = new THREE.Mesh(new THREE.BoxGeometry(wallThick, h, len), wallMat);
+        rwMesh.position.set(cx + Math.cos(angle) * (w / 2 + wallThick / 2), h / 2, cz - Math.sin(angle) * (w / 2 + wallThick / 2));
+        rwMesh.rotation.y = angle;
+        rwMesh.userData.isTunnelWall = true;
+        scene.add(rwMesh);
+        obs.push({ mesh: rwMesh, box: new THREE.Box3().setFromObject(rwMesh) });
+
+        // Ceiling slab
+        const tcMesh = new THREE.Mesh(new THREE.BoxGeometry(w + wallThick * 2, wallThick, len), ceilMat);
+        tcMesh.position.set(cx, h + wallThick / 2, cz);
+        tcMesh.rotation.y = angle;
+        tcMesh.userData.isTunnelWall = true;
+        scene.add(tcMesh);
+        obs.push({ mesh: tcMesh, box: new THREE.Box3().setFromObject(tcMesh) });
+
+        // Floor strip
+        const tfMesh = new THREE.Mesh(new THREE.BoxGeometry(w + wallThick * 2, wallThick, len), floorMat);
+        tfMesh.position.set(cx, -wallThick / 2, cz);
+        tfMesh.rotation.y = angle;
+        tfMesh.userData.isTunnelWall = true;
+        scene.add(tfMesh);
+        obs.push({ mesh: tfMesh, box: new THREE.Box3().setFromObject(tfMesh) });
+    }
+
+    // --- Cavern rock walls (ring of irregular BoxGeometry segments) ---
+    for (const cavern of caverns) {
+        const segCount = 14 + Math.floor(rng() * 8);
+        for (let i = 0; i < segCount; i++) {
+            const angle = (i / segCount) * Math.PI * 2 + (rng() - 0.5) * 0.4;
+            const dist = cavern.radius + rng() * 2.5;
+            const segW = 2.5 + rng() * 4.5;
+            const segH = CAVE_HEIGHT * (0.5 + rng() * 0.5);
+            const segD = 2.0 + rng() * 3.0;
+            const wx = cavern.cx + Math.cos(angle) * dist;
+            const wz = cavern.cz + Math.sin(angle) * dist;
+            const mat = rng() < 0.5 ? rockMat : rockMat2;
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(segW, segH, segD), mat);
+            mesh.position.set(wx, segH / 2, wz);
+            mesh.rotation.y = angle + Math.PI / 2 + (rng() - 0.5) * 0.5;
+            scene.add(mesh);
+            if (segW > 0.8) {
+                obs.push({ mesh, box: new THREE.Box3().setFromObject(mesh) });
+            }
+        }
+    }
+
+    // --- Stalactites (hanging from ceiling, y-flipped) ---
+    for (const cavern of caverns) {
+        const count = 6 + Math.floor(rng() * 10);
+        for (let i = 0; i < count; i++) {
+            const angle = rng() * Math.PI * 2;
+            const dist = rng() * cavern.radius * 0.85;
+            const sx = cavern.cx + Math.cos(angle) * dist;
+            const sz = cavern.cz + Math.sin(angle) * dist;
+            const baseR = 0.15 + rng() * 0.55;
+            const stalH = 1.5 + rng() * 3.5;
+            const mesh = new THREE.Mesh(new THREE.ConeGeometry(baseR, stalH, 6), stalMat);
+            mesh.rotation.z = Math.PI; // y-flip: tip points down
+            mesh.position.set(sx, CAVE_HEIGHT - stalH / 2, sz);
+            scene.add(mesh);
+            if (baseR > 0.4) {
+                obs.push({ mesh, box: new THREE.Box3().setFromObject(mesh) });
+            }
+        }
+    }
+
+    // --- Stalagmites (rising from floor) ---
+    for (const cavern of caverns) {
+        const count = 5 + Math.floor(rng() * 8);
+        for (let i = 0; i < count; i++) {
+            const angle = rng() * Math.PI * 2;
+            const dist = rng() * cavern.radius * 0.8;
+            const sx = cavern.cx + Math.cos(angle) * dist;
+            const sz = cavern.cz + Math.sin(angle) * dist;
+            const baseR = 0.12 + rng() * 0.5;
+            const stalH = 0.8 + rng() * 2.5;
+            const mesh = new THREE.Mesh(new THREE.ConeGeometry(baseR, stalH, 6), stalMat);
+            mesh.position.set(sx, stalH / 2, sz);
+            scene.add(mesh);
+            if (baseR > 0.4) {
+                obs.push({ mesh, box: new THREE.Box3().setFromObject(mesh) });
+            }
+        }
+    }
+
+    // --- Crystal formations (at least 6 clusters) ---
+    const crystalColors = [0x4488ff, 0x44ffaa, 0x22ddff, 0x66aaff, 0x33ffcc, 0x88aaff];
+    const crystalCount = Math.max(6, caverns.length + 1);
+    for (let ci = 0; ci < crystalCount; ci++) {
+        const cavern = caverns[ci % caverns.length];
+        const angle = rng() * Math.PI * 2;
+        const dist = rng() * cavern.radius * 0.7;
+        const cx = cavern.cx + Math.cos(angle) * dist;
+        const cz = cavern.cz + Math.sin(angle) * dist;
+        const color = crystalColors[ci % crystalColors.length];
+        const emissiveMat = new THREE.MeshStandardMaterial({
+            color,
+            emissive: color,
+            emissiveIntensity: 0.8,
+            roughness: 0.2,
+            metalness: 0.5
+        });
+
+        // Cluster of 2-4 crystal spires
+        const spireCount = 2 + Math.floor(rng() * 3);
+        for (let s = 0; s < spireCount; s++) {
+            const sa = rng() * Math.PI * 2;
+            const sd = rng() * 1.2;
+            const spireH = 1.0 + rng() * 2.5;
+            const spireR = 0.15 + rng() * 0.35;
+            let mesh;
+            if (rng() < 0.5) {
+                mesh = new THREE.Mesh(new THREE.ConeGeometry(spireR, spireH, 5), emissiveMat);
+            } else {
+                mesh = new THREE.Mesh(new THREE.OctahedronGeometry(spireR * 1.5), emissiveMat);
+            }
+            mesh.position.set(cx + Math.cos(sa) * sd, spireH / 2, cz + Math.sin(sa) * sd);
+            mesh.rotation.y = rng() * Math.PI;
+            // Tag only the first spire as the cluster representative (1 tag per 1 PointLight)
+            if (s === 0) mesh.userData.isCrystal = true;
+            scene.add(mesh);
+        }
+
+        // PointLight for this crystal cluster
+        const lightColor = crystalColors[ci % crystalColors.length];
+        const ptLight = new THREE.PointLight(lightColor, 1.5, 20 + rng() * 10);
+        ptLight.position.set(cx, 1.5, cz);
+        scene.add(ptLight);
+    }
+
+    // --- Cave pool (decorative, in first cavern) ---
+    {
+        const poolCavern = caverns[0];
+        const poolMesh = new THREE.Mesh(new THREE.PlaneGeometry(poolCavern.radius * 0.6, poolCavern.radius * 0.5), poolMat);
+        poolMesh.rotation.x = -Math.PI / 2;
+        poolMesh.position.set(poolCavern.cx + 2, 0.02, poolCavern.cz + 2);
+        scene.add(poolMesh);
+    }
+
+    // --- Directional fill light (intensity 0.05) ---
+    const dirFill = new THREE.DirectionalLight(0xffffff, 0.05);
+    dirFill.position.set(0, CAVE_HEIGHT, 0);
+    scene.add(dirFill);
+
+    // --- Expose spawn cavern ---
+    const spawnCavern = caverns.find(c => c.isSpawnCavern);
+    if (spawnCavern) {
+        gameState.zombieSpawnCavern = { cx: spawnCavern.cx, cz: spawnCavern.cz, radius: spawnCavern.radius };
+    }
+
+    // --- Ambient audio (graceful degradation) ---
+    try {
+        const AudioCtx = (typeof AudioContext !== 'undefined') ? AudioContext :
+            (typeof window !== 'undefined' && window.AudioContext) ? window.AudioContext : null;
+        if (AudioCtx) {
+            const audioCtx = new AudioCtx();
+            const oscillator = audioCtx.createOscillator();
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(60, audioCtx.currentTime);
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0.02, audioCtx.currentTime);
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.start();
+            gameState.caveAmbientNode = gainNode;
+        } else {
+            gameState.caveAmbientNode = null;
+        }
+    } catch (e) {
+        gameState.caveAmbientNode = null;
+    }
+}
+
 export function buildMap(mapId) {
     while (scene.children.length) scene.remove(scene.children[0]);
     const obs = [];
@@ -1666,6 +2037,14 @@ export function buildMap(mapId) {
         buildFortressMap(obs);
     } else if (mapId === 'hallway') {
         buildHallwayMap(obs);
+    } else if (mapId === 'cave') {
+        scene.fog = new THREE.Fog(0x050505, 15, 60);
+        scene.background = new THREE.Color(0x050505);
+        gameState.fogNearBase = scene.fog.near;
+        gameState.fogFarBase = scene.fog.far;
+        gameState.dayNightActive = false;
+        gameState.zombieSpawnCavern = null;
+        buildCaveMap(obs);
     } else if (mapId === 'forest') {
         scene.fog = new THREE.Fog(0x060402, 80, 190);
         scene.background = new THREE.Color(0x030201);
