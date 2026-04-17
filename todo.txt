@@ -2,8 +2,6 @@ remake starcraft?
 
 make warzone multiplayer
 
-add cave map
-
 add escape mode
 add new map for it
 

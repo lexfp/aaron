@@ -910,6 +910,18 @@ function startGame(mode, mapId) {
         spawnHostage(MAPS[mapId].size);
         gameState.zombiesAlive = 0;
         gameState.zombiesToSpawn = 80;
+        spawnZombie(false, false, null, true);
+        const _rescueApex = gameState.zombieEntities[gameState.zombieEntities.length - 1];
+        if (_rescueApex) {
+            _rescueApex.attracted = true;
+            // Place 18 units from the player so it's immediately visible
+            const _spawnAng = Math.random() * Math.PI * 2;
+            _rescueApex.mesh.position.set(
+                camera.position.x + Math.sin(_spawnAng) * 18,
+                camera.position.y - 1.7,
+                camera.position.z + Math.cos(_spawnAng) * 18
+            );
+        }
         gameState.zombieSpawnTimer = 0;
         document.getElementById('wave-hud').style.display = 'block';
         document.getElementById('wave-hud').textContent = 'Find the Hostage!';

@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { WEAPONS, MAPS } from './data.js';
 import { playerData, playerState, savePlayerData, gameState, awardXP } from './state.js';
-import { scene, camera, obstacles } from './engine.js';
+import { scene, camera, obstacles, moveSpeed } from './engine.js';
 import { playGunshot } from './audio.js';
 import { addKillFeed, updateHUD, showRoundOverlay } from './ui.js';
 import { dropWeapon } from './weapons.js';
@@ -11,7 +11,7 @@ import { damagePlayer, checkPvPEnd } from './combat.js';
 
 // --- Zombies ---
 
-export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
+export function spawnZombie(isBoss, isGiga = false, speedOverride = null, isApex = false) {
     const mapSize = MAPS[gameState.currentMap].size;
     const angle = Math.random() * Math.PI * 2;
     let spawnX, spawnZ;
@@ -56,10 +56,15 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
     }
 
     let hp, damage, dropMoney, weaponId = null;
-    const bodySize = isGiga ? 4.05 : (isBoss ? 2.5 : 0.9);
+    const bodySize = isApex ? 4.5 : (isGiga ? 4.05 : (isBoss ? 2.5 : 0.9));
     let armoredEnemy = false;
 
-    if (isGiga) {
+    if (isApex) {
+        const lvl = playerData.level;
+        hp = 1000 + (lvl - 1) * 200;
+        damage = 50 + (lvl - 1) * 10;
+        dropMoney = 100 + (lvl - 1) * 25;
+    } else if (isGiga) {
         hp = 1000; damage = 50; dropMoney = 75;
     } else if (isBoss) {
         hp = 100; damage = 20; dropMoney = 10;
@@ -83,7 +88,7 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
     }
 
     const group = new THREE.Group();
-    const skinColor = isGiga ? 0x220011 : (isBoss ? 0x880044 : [0x445533, 0x3a5530, 0x504a38, 0x3d4a33][Math.floor(Math.random() * 4)]);
+    const skinColor = isApex ? 0xcc5500 : (isGiga ? 0x220011 : (isBoss ? 0x880044 : [0x445533, 0x3a5530, 0x504a38, 0x3d4a33][Math.floor(Math.random() * 4)]));
     const bodyMat = new THREE.MeshStandardMaterial({ color: skinColor });
 
     const shirtColors = [0x8B0000, 0x2F4F4F, 0x4B3621, 0x556B2F, 0x8B4513, 0x36454F, 0x702963, 0x1C1C1C, 0x3B5998, 0xA0522D];
@@ -98,7 +103,7 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
     const head = new THREE.Mesh(new THREE.SphereGeometry(bodySize * 0.25, 8, 8), bodyMat);
     head.position.y = bodySize * 1.5; head.castShadow = true; group.add(head);
 
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const eyeMat = new THREE.MeshBasicMaterial({ color: isApex ? 0xffdd00 : 0xff0000 });
     const eye1 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.05), eyeMat);
     eye1.position.set(0.1, 0.05, bodySize * 0.22); head.add(eye1);
     const eye2 = eye1.clone(); eye2.position.x = -0.1; head.add(eye2);
@@ -115,6 +120,17 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
     const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.18, bodySize * 0.5, bodySize * 0.18), pantMat);
     leftLeg.position.set(-bodySize * 0.15, bodySize * 0.25, 0); group.add(leftLeg);
     const rightLeg = leftLeg.clone(); rightLeg.position.x = bodySize * 0.15; group.add(rightLeg);
+
+    // Apex crown of fire spikes
+    if (isApex) {
+        const crownMat = new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0xff5500, emissiveIntensity: 0.7 });
+        for (let s = 0; s < 6; s++) {
+            const spike = new THREE.Mesh(new THREE.ConeGeometry(bodySize * 0.05, bodySize * 0.32, 5), crownMat);
+            const sAngle = (s / 6) * Math.PI * 2;
+            spike.position.set(Math.cos(sAngle) * bodySize * 0.22, bodySize * 1.82, Math.sin(sAngle) * bodySize * 0.22);
+            group.add(spike);
+        }
+    }
 
     // Random accessories
     const rAcc = Math.random();
@@ -163,7 +179,7 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
 
     // Ensure we don't spawn inside a bounding box — nudge outward along spawn angle
     // (skip for hallway — nudging would push zombies through the end wall)
-    const spawnRadius = isGiga ? 1.5 : (isBoss ? 0.7 : 0.5);
+    const spawnRadius = isApex ? 1.8 : (isGiga ? 1.5 : (isBoss ? 0.7 : 0.5));
     if (gameState.currentMap !== 'hallway') {
         for (let attempts = 0; attempts < 10; attempts++) {
             if (!checkZombieCollision(new THREE.Vector3(spawnX, 1, spawnZ), spawnRadius)) break;
@@ -194,14 +210,16 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null) {
 
     scene.add(group);
 
-    const defaultSpeed = isGiga ? 7.0 : (isBoss ? 2.5 : (gameState.mode === 'rescue' ? 4.0 : 3.5));
+    const _apexLvl = playerData.level;
+    const _apexSpeedCap = moveSpeed * playerState.speedMult + 2;
+    const defaultSpeed = isApex ? Math.min(_apexSpeedCap, 8.0 + (_apexLvl - 1) * 0.4) : (isGiga ? 7.0 : (isBoss ? 2.5 : (gameState.mode === 'rescue' ? 4.0 : 3.5)));
     gameState.zombieEntities.push({
-        mesh: group, hp, maxHp: hp, damage, dropMoney, isBoss, isGiga,
+        mesh: group, hp, maxHp: hp, damage, dropMoney, isBoss, isGiga, isApex,
         weaponId, speed: speedOverride != null ? speedOverride : defaultSpeed,
         attackCooldown: 0, lastNoiseCheck: 0, attracted: gameState.currentMap === 'hallway', dead: false,
         hpCtx: ctx, hpTex: tex,
-        zombieRadius: isGiga ? 1.5 : (isBoss ? 0.7 : 0.5),
-        attackDist: isGiga ? 4 : 2,
+        zombieRadius: isApex ? 1.8 : (isGiga ? 1.5 : (isBoss ? 0.7 : 0.5)),
+        attackDist: isApex ? 5 : (isGiga ? 4 : 2),
         damageReduction: armoredEnemy ? 0.35 : 0,
         aiState: 'charge', aiTimer: 0,
         flankAngle: (Math.random() > 0.5 ? 1 : -1) * (Math.PI / 4 + Math.random() * Math.PI / 4),
@@ -325,8 +343,10 @@ export function killZombie(z, idx) {
         gameState.ammoPickups.push({ mesh, collected: false, isMedkit: true });
     }
 
-    addKillFeed(z.isGiga ? 'GIGA ZOMBIE SLAIN!' : (z.isBoss ? 'Boss Zombie' : 'Zombie'), z.isGiga ? '#ff00ff' : '#fff');
-    const xp = z.isGiga ? 200 : z.isBoss ? 50 : (gameState.mode === 'rescue' ? 15 : 10);
+    const killLabel = z.isApex ? 'APEX ZOMBIE SLAIN!' : (z.isGiga ? 'GIGA ZOMBIE SLAIN!' : (z.isBoss ? 'Boss Zombie' : 'Zombie'));
+    const killColor = z.isApex ? '#ffaa00' : (z.isGiga ? '#ff00ff' : '#fff');
+    addKillFeed(killLabel, killColor);
+    const xp = z.isApex ? (300 + (playerData.level - 1) * 50) : (z.isGiga ? 200 : z.isBoss ? 50 : (gameState.mode === 'rescue' ? 15 : 10));
     awardXP(xp);
     savePlayerData();
 }
@@ -424,7 +444,10 @@ export function updateZombies(dt) {
             const guaranteedGigas = Math.floor(rawGigaChance);
             const extraGigaChance = rawGigaChance - guaranteedGigas;
             const gigaCount = guaranteedGigas + (Math.random() < extraGigaChance ? 1 : 0);
-            if (gigaCount > 0) {
+            const apexChance = (gameState.mode === 'zombie' && playerData.level >= 3) ? Math.min(0.15, (playerData.level - 2) * 0.02) : 0;
+            if (Math.random() < apexChance) {
+                spawnZombie(false, false, null, true);
+            } else if (gigaCount > 0) {
                 for (let g = 0; g < gigaCount; g++) spawnZombie(false, true);
             } else {
                 const isBoss = kills >= 20 && Math.random() < Math.min(0.3, 0.08 + kills * 0.003);
@@ -472,7 +495,7 @@ export function updateZombies(dt) {
         const vertDist = Math.abs(playerPos.y - z.mesh.position.y);
         const canReachPlayer = vertDist < 2.5;
 
-        let stopDist = z.isGiga ? 3.5 : 1.5;
+        let stopDist = z.isApex ? 4.0 : (z.isGiga ? 3.5 : 1.5);
         let attackDist = z.attackDist || 2;
         let weaponDamage = z.damage;
         const wDef = (z.weaponId && WEAPONS[z.weaponId]) ? WEAPONS[z.weaponId] : null;
