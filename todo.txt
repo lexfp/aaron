@@ -8,6 +8,7 @@ add escape mode
 add new map for it
 
 add tower defense gamemode
+fix apex zombies
 
 add a magic element to the game(zombie mages, magic spells)
 
