@@ -1197,7 +1197,7 @@ function animate() {
                     const _chargeProgress = Math.min(Math.max(0, _heldSec - JUMP_CHARGE_DELAY) / _dynChargeMax, 1);
                     if (_isHeld && _heldSec > JUMP_CHARGE_DELAY) {
                         _chargeBar.style.display = 'block';
-                        _chargeBar.querySelector('.fill').style.width = (_chargeProgress * 100) + '%';
+                        document.getElementById('jump-charge-fill').style.width = (_chargeProgress * 100) + '%';
                     } else {
                         _chargeBar.style.display = 'none';
                     }

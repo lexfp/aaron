@@ -101,9 +101,12 @@
         <div id="wave-hud">Wave 1</div>
         <div id="weapon-slots"></div>
         <div id="kill-feed"></div>
-        <div id="jump-charge-bar" style="display:none">
-            <div class="fill"></div>
-            <div class="label">Jump Charge</div>
+        <div id="jump-charge-bar"
+            style="display:none;position:absolute;bottom:30px;left:50%;transform:translateX(-50%);width:200px;height:14px;background:rgba(0,0,0,0.7);border:2px solid #aadd00;border-radius:4px;overflow:hidden;">
+            <div id="jump-charge-fill" style="height:100%;background:#aadd00;width:0%;"></div>
+            <div
+                style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000;letter-spacing:0.5px;">
+                Jump Charge</div>
         </div>
         <div id="interaction-prompt">Press [E] to pick up</div>
         <div id="scope-overlay">
