@@ -1301,6 +1301,13 @@ export function buildCaveMap(obs) {
 
     const { caverns, tunnels } = generateCaveLayout(rng);
 
+    // --- Determine player spawn cavern early so geometry can clear space around it ---
+    const _playerCavern = caverns
+        .filter(c => !c.isSpawnCavern)
+        .reduce((best, c) => (!best || c.radius < best.radius) ? c : best, null)
+        || caverns[0];
+    const PLAYER_CLEAR_R = 5; // no stalagmites within this radius of spawn center
+
     // --- Materials ---
     const floorMat = new THREE.MeshStandardMaterial({ color: map.color, roughness: 0.95 });
     const wallMat = new THREE.MeshStandardMaterial({ color: map.wallColor, roughness: 0.9 });
@@ -1343,13 +1350,15 @@ export function buildCaveMap(obs) {
         const h = tunnel.height;
         const wallThick = 1.5;
 
-        // Left wall
+        // Left wall — isSlope so inflated AABB doesn't cover cavern interiors; raycast handles collision
         const lwMesh = new THREE.Mesh(new THREE.BoxGeometry(wallThick, h, len), wallMat);
         lwMesh.position.set(cx - Math.cos(angle) * (w / 2 + wallThick / 2), h / 2, cz + Math.sin(angle) * (w / 2 + wallThick / 2));
         lwMesh.rotation.y = angle;
         lwMesh.userData.isTunnelWall = true;
         scene.add(lwMesh);
-        obs.push({ mesh: lwMesh, box: new THREE.Box3().setFromObject(lwMesh) });
+        lwMesh.updateMatrixWorld(true);
+        obs.push({ mesh: lwMesh, box: new THREE.Box3().setFromObject(lwMesh), isSlope: true });
+        gameState.slopeMeshes.push(lwMesh);
 
         // Right wall
         const rwMesh = new THREE.Mesh(new THREE.BoxGeometry(wallThick, h, len), wallMat);
@@ -1357,7 +1366,9 @@ export function buildCaveMap(obs) {
         rwMesh.rotation.y = angle;
         rwMesh.userData.isTunnelWall = true;
         scene.add(rwMesh);
-        obs.push({ mesh: rwMesh, box: new THREE.Box3().setFromObject(rwMesh) });
+        rwMesh.updateMatrixWorld(true);
+        obs.push({ mesh: rwMesh, box: new THREE.Box3().setFromObject(rwMesh), isSlope: true });
+        gameState.slopeMeshes.push(rwMesh);
 
         // Ceiling slab
         const tcMesh = new THREE.Mesh(new THREE.BoxGeometry(w + wallThick * 2, wallThick, len), ceilMat);
@@ -1393,7 +1404,9 @@ export function buildCaveMap(obs) {
             mesh.rotation.y = angle + Math.PI / 2 + (rng() - 0.5) * 0.5;
             scene.add(mesh);
             if (segW > 0.8) {
-                obs.push({ mesh, box: new THREE.Box3().setFromObject(mesh) });
+                mesh.updateMatrixWorld(true);
+                obs.push({ mesh, box: new THREE.Box3().setFromObject(mesh), isSlope: true });
+                gameState.slopeMeshes.push(mesh);
             }
         }
     }
@@ -1428,6 +1441,9 @@ export function buildCaveMap(obs) {
             const sz = cavern.cz + Math.sin(angle) * dist;
             const baseR = 0.12 + rng() * 0.5;
             const stalH = 0.8 + rng() * 2.5;
+            // Skip stalagmites too close to the player spawn point
+            const dxP = sx - _playerCavern.cx, dzP = sz - _playerCavern.cz;
+            if (dxP * dxP + dzP * dzP < PLAYER_CLEAR_R * PLAYER_CLEAR_R) continue;
             const mesh = new THREE.Mesh(new THREE.ConeGeometry(baseR, stalH, 6), stalMat);
             mesh.position.set(sx, stalH / 2, sz);
             scene.add(mesh);
@@ -1502,6 +1518,9 @@ export function buildCaveMap(obs) {
         gameState.zombieSpawnCavern = { cx: spawnCavern.cx, cz: spawnCavern.cz, radius: spawnCavern.radius };
     }
 
+    // --- Player start: center of the pre-selected non-zombie cavern (clear of stalagmites) ---
+    gameState.cavePlayerSpawn = { x: _playerCavern.cx, z: _playerCavern.cz };
+
     // --- Ambient audio (graceful degradation) ---
     try {
         const AudioCtx = (typeof AudioContext !== 'undefined') ? AudioContext :
@@ -1537,6 +1556,7 @@ export function buildMap(mapId) {
     gameState.secretPassages = [];
     gameState.hallwayPlayerSpawnZ = null;
     gameState.hallwayZombieSpawnZ = null;
+    gameState.cavePlayerSpawn = null;
 
     // Clear streaming chunk state from previous map
     _forestChunks.clear(); _forestObs = null; _forestChunkCenters = []; _forestMats = null;

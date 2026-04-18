@@ -108,6 +108,7 @@ export const gameState = {
     fogFarBase: 0,
     // Cave map
     zombieSpawnCavern: null,  // { cx, cz, radius } — set by buildCaveMap, read by spawnZombie
+    cavePlayerSpawn: null,    // { x, z } — center of a non-zombie cavern, set by buildCaveMap
     caveAmbientNode: null     // AudioNode reference for cave ambient sound; null if Web Audio unavailable
 };
 

@@ -78,8 +78,8 @@ function checkCollision(newPos) {
         }
     }
 
-    // Slope steepness/height check + side-entry block for mountain map
-    if (gameState.currentMap === 'mountain') {
+    // Slope steepness/height check + side-entry block for mountain/cave maps
+    if (gameState.currentMap === 'mountain' || gameState.currentMap === 'cave') {
         const floorAtNew = getFloorHeight(newPos, true);
         const currentFeetY = camera.position.y - 1.7;
         if (floorAtNew > currentFeetY + 0.6) return true;
@@ -854,6 +854,10 @@ function startGame(mode, mapId) {
         camera.position.set(0, 1.7, gameState.hallwayPlayerSpawnZ);
         camera.rotation.set(0, Math.PI, 0); // face north (-z)
     }
+    // Cave map: spawn at the center of a non-zombie cavern so player isn't inside a wall
+    if (gameState.currentMap === 'cave' && gameState.cavePlayerSpawn != null) {
+        camera.position.set(gameState.cavePlayerSpawn.x, 1.7, gameState.cavePlayerSpawn.z);
+    }
     const spawnFloor = getFloorHeight(camera.position);
     camera.position.y = spawnFloor + 1.7;
     scene.add(controls.getObject());
@@ -906,6 +910,18 @@ function startGame(mode, mapId) {
         spawnHostage(MAPS[mapId].size);
         gameState.zombiesAlive = 0;
         gameState.zombiesToSpawn = 80;
+        spawnZombie(false, false, null, true);
+        const _rescueApex = gameState.zombieEntities[gameState.zombieEntities.length - 1];
+        if (_rescueApex) {
+            _rescueApex.attracted = true;
+            // Place 18 units from the player so it's immediately visible
+            const _spawnAng = Math.random() * Math.PI * 2;
+            _rescueApex.mesh.position.set(
+                camera.position.x + Math.sin(_spawnAng) * 18,
+                camera.position.y - 1.7,
+                camera.position.z + Math.cos(_spawnAng) * 18
+            );
+        }
         gameState.zombieSpawnTimer = 0;
         document.getElementById('wave-hud').style.display = 'block';
         document.getElementById('wave-hud').textContent = 'Find the Hostage!';
@@ -1208,7 +1224,7 @@ function animate() {
             }
 
             // Side-entry slope check: raycast in move direction (only when actually moving)
-            if (gameState.currentMap === 'mountain') {
+            if (gameState.currentMap === 'mountain' || gameState.currentMap === 'cave') {
                 const slopeMeshes = gameState.slopeMeshes || [];
                 const moveDist = Math.sqrt(moveVec.x * moveVec.x + moveVec.z * moveVec.z);
                 if (slopeMeshes.length > 0 && moveDist > 0.001) {
@@ -1243,7 +1259,7 @@ function animate() {
 
             // After horizontal move, check if we've walked into the side of a slope:
             // if the floor at the new position is more than 0.6m above our feet, push back.
-            if (gameState.currentMap === 'mountain') {
+            if (gameState.currentMap === 'mountain' || gameState.currentMap === 'cave') {
                 const feetY = camera.position.y - 1.7;
                 const floorHere = getFloorHeight(camera.position);
                 if (floorHere > feetY + 0.6) {
@@ -1273,9 +1289,9 @@ function animate() {
                 }
             }
 
-            // CCD: if falling on mountain map, sweep the full vertical path for slope surfaces
+            // CCD: if falling on mountain/cave map, sweep the full vertical path for slope surfaces
             // so the player can't phase through them when moving fast
-            if (gameState.currentMap === 'mountain' && velocity.y < 0) {
+            if ((gameState.currentMap === 'mountain' || gameState.currentMap === 'cave') && velocity.y < 0) {
                 const prevFeetY = prevCamY - 1.7;
                 const newFeetY = camera.position.y - 1.7;
                 // Cast from previous camera Y (not feet) to cover the full swept path
