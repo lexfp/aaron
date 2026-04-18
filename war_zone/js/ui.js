@@ -512,11 +512,11 @@ export function showLoadout() {
 
     const statDefs = [
         { key: 'health', label: 'Health', color: '#00ff88', desc: '+5 max HP per point' },
-        { key: 'speed', label: 'Speed', color: '#00aaff', desc: '+2% move speed per point' },
+        { key: 'speed', label: 'Sprint Speed', color: '#00aaff', desc: '+2% sprint speed per point' },
         { key: 'damage', label: 'Damage', color: '#ff4444', desc: '+2% damage & +5% headshot bonus per point' },
         { key: 'stamina', label: 'Stamina', color: '#ffaa00', desc: '+10 max stamina per point' },
         { key: 'staminaRegen', label: 'Stamina Regen', color: '#ffcc44', desc: '+10% regen rate per point' },
-        { key: 'jump', label: 'Jump Height', color: '#aa66ff', desc: '+5% jump height per point' },
+        { key: 'jump', label: 'Jump Height', color: '#aa66ff', desc: '+charge height & +10% charge time per point' },
         { key: 'reload', label: 'Reload Time', color: '#00ddff', desc: '-5% reload time per point' }
     ];
 
