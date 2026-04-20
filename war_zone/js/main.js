@@ -179,6 +179,12 @@ let tpBodyYaw = 0;     // body facing direction (from movement)
 let tpPunchSide = -1;    // alternates: +1 = right fist, -1 = left fist
 let tpPrevSwingTime = 0; // detect new punch (weaponSwingTime jump)
 
+// Charged jump state
+const JUMP_CHARGE_DELAY = 0.2; // seconds before charge starts accumulating
+const JUMP_CHARGE_RATE = 16;  // jump force units gained per second of charge
+const JUMP_BASE_FORCE = 12;   // force on instant tap (no charge)
+const JUMP_CHARGE_BONUS = 4;  // base extra force at full charge (scales with jump stat)
+
 // Orbit camera input
 document.addEventListener('mousemove', (e) => {
     if (!thirdPerson || !gameState.active) return;
@@ -914,12 +920,13 @@ function startGame(mode, mapId) {
         const _rescueApex = gameState.zombieEntities[gameState.zombieEntities.length - 1];
         if (_rescueApex) {
             _rescueApex.attracted = true;
-            // Place 18 units from the player so it's immediately visible
+            // Place on the edge of the map at a random angle
+            const _mapEdge = MAPS[mapId].size * 0.92;
             const _spawnAng = Math.random() * Math.PI * 2;
             _rescueApex.mesh.position.set(
-                camera.position.x + Math.sin(_spawnAng) * 18,
+                Math.sin(_spawnAng) * _mapEdge,
                 camera.position.y - 1.7,
-                camera.position.z + Math.cos(_spawnAng) * 18
+                Math.cos(_spawnAng) * _mapEdge
             );
         }
         gameState.zombieSpawnTimer = 0;
@@ -1151,7 +1158,7 @@ function animate() {
                 else if (slot.startsWith('light_')) armorPenalty += 0.0125;
             }
             const armorSpeedMult = 1 - armorPenalty;
-            const speed = moveSpeed * (isSprinting ? sprintMult : 1) * playerState.speedMult * armorSpeedMult;
+            const speed = moveSpeed * (isSprinting ? sprintMult * playerState.speedMult : 1) * armorSpeedMult;
             velocity.x -= velocity.x * 10.0 * dt;
             velocity.z -= velocity.z * 10.0 * dt;
 
@@ -1166,25 +1173,58 @@ function animate() {
             if (direction.x !== 0) velocity.x -= direction.x * speed * dt * 15;
             if (keys.space && !playerState.flyMode) {
                 if (canJump) {
-                    let jForce = jumpForce * (1 + (playerData.stats?.jump || 0) * 0.05);
-                    // Inside a crater: boost jump just enough to clear the rim
-                    for (const pit of (gameState.craterPits || [])) {
-                        const _dx = camera.position.x - pit.cx;
-                        const _dz = camera.position.z - pit.cz;
-                        if (_dx * _dx + _dz * _dz < pit.r * pit.r) {
-                            // v = sqrt(2 * g * h), h = depth + rimLip(0.45) + tiny clearance
-                            jForce = Math.sqrt(2 * gravity * (pit.depth + 0.1));
-                            break;
-                        }
-                    }
-                    velocity.y = jForce;
-                    setCanJump(false);
+                    // Space held on ground — nothing to do, charge tracked via _spacePressTime
                 } else if (gameState.currentMap === 'forest') {
                     // Tree scaling: holding Space near a trunk climbs it
                     const nearTrunk = obstacles.some(o => o.isTrunk &&
                         Math.abs(o.mesh.position.x - camera.position.x) < 1.1 &&
                         Math.abs(o.mesh.position.z - camera.position.z) < 1.1);
                     if (nearTrunk) velocity.y = 5;
+                }
+            }
+
+            // Update charge bar — show while space is held and charge delay has passed
+            {
+                const _chargeBar = document.getElementById('jump-charge-bar');
+                if (_chargeBar) {
+                    const _jumpPoints = playerData.stats?.jump || 0;
+                    const _totalBonus = JUMP_CHARGE_BONUS * (1 + _jumpPoints * 0.05);
+                    const _dynChargeMax = _totalBonus / JUMP_CHARGE_RATE;
+                    const _pressT = window._spacePressTime || 0;
+                    const _upT = window._spaceUpTime || 0;
+                    const _isHeld = _pressT > _upT; // press happened more recently than release
+                    const _heldSec = _isHeld ? (performance.now() - _pressT) / 1000 : 0;
+                    const _chargeProgress = Math.min(Math.max(0, _heldSec - JUMP_CHARGE_DELAY) / _dynChargeMax, 1);
+                    if (_isHeld && _heldSec > JUMP_CHARGE_DELAY) {
+                        _chargeBar.style.display = 'block';
+                        document.getElementById('jump-charge-fill').style.width = (_chargeProgress * 100) + '%';
+                    } else {
+                        _chargeBar.style.display = 'none';
+                    }
+                }
+            }
+
+            // Fire jump on space release — consume one release event per frame
+            if ((window._spaceReleasedCount || 0) > 0 && !playerState.flyMode) {
+                window._spaceReleasedCount--;
+                if (canJump) {
+                    const heldSec = (window._spaceHeldMs || 0) / 1000;
+                    const jumpPoints = playerData.stats?.jump || 0;
+                    const totalBonus = JUMP_CHARGE_BONUS * (1 + jumpPoints * 0.05);
+                    const dynChargeMax = totalBonus / JUMP_CHARGE_RATE;
+                    const chargeRatio = Math.min(Math.max(0, heldSec - JUMP_CHARGE_DELAY) / dynChargeMax, 1);
+                    let jForce = JUMP_BASE_FORCE + totalBonus * chargeRatio;
+                    // Inside a crater: boost jump just enough to clear the rim
+                    for (const pit of (gameState.craterPits || [])) {
+                        const _dx = camera.position.x - pit.cx;
+                        const _dz = camera.position.z - pit.cz;
+                        if (_dx * _dx + _dz * _dz < pit.r * pit.r) {
+                            jForce = Math.sqrt(2 * gravity * (pit.depth + 0.1));
+                            break;
+                        }
+                    }
+                    velocity.y = jForce;
+                    setCanJump(false);
                 }
             }
 

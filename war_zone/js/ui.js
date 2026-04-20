@@ -512,11 +512,11 @@ export function showLoadout() {
 
     const statDefs = [
         { key: 'health', label: 'Health', color: '#00ff88', desc: '+5 max HP per point' },
-        { key: 'speed', label: 'Speed', color: '#00aaff', desc: '+2% move speed per point' },
+        { key: 'speed', label: 'Sprint Speed', color: '#00aaff', desc: '+2% sprint speed per point' },
         { key: 'damage', label: 'Damage', color: '#ff4444', desc: '+2% damage & +5% headshot bonus per point' },
         { key: 'stamina', label: 'Stamina', color: '#ffaa00', desc: '+10 max stamina per point' },
         { key: 'staminaRegen', label: 'Stamina Regen', color: '#ffcc44', desc: '+10% regen rate per point' },
-        { key: 'jump', label: 'Jump Height', color: '#aa66ff', desc: '+5% jump height per point' },
+        { key: 'jump', label: 'Jump Height', color: '#aa66ff', desc: '+charge height & +10% charge time per point' },
         { key: 'reload', label: 'Reload Time', color: '#00ddff', desc: '-5% reload time per point' }
     ];
 
@@ -538,8 +538,11 @@ export function showLoadout() {
             <div style="font-size:11px;color:#666;margin:4px 0 6px">${desc}</div>
             ${effectiveLine}
             <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;">
-                <input data-stat-input="${key}" type="number" min="1" max="${Math.max(1, playerData.statPoints)}" value="1"
-                    ${playerData.statPoints < 1 ? 'disabled' : ''}
+                <button data-stat-remove="${key}" ${pts < 1 ? 'disabled' : ''}
+                    style="background:${pts > 0 ? '#cc2222' : '#333'};color:${pts > 0 ? '#fff' : '#555'};border:none;border-radius:5px;padding:6px 14px;font-size:14px;font-weight:700;cursor:${pts > 0 ? 'pointer' : 'default'}">
+                    − Remove
+                </button>
+                <input data-stat-input="${key}" type="number" min="1" max="${Math.max(playerData.statPoints, pts, 1)}" value="1"
                     style="width:52px;padding:4px 6px;border-radius:5px;border:1px solid ${color};background:#111;color:#fff;font-size:14px;font-weight:700;text-align:center;">
                 <button data-stat="${key}" ${playerData.statPoints < 1 ? 'disabled' : ''}
                     style="background:${playerData.statPoints > 0 ? color : '#333'};color:${playerData.statPoints > 0 ? '#000' : '#555'};border:none;border-radius:5px;padding:6px 14px;font-size:14px;font-weight:700;cursor:${playerData.statPoints > 0 ? 'pointer' : 'default'}">
@@ -547,46 +550,91 @@ export function showLoadout() {
                 </button>
             </div>`;
         const btn = card.querySelector('[data-stat]');
+        const removeBtn = card.querySelector(`[data-stat-remove="${key}"]`);
         const input = card.querySelector(`[data-stat-input="${key}"]`);
-        const ptDisplay = card.querySelector('[data-stat-pts]');
-        if (btn && playerData.statPoints > 0) {
+
+        // Helper to refresh the reload effective line
+        const updateReloadLine = () => {
+            if (key !== 'reload') return;
+            const mult = Math.max(0.2, 1 - playerData.stats[key] * 0.05);
+            let el = card.querySelector('[data-reload-eff]');
+            if (!el) {
+                el = document.createElement('div');
+                el.dataset.reloadEff = '1';
+                el.style.cssText = `font-size:11px;color:${color};margin-bottom:4px`;
+                card.querySelector('[data-stat-val]').after(el);
+            }
+            if (playerData.stats[key] > 0) {
+                el.textContent = `${Math.round((1 - mult) * 100)}% faster (${(mult * 100).toFixed(0)}% of base)`;
+            } else {
+                el.textContent = '';
+            }
+        };
+
+        // Helper to refresh the global points-to-spend label
+        const updatePtsLabel = () => {
+            const header = document.querySelector('#loadout-stats-section [data-pts-label]');
+            if (header) {
+                header.textContent = playerData.statPoints > 0
+                    ? `${playerData.statPoints} point${playerData.statPoints !== 1 ? 's' : ''} to spend`
+                    : '';
+            }
+        };
+
+        if (btn) {
             btn.onclick = () => {
+                if (playerData.statPoints < 1) return;
                 const amount = Math.min(Math.max(1, parseInt(input.value) || 1), playerData.statPoints);
                 playerData.statPoints -= amount;
                 playerData.stats[key] += amount;
                 savePlayerData();
 
-                // Update this card in-place
                 card.querySelector('[data-stat-val]').textContent = playerData.stats[key];
-                input.max = Math.max(1, playerData.statPoints);
+                input.max = Math.max(playerData.statPoints, playerData.stats[key], 1);
                 if (playerData.statPoints < 1) {
-                    input.disabled = true;
                     btn.disabled = true;
                     btn.style.background = '#333';
                     btn.style.color = '#555';
                     btn.style.cursor = 'default';
                 }
+                // Enable remove button now that stat has points
+                removeBtn.disabled = false;
+                removeBtn.style.background = '#cc2222';
+                removeBtn.style.color = '#fff';
+                removeBtn.style.cursor = 'pointer';
 
-                // Update the reload effective line if needed
-                if (key === 'reload') {
-                    const mult = Math.max(0.2, 1 - playerData.stats[key] * 0.05);
-                    let el = card.querySelector('[data-reload-eff]');
-                    if (!el) {
-                        el = document.createElement('div');
-                        el.dataset.reloadEff = '1';
-                        el.style.cssText = `font-size:11px;color:${color};margin-bottom:4px`;
-                        card.querySelector('[data-stat-val]').after(el);
-                    }
-                    el.textContent = `${Math.round((1 - mult) * 100)}% faster (${(mult * 100).toFixed(0)}% of base)`;
+                updateReloadLine();
+                updatePtsLabel();
+            };
+        }
+
+        if (removeBtn) {
+            removeBtn.onclick = () => {
+                const amount = Math.min(Math.max(1, parseInt(input.value) || 1), playerData.stats[key]);
+                if (amount < 1) return;
+                playerData.stats[key] -= amount;
+                playerData.statPoints += amount;
+                savePlayerData();
+
+                card.querySelector('[data-stat-val]').textContent = playerData.stats[key];
+                input.max = Math.max(playerData.statPoints, playerData.stats[key], 1);
+
+                // Re-enable add button
+                btn.disabled = false;
+                btn.style.background = color;
+                btn.style.color = '#000';
+                btn.style.cursor = 'pointer';
+
+                // Disable remove button if stat is now 0
+                if (playerData.stats[key] < 1) {
+                    removeBtn.disabled = true;
+                    removeBtn.style.background = '#333';
+                    removeBtn.style.color = '#555';
+                    removeBtn.style.cursor = 'default';
                 }
 
-                // Update the global points-to-spend label
-                const header = document.querySelector('#loadout-stats-section [data-pts-label]');
-                if (header) {
-                    header.textContent = playerData.statPoints > 0
-                        ? `${playerData.statPoints} point${playerData.statPoints !== 1 ? 's' : ''} to spend`
-                        : '';
-                }
+                updateReloadLine();
+                updatePtsLabel();
             };
         }
         statGrid.appendChild(card);

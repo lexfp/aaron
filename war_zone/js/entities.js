@@ -211,7 +211,7 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null, isApex
     scene.add(group);
 
     const _apexLvl = playerData.level;
-    const _apexSpeedCap = moveSpeed * playerState.speedMult + 2;
+    const _apexSpeedCap = Math.min(15, moveSpeed * playerState.speedMult + 2);
     const defaultSpeed = isApex ? Math.min(_apexSpeedCap, 8.0 + (_apexLvl - 1) * 0.4) : (isGiga ? 7.0 : (isBoss ? 2.5 : (gameState.mode === 'rescue' ? 4.0 : 3.5)));
     gameState.zombieEntities.push({
         mesh: group, hp, maxHp: hp, damage, dropMoney, isBoss, isGiga, isApex,
@@ -444,8 +444,8 @@ export function updateZombies(dt) {
             const guaranteedGigas = Math.floor(rawGigaChance);
             const extraGigaChance = rawGigaChance - guaranteedGigas;
             const gigaCount = guaranteedGigas + (Math.random() < extraGigaChance ? 1 : 0);
-            const apexChance = (gameState.mode === 'zombie' && playerData.level >= 3) ? Math.min(0.15, (playerData.level - 2) * 0.02) : 0;
-            if (Math.random() < apexChance) {
+            const apexChance = (gameState.mode === 'zombie' && playerData.level >= 3 && kills >= 20) ? Math.min(0.10, (playerData.level - 2) * 0.01) : 0;
+            if (gigaCount > 0 && Math.random() < apexChance) {
                 spawnZombie(false, false, null, true);
             } else if (gigaCount > 0) {
                 for (let g = 0; g < gigaCount; g++) spawnZombie(false, true);
@@ -542,6 +542,38 @@ export function updateZombies(dt) {
             }
         }
         if (z.mesh.position.y < cachedFloor) z.mesh.position.y = cachedFloor;
+
+        // Apex zombie in rescue mode: proactively jump over mountains/slopes ahead
+        if (z.isApex && gameState.mode === 'rescue' && !z._airborne) {
+            z._apexJumpTimer = (z._apexJumpTimer || 0) - dt;
+            if (z._apexJumpTimer <= 0) {
+                z._apexJumpTimer = 0.25; // check 4× per second
+                const toPlayerX = playerPos.x - z.mesh.position.x;
+                const toPlayerZ = playerPos.z - z.mesh.position.z;
+                const toDist = Math.sqrt(toPlayerX * toPlayerX + toPlayerZ * toPlayerZ);
+                if (toDist > 2) {
+                    const dirX = toPlayerX / toDist;
+                    const dirZ = toPlayerZ / toDist;
+                    const slopeMeshes = gameState.slopeMeshes || [];
+                    const _apexRay = new THREE.Raycaster();
+                    let maxAheadFloor = cachedFloor;
+                    for (const lookAhead of [3, 6, 9]) {
+                        const sx = z.mesh.position.x + dirX * lookAhead;
+                        const sz = z.mesh.position.z + dirZ * lookAhead;
+                        _apexRay.set(new THREE.Vector3(sx, z.mesh.position.y + 20, sz), new THREE.Vector3(0, -1, 0));
+                        const hits = _apexRay.intersectObjects(slopeMeshes);
+                        if (hits.length > 0) maxAheadFloor = Math.max(maxAheadFloor, hits[0].point.y);
+                    }
+                    const riseNeeded = maxAheadFloor - z.mesh.position.y;
+                    if (riseNeeded > 1.0) {
+                        // Jump high enough to clear the peak with 1.5 unit clearance
+                        z.vy = Math.sqrt(2 * 30 * (riseNeeded + 1.5));
+                        z._airborne = true;
+                        z._apexJumpTimer = 1.0; // cooldown after jumping
+                    }
+                }
+            }
+        }
 
         // AI state — always player-focused (no "cover" toward buildings)
         z.aiTimer -= dt;

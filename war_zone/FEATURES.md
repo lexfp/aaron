@@ -69,7 +69,7 @@ Four slots: Helmet, Breastplate, Pants, Boots. Drag-drop or click to equip in Lo
 | Zombie | 25 | 5 | 3.5 | $1 | 5% chance armed (close weapon) |
 | Boss Zombie | 100 | 20 | 2.5 | $10 | Can carry any weapon |
 | Giga Zombie | 1000 | 50 | 7.0 | $75 | Rare; very large |
-| Apex Zombie | 1000+(lvl-1)×200 | 50+(lvl-1)×10 | min(playerWalk+2, 8+(lvl-1)×0.4) | 100+(lvl-1)×25 | Zombie mode: requires level ≥3, 2%/level chance (max 15%). Rescue mode: 1 spawns 18 units from player, immediately attracted. Orange-gold skin, fire spike crown, yellow eyes; 300+(lvl-1)×50 XP on kill |
+| Apex Zombie | 1000+(lvl-1)×200 | 50+(lvl-1)×10 | min(playerWalk+2, 8+(lvl-1)×0.4, 15) | 100+(lvl-1)×25 | Zombie mode: requires level ≥3, replaces a giga spawn at 1%/level chance (max 10%). Rescue mode: 1 spawns 18 units from player, immediately attracted. Orange-gold skin, fire spike crown, yellow eyes; 300+(lvl-1)×50 XP on kill |
 | Rescue Hostile | 40 | 8 | 4.0 | $3 | 50% armed; 40% armored (35% dmg reduction) |
 
 ## Progression

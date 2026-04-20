@@ -38,7 +38,7 @@ export function setupInput(CHEATS, resumeGameFn) {
         const key = e.key.toLowerCase();
         if (key in keys) keys[key] = true;
         if (key === 'shift') keys.shift = true;
-        if (key === ' ') { keys.space = true; e.preventDefault(); }
+        if (key === ' ') { keys.space = true; if (!window._spaceHeld) { window._spacePressTime = performance.now(); window._spaceHeld = true; } e.preventDefault(); }
         if (e.key === 'Tab') e.preventDefault();
         if (!gameState.active) return;
 
@@ -98,6 +98,7 @@ export function setupInput(CHEATS, resumeGameFn) {
         if (key in keys) keys[key] = false;
         if (key === 'shift') keys.shift = false;
         if (key === ' ') keys.space = false;
+        if (key === ' ') { window._spaceHeld = false; window._spaceUpTime = performance.now(); window._spaceReleasedCount = (window._spaceReleasedCount || 0) + 1; window._spaceHeldMs = performance.now() - (window._spacePressTime || performance.now()); }
     });
 
     // Chat / cheat input

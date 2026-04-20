@@ -1133,14 +1133,14 @@ function buildFortressMap(obs) {
         addObstacle(obs, keepWalkMat, 2.5, 0.4, 2, -18.75, 10.2, 8);
     }
 
-    // Walkway torches (y=10.2, sitting on walkway top)
+    // Walkway torches (y=10.6, sitting on walkway top surface at y=10.4)
     for (const tx of [-12, -4, 4, 12]) {
-        addTorch(tx, 10.2, -22);
-        addTorch(tx, 10.2, 22);
+        addTorch(tx, 10.6, -22);
+        addTorch(tx, 10.6, 22);
     }
     for (const tz of [-12, -4, 4, 12]) {
-        addTorch(22, 10.2, tz);
-        addTorch(-22, 10.2, tz);
+        addTorch(22, 10.6, tz);
+        addTorch(-22, 10.6, tz);
     }
 
     // Arrow slits on inner keep exterior (scaled to new height)
@@ -1283,11 +1283,11 @@ function buildFortressMap(obs) {
         addObstacle(obs, stoneMat, w, h, d, rx, h / 2, rz);
     }
 
-    // Torches along inner wall faces (y=4 for new wall height)
-    for (const tx of [-60, -30, 0, 30, 65]) addTorch(tx, 4, -81);
-    for (const tx of [-60, -30, 0, 30, 60]) addTorch(tx, 4, 81);
-    for (const tz of [-60, -30, -5, 30, 60]) addTorch(81, 4, tz);
-    for (const tz of [-65, 0, 30, 60]) addTorch(-81, 4, tz);
+    // Torches along inner wall faces (y=6.2, sitting on outer wall top surface at y=6)
+    for (const tx of [-60, -30, 0, 30, 65]) addTorch(tx, 6.2, -81);
+    for (const tx of [-60, -30, 0, 30, 60]) addTorch(tx, 6.2, 81);
+    for (const tz of [-60, -30, -5, 30, 60]) addTorch(81, 6.2, tz);
+    for (const tz of [-65, 0, 30, 60]) addTorch(-81, 6.2, tz);
 }
 
 // ─── Cave map ─────────────────────────────────────────────────────────────────
