@@ -152,7 +152,7 @@ export const ATTACHMENTS = {
 export const MAPS = {
     warehouse: {
         name: 'Warehouse', description: 'Pitch-dark industrial labyrinth. Every shadow hides a threat.',
-        size: 120, color: 0x3a3a3a, wallColor: 0x505050, ambientLight: 0.22
+        size: 120, color: 0x3a3a3a, wallColor: 0x505050, ambientLight: 1.1
     },
     desert: {
         name: 'Desert Outpost', description: 'Burning sun, zero mercy. Open ground and deadly sightlines.',
@@ -187,3 +187,20 @@ export const MAPS = {
         ambientLight: 0.08
     }
 };
+
+export const DEFAULT_KEYBINDS = {
+    moveForward: 'w', moveBack: 's', moveLeft: 'a', moveRight: 'd',
+    jump: ' ', sprint: 'shift',
+    reload: 'r', interact: 'e', dropWeapon: 'x',
+    medkit: 'q', adrenaline: 'y', cycleWeapon: 'c',
+    airstrike: 'f', zoom: 'z', thirdPerson: 'tab', chat: '`',
+};
+export const keybinds = (() => {
+    try {
+        const saved = JSON.parse(localStorage.getItem('wz_keybinds') || '{}');
+        return Object.assign({}, DEFAULT_KEYBINDS, saved);
+    } catch { return { ...DEFAULT_KEYBINDS }; }
+})();
+export function saveKeybinds() {
+    localStorage.setItem('wz_keybinds', JSON.stringify(keybinds));
+}

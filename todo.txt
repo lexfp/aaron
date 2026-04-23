@@ -11,4 +11,8 @@ fix apex zombies
 add a magic element to the game(zombie mages, magic spells)
 
 /resume
-claude --resume 1a57d3f6-6304-4f13-9644-4f2c69772ef5
+claude --resume "secret-tunnels-corridors"
+
+
+make zombies actually wander around the entire map
+fix secret passages

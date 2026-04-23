@@ -6,7 +6,15 @@ import { switchWeapon, reload, dropCurrentWeapon, toggleZoom, pickupWeapon } fro
 import { shoot, callAirstrike, useMedkit, useAdrenaline } from './combat.js';
 import { addKillFeed, updateConsumablesPanel } from './ui.js';
 import { camera } from './engine.js';
-import { WEAPONS } from './data.js';
+import { WEAPONS, keybinds } from './data.js';
+
+function keyLabel(val) {
+    if (val === ' ') return 'Space';
+    if (val === 'shift') return 'Shift';
+    if (val === 'tab') return 'Tab';
+    if (val === 'enter') return 'Enter';
+    return val.toUpperCase();
+}
 
 let chatOpen = false;
 let cheatUnlocked = false;
@@ -16,7 +24,7 @@ let mouseDown = false;
 
 export function setupInput(CHEATS, resumeGameFn) {
     document.addEventListener('keydown', (e) => {
-        if (e.key === '`' || e.key === '~') {
+        if (e.key.toLowerCase() === keybinds.chat || e.key === '~') {
             if (gameState.active) {
                 chatOpen = !chatOpen;
                 const el = document.getElementById('cheat-console');
@@ -34,18 +42,23 @@ export function setupInput(CHEATS, resumeGameFn) {
             return;
         }
         if (chatOpen) return;
+        if (window._keybindsMenuOpen) return;
 
         const key = e.key.toLowerCase();
-        if (key in keys) keys[key] = true;
-        if (key === 'shift') keys.shift = true;
-        if (key === ' ') { keys.space = true; if (!window._spaceHeld) { window._spacePressTime = performance.now(); window._spaceHeld = true; } e.preventDefault(); }
-        if (e.key === 'Tab') e.preventDefault();
+        if (key === keybinds.moveForward) keys.w = true;
+        if (key === keybinds.moveBack) keys.s = true;
+        if (key === keybinds.moveLeft) keys.a = true;
+        if (key === keybinds.moveRight) keys.d = true;
+        if (key === keybinds.sprint) keys.shift = true;
+        if (key === keybinds.interact) keys.e = true;
+        if (key === keybinds.jump) { keys.space = true; if (!window._spaceHeld) { window._spacePressTime = performance.now(); window._spaceHeld = true; } e.preventDefault(); }
+        if (key === keybinds.thirdPerson) e.preventDefault();
         if (!gameState.active) return;
 
         if (key >= '1' && key <= '9') switchWeapon(parseInt(key) - 1);
-        if (key === 'x') dropCurrentWeapon();
-        if (key === 'r') reload();
-        if (key === 'e') {
+        if (key === keybinds.dropWeapon) dropCurrentWeapon();
+        if (key === keybinds.reload) reload();
+        if (key === keybinds.interact) {
             if (!tryPickup()) {
                 const panel = document.getElementById('consumables-panel');
                 const isVisible = panel.style.display === 'flex';
@@ -62,12 +75,12 @@ export function setupInput(CHEATS, resumeGameFn) {
                 controls.unlock();
             }
         }
-        if (key === 'q') {
+        if (key === keybinds.medkit) {
             if (!useMedkit()) switchWeapon(playerState.currentWeaponIndex - 1);
         }
-        if (key === 'y') useAdrenaline();
-        if (key === 'c') switchWeapon(playerState.currentWeaponIndex + 1);
-        if (key === 'f') {
+        if (key === keybinds.adrenaline) useAdrenaline();
+        if (key === keybinds.cycleWeapon) switchWeapon(playerState.currentWeaponIndex + 1);
+        if (key === keybinds.airstrike) {
             if (playerData.airstrikes > 0) {
                 const AIRSTRIKE_COOLDOWN = 5 * 60 * 1000;
                 const now = performance.now();
@@ -84,9 +97,8 @@ export function setupInput(CHEATS, resumeGameFn) {
                 }
             }
         }
-        if (key === 'z') toggleZoom();
-        if (e.key === 'Tab') {
-            e.preventDefault();
+        if (key === keybinds.zoom) toggleZoom();
+        if (key === keybinds.thirdPerson) {
             if (gameState.active && (controls.isLocked || window._isThirdPerson?.())) {
                 window._toggleThirdPerson && window._toggleThirdPerson();
             }
@@ -95,10 +107,19 @@ export function setupInput(CHEATS, resumeGameFn) {
 
     document.addEventListener('keyup', (e) => {
         const key = e.key.toLowerCase();
-        if (key in keys) keys[key] = false;
-        if (key === 'shift') keys.shift = false;
-        if (key === ' ') keys.space = false;
-        if (key === ' ') { window._spaceHeld = false; window._spaceUpTime = performance.now(); window._spaceReleasedCount = (window._spaceReleasedCount || 0) + 1; window._spaceHeldMs = performance.now() - (window._spacePressTime || performance.now()); }
+        if (key === keybinds.moveForward) keys.w = false;
+        if (key === keybinds.moveBack) keys.s = false;
+        if (key === keybinds.moveLeft) keys.a = false;
+        if (key === keybinds.moveRight) keys.d = false;
+        if (key === keybinds.sprint) keys.shift = false;
+        if (key === keybinds.interact) keys.e = false;
+        if (key === keybinds.jump) {
+            keys.space = false;
+            window._spaceHeld = false;
+            window._spaceUpTime = performance.now();
+            window._spaceReleasedCount = (window._spaceReleasedCount || 0) + 1;
+            window._spaceHeldMs = performance.now() - (window._spacePressTime || performance.now());
+        }
     });
 
     // Chat / cheat input
@@ -119,16 +140,15 @@ export function setupInput(CHEATS, resumeGameFn) {
                 if (raw.startsWith('`')) {
                     const cmd = raw.slice(1).toLowerCase().trim();
                     if (cmd === 'admin') {
-                        closeChatInput(resumeGameFn);
+                        // Close chat, then show custom overlay (avoids native prompt pointer-lock timing issues)
+                        chatOpen = false;
+                        document.getElementById('cheat-console').style.display = 'none';
                         adminPromptOpen = true;
-                        const code = prompt('Enter access code:');
-                        adminPromptOpen = false;
-                        if (code === ADMIN_CODE) {
-                            cheatUnlocked = true;
-                            showCheatFeedback('Cheat access granted. Type `cheatName to use cheats.');
-                        } else if (code !== null) {
-                            showCheatFeedback('Wrong code.');
-                        }
+                        const overlay = document.getElementById('admin-overlay');
+                        const codeInput = document.getElementById('admin-code-input');
+                        overlay.style.display = 'block';
+                        codeInput.value = '';
+                        codeInput.focus();
                     } else if (cheatUnlocked) {
                         if (CHEATS[cmd]) {
                             CHEATS[cmd]();
@@ -147,6 +167,23 @@ export function setupInput(CHEATS, resumeGameFn) {
             } else {
                 closeChatInput(resumeGameFn);
             }
+        }
+    });
+
+    // Admin code overlay
+    document.getElementById('admin-code-input').addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Escape' || e.key === 'Enter') {
+            const code = e.key === 'Enter' ? e.target.value.trim() : null;
+            document.getElementById('admin-overlay').style.display = 'none';
+            adminPromptOpen = false;
+            if (code === ADMIN_CODE) {
+                cheatUnlocked = true;
+                showCheatFeedback('Cheat access granted. Type `cheatName to use cheats.');
+            } else if (code !== null) {
+                showCheatFeedback('Wrong code.');
+            }
+            if (gameState.active && !window._isThirdPerson?.()) resumeGameFn();
         }
     });
 
@@ -242,7 +279,7 @@ export function checkInteractionPrompt() {
         const dx = camera.position.x - passage.mesh.position.x;
         const dz = camera.position.z - passage.mesh.position.z;
         if (Math.sqrt(dx * dx + dz * dz) < 4) {
-            document.getElementById('interaction-prompt').textContent = 'Press [E] to open passage';
+            document.getElementById('interaction-prompt').textContent = `Press [${keyLabel(keybinds.interact)}] to open ${passage.label || 'passage'}`;
             showPrompt = true;
             break;
         }
@@ -250,7 +287,7 @@ export function checkInteractionPrompt() {
 
     if (!showPrompt && gameState.mode === 'rescue' && gameState.hostage && !gameState.hostage.rescued) {
         if (camera.position.distanceTo(gameState.hostage.mesh.position) < 5) {
-            document.getElementById('interaction-prompt').textContent = `Press [E] to Rescue Hostage`;
+            document.getElementById('interaction-prompt').textContent = `Press [${keyLabel(keybinds.interact)}] to Rescue Hostage`;
             showPrompt = true;
         }
     }
@@ -259,7 +296,7 @@ export function checkInteractionPrompt() {
         for (const dw of gameState.droppedWeapons) {
             if (camera.position.distanceTo(dw.mesh.position) < 3) {
                 document.getElementById('interaction-prompt').textContent =
-                    `Press [E] to pick up ${WEAPONS[dw.weaponId].name}`;
+                    `Press [${keyLabel(keybinds.interact)}] to pick up ${WEAPONS[dw.weaponId].name}`;
                 showPrompt = true;
                 break;
             }
