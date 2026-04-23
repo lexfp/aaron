@@ -14,6 +14,9 @@ function refreshConsumablesIfOpen() {
 import { getCurrentWeapon, hasSilencer, hasScope, reload, toggleZoom } from './weapons.js';
 import { killZombie, attractZombies, spawnPvPEnemy } from './entities.js';
 import { cb } from './callbacks.js';
+import { checkAchievements } from './achievements.js';
+
+let _lastHitWasHeadshot = false;
 
 function setShootRay() {
     const ndc = gameState.tpShootNDC;
@@ -140,8 +143,12 @@ function calculateDamage(def, hit) {
             const headshotBase = (hasActiveScope && isZoomed) ? 40 : 10;
             dmg += headshotBase * (1 + damageStats * 0.05);
             addKillFeed('HEADSHOT!', '#ff4444');
-        } else if (localY > entityHeight * 0.5 && (hit.point.x - hitEntity.mesh.position.x) > 0.2) {
-            dmg = Math.max(0, dmg - 5);
+            _lastHitWasHeadshot = true;
+        } else {
+            _lastHitWasHeadshot = false;
+            if (localY > entityHeight * 0.5 && (hit.point.x - hitEntity.mesh.position.x) > 0.2) {
+                dmg = Math.max(0, dmg - 5);
+            }
         }
     }
     return Math.floor(dmg);
@@ -165,11 +172,13 @@ function applyDamageToEnemy(hit, dmg) {
     if (!entity) return;
     if (entity.damageReduction) dmg = Math.max(1, Math.floor(dmg * (1 - entity.damageReduction)));
     entity.hp -= dmg;
+    playerData.totalDamageDealt = (playerData.totalDamageDealt || 0) + dmg;
     playHit();
     showDamageNumber(hit.point, dmg);
 
     if (entity.hp <= 0) {
         if (gameState.mode === 'zombie' || gameState.mode === 'rescue') {
+            if (_lastHitWasHeadshot) playerData.totalHeadshotKills = (playerData.totalHeadshotKills || 0) + 1;
             const idx = gameState.zombieEntities.indexOf(entity);
             if (idx >= 0) killZombie(entity, idx);
         } else if (gameState.mode === 'pvp') {
@@ -185,6 +194,7 @@ function applyDamageToEnemy(hit, dmg) {
 
 export function damagePlayer(amount, attackerPos = null) {
     if (playerState.godMode) return;
+    gameState.tookDamageThisGame = true;
     const { def } = getCurrentWeapon();
 
     let bypassShield = false;
@@ -227,6 +237,8 @@ export function useMedkit() {
     playerState.hp = Math.min(playerState.maxHp, playerState.hp + eq.hpRestore);
     playerData.ownedEquipment.splice(idx, 1);
     savePlayerData();
+    playerData.totalMedkitsUsed = (playerData.totalMedkitsUsed || 0) + 1;
+    checkAchievements();
     playPickup();
     updateHUD();
     refreshConsumablesIfOpen();
@@ -249,20 +261,95 @@ export function useAdrenaline() {
 
 // --- Throwables & Explosions ---
 
+const _activeProjectiles = [];
+const _THROW_SPEED = 16;
+const _THROW_ARC   = 0.28;  // upward bias added to throw direction
+const _GRAVITY     = 14;    // units/s² (slightly exaggerated for snappy feel)
+
 function throwProjectile(def) {
-    setShootRay();
-    const colliders = [...getEnemyMeshes(), ...obstacles.filter(o => o.mesh).map(o => o.mesh)];
-    const hits = raycaster.intersectObjects(colliders, true);
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    dir.y += _THROW_ARC;
+    dir.normalize();
 
-    let explodePos;
-    if (hits.length > 0 && hits[0].distance < 30) {
-        explodePos = hits[0].point;
-    } else {
-        explodePos = camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(30));
+    const startPos = camera.position.clone();
+    startPos.addScaledVector(dir, 0.6);   // start just in front of camera
+
+    const color = def.fire ? 0x995500 : 0x3d5a3d;
+    const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.09, 7, 7),
+        new THREE.MeshStandardMaterial({ color, roughness: 0.6 })
+    );
+    mesh.position.copy(startPos);
+    scene.add(mesh);
+
+    _activeProjectiles.push({
+        mesh,
+        vel: dir.clone().multiplyScalar(_THROW_SPEED),
+        def,
+        born: performance.now() / 1000,
+    });
+}
+
+export function updateProjectiles(dt) {
+    for (let i = _activeProjectiles.length - 1; i >= 0; i--) {
+        const p = _activeProjectiles[i];
+
+        // Gravity
+        p.vel.y -= _GRAVITY * dt;
+
+        // Move
+        p.mesh.position.addScaledVector(p.vel, dt);
+
+        // Tumble visually
+        p.mesh.rotation.x += 4 * dt;
+        p.mesh.rotation.z += 2.5 * dt;
+
+        // Safety timeout
+        if (performance.now() / 1000 - p.born > 8) {
+            _detonateProjectile(p);
+            _activeProjectiles.splice(i, 1);
+            continue;
+        }
+
+        let detonated = false;
+
+        // Ground hit (y accounting for slight embed)
+        if (p.mesh.position.y <= 0.09) {
+            p.mesh.position.y = 0.09;
+            _detonateProjectile(p);
+            detonated = true;
+        }
+
+        // Obstacle / enemy collision via mini-raycast ahead of travel
+        if (!detonated) {
+            const speed = p.vel.length();
+            if (speed > 0.01) {
+                const travelDir = p.vel.clone().normalize();
+                const lookAhead = speed * dt + 0.12;
+                const colliders = [
+                    ...getEnemyMeshes(),
+                    ...obstacles.filter(o => o.mesh).map(o => o.mesh),
+                ];
+                const rc = new THREE.Raycaster(p.mesh.position.clone(), travelDir, 0, lookAhead);
+                const hits = rc.intersectObjects(colliders, true);
+                if (hits.length > 0) {
+                    p.mesh.position.copy(hits[0].point);
+                    _detonateProjectile(p);
+                    detonated = true;
+                }
+            }
+        }
+
+        if (detonated) _activeProjectiles.splice(i, 1);
     }
+}
 
-    if (def.explosive) createExplosion(explodePos, def.radius, def.damage);
-    if (def.fire) createFireZone(explodePos, def.radius, def.damage, def.duration);
+function _detonateProjectile(p) {
+    const pos = p.mesh.position.clone();
+    scene.remove(p.mesh);
+    if (p.def.explosive) createExplosion(pos, p.def.radius, p.def.damage);
+    if (p.def.fire)      createFireZone(pos, p.def.radius, p.def.damage, p.def.duration);
 }
 
 function createExplosion(pos, radius, damage) {
@@ -274,8 +361,9 @@ function createExplosion(pos, radius, damage) {
 
     for (const z of gameState.zombieEntities) {
         if (z.hp > 0 && z.mesh.position.distanceTo(pos) < radius) {
+            playerData.totalDamageDealt = (playerData.totalDamageDealt || 0) + Math.min(damage, Math.max(0, z.hp));
             z.hp -= damage;
-            if (z.hp <= 0) { const idx = gameState.zombieEntities.indexOf(z); if (idx >= 0) killZombie(z, idx); }
+            if (z.hp <= 0) { const idx = gameState.zombieEntities.indexOf(z); if (idx >= 0) killZombie(z, idx, true); }
         }
     }
     if (gameState.pvpEnemy?.hp > 0 && gameState.pvpEnemy.mesh.position.distanceTo(pos) < radius) {
@@ -372,7 +460,11 @@ function showDamageNumber(pos, dmg) {
 export function checkPvPEnd() {
     if (gameState.pvpPlayerScore >= 3) {
         playerData.money += 200;
+        playerData.totalMoneyEarned = (playerData.totalMoneyEarned || 0) + 200;
+        playerData.totalPvpWins = (playerData.totalPvpWins || 0) + 1;
+        if (!gameState.tookDamageThisGame) playerData.flawlessRuns = (playerData.flawlessRuns || 0) + 1;
         savePlayerData();
+        checkAchievements();
         showRoundOverlay('YOU WIN!', '+$200', 3000);
         setTimeout(() => cb.quitToMenu(), 3500);
     } else if (gameState.pvpEnemyScore >= 3) {
@@ -409,6 +501,8 @@ function gameOver() {
 export function callAirstrike() {
     const pos = camera.position.clone();
     playSound(40, 2.0, 'sawtooth', 0.5);
+    playerData.totalAirstrikes = (playerData.totalAirstrikes || 0) + 1;
+    checkAchievements();
     showRoundOverlay('AIRSTRIKE INBOUND', 'Take cover!', 1500);
 
     setTimeout(() => {
@@ -431,7 +525,7 @@ export function callAirstrike() {
                 } else {
                     z.hp -= 10000;
                 }
-                if (z.hp <= 0) killZombie(z, i);
+                if (z.hp <= 0) killZombie(z, i, true);
             }
         }
         if (gameState.pvpEnemy?.hp > 0 && gameState.pvpEnemy.mesh.position.distanceTo(pos) < radius) {
