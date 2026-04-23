@@ -1,8 +1,9 @@
 // Screen management, shop, loadout, HUD, overlays, cheats
 
-import { WEAPONS, EQUIPMENT, ATTACHMENTS, MAPS, DAMAGE_THRESHOLD } from './data.js';
+import { WEAPONS, EQUIPMENT, ATTACHMENTS, MAPS, DAMAGE_THRESHOLD, DEFAULT_KEYBINDS, keybinds, saveKeybinds } from './data.js';
 import { playerData, playerState, savePlayerData, gameState, xpToNextLevel, setAwardXPImpl, awardXP } from './state.js';
 import { cb } from './callbacks.js';
+import { checkAchievements } from './achievements.js';
 
 // Wire up level-up notification (avoids circular dep: state -> ui)
 setAwardXPImpl((didLevelUp) => {
@@ -181,6 +182,7 @@ window.buyWeapon = function (id) {
         playerData.ownedWeapons.push(id);
         playerData.weaponUsage[id] = 0;
         savePlayerData();
+        checkAchievements();
         showShop();
     }
 };
@@ -787,6 +789,26 @@ export function buildCheats() {
         'heal': () => { playerState.hp = playerState.maxHp; showCheatMsg('Healed'); },
         'speed': () => { playerState.speedMult = playerState.speedMult === 1 ? 2 : 1; showCheatMsg('Speed x' + playerState.speedMult); },
         'levelup': () => { const lvls = parseInt(prompt('How many levels?', '1')); if (!isNaN(lvls) && lvls > 0) { playerData.level += lvls; playerData.statPoints += lvls * 5; savePlayerData(); showCheatMsg(`+${lvls} Levels! Now LVL ${playerData.level} (+${lvls * 5} pts)`); } },
+        'nightvision': () => {
+            playerState.nightVision = !playerState.nightVision;
+            const canvas = document.querySelector('canvas');
+            let nvDiv = document.getElementById('nv-overlay');
+            if (playerState.nightVision) {
+                if (canvas) canvas.style.filter = 'saturate(0) sepia(1) hue-rotate(90deg) saturate(3) brightness(1.8)';
+                if (!nvDiv) {
+                    nvDiv = document.createElement('div');
+                    nvDiv.id = 'nv-overlay';
+                    nvDiv.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:50;background:radial-gradient(ellipse at 50% 50%,transparent 35%,rgba(0,30,0,0.65) 100%);';
+                    document.body.appendChild(nvDiv);
+                }
+                nvDiv.style.display = 'block';
+                showCheatMsg('Night Vision ON');
+            } else {
+                if (canvas) canvas.style.filter = '';
+                if (nvDiv) nvDiv.style.display = 'none';
+                showCheatMsg('Night Vision OFF');
+            }
+        },
         'reset': () => { window.startGame(gameState.mode, gameState.currentMap); showCheatMsg('Game Reset!'); }
     };
 }
@@ -832,12 +854,13 @@ export function updateConsumablesPanel() {
         airstrikeStatus = remaining > 0 ? ` <span style="color:#ff4444">(cooldown: ${remaining}s)</span>` : ' <span style="color:#00ff88">(ready)</span>';
     }
 
+    const kd = (v) => v === ' ' ? 'Space' : v.toUpperCase();
     panel.innerHTML = `
-        <div style="font-size:20px;font-weight:bold;color:#ffaa00;margin-bottom:12px;border-bottom:1px solid #555;padding-bottom:8px">Consumables [E]</div>
-        <div style="margin:8px 0"><span style="color:#00ff88">Med Kit</span> &times;${medkits} &nbsp;<span style="color:#888">Q to use</span></div>
-        <div style="margin:8px 0"><span style="color:#ff88ff">Adrenaline</span> &times;${adrenalines} &nbsp;<span style="color:#888">Y to use</span></div>
-        <div style="margin:8px 0"><span style="color:#ff4444">Airstrike</span> &times;${airstrikes}${airstrikeStatus} &nbsp;<span style="color:#888">F to use</span></div>
-        <div style="margin-top:12px;color:#666;font-size:13px">Press E to close</div>
+        <div style="font-size:20px;font-weight:bold;color:#ffaa00;margin-bottom:12px;border-bottom:1px solid #555;padding-bottom:8px">Consumables [${kd(keybinds.interact)}]</div>
+        <div style="margin:8px 0"><span style="color:#00ff88">Med Kit</span> &times;${medkits} &nbsp;<span style="color:#888">${kd(keybinds.medkit)} to use</span></div>
+        <div style="margin:8px 0"><span style="color:#ff88ff">Adrenaline</span> &times;${adrenalines} &nbsp;<span style="color:#888">${kd(keybinds.adrenaline)} to use</span></div>
+        <div style="margin:8px 0"><span style="color:#ff4444">Airstrike</span> &times;${airstrikes}${airstrikeStatus} &nbsp;<span style="color:#888">${kd(keybinds.airstrike)} to use</span></div>
+        <div style="margin-top:12px;color:#666;font-size:13px">Press ${kd(keybinds.interact)} to close</div>
     `;
 }
 
@@ -847,11 +870,12 @@ const TUTORIAL_STEPS = [
     { title: 'Welcome to Warzone!', body: "You're a soldier fighting for survival. This tutorial will teach you the basics." },
     { title: 'Movement', body: '<b>WASD</b> to move &bull; <b>Shift</b> to sprint &bull; <b>Space</b> to jump<br>On forest maps, hold <b>Space</b> near a tree trunk to climb it.' },
     { title: 'Combat', body: '<b>Left Click</b> to shoot &bull; <b>Right Click</b> or <b>Z</b> to zoom<br><b>R</b> to reload &bull; Aim for the head for bonus damage!' },
-    { title: 'Weapons', body: '<b>1&ndash;9</b> or <b>mouse wheel</b> to switch weapons &bull; <b>C</b> switches forward<br><b>X</b> drops your current weapon &bull; <b>E</b> picks up dropped weapons.' },
+    { title: 'Weapons & Utility', body: '<b>1&ndash;9</b> or <b>mouse wheel</b> to switch weapons &bull; <b>C</b> = next, <b>Q</b> = prev (or use med kit if you have one)<br><b>X</b> drops your current weapon &bull; <b>E</b> picks up dropped weapons<br><b>Compass</b> needle points to your objective &bull; <b>Flashlight</b> spawns near you each match — equip it to light dark areas' },
     { title: 'Consumables', body: '<b>Q</b> &ndash; Use Med Kit (restores 50 HP)<br><b>Y</b> &ndash; Use Adrenaline (temp HP boost)<br><b>F</b> &ndash; Call Airstrike (once per 5 min)<br><b>E</b> &ndash; View your consumables list' },
-    { title: 'Armor & Shop', body: 'Buy weapons, armor (helmet, breastplate, pants, boots), and consumables in the <b>Shop</b> for an up to 90% damage reduction.<br>Equip your gear before a mission in <b>Loadout</b>.' },
-    { title: 'Game Modes', body: '<b>Zombie Apocalypse</b> &ndash; Survive waves of zombies. Bosses & Giga Zombies spawn later.<br><b>Rescue Mission</b> &ndash; Find and extract the hostage.<br><b>PvP Arena</b> &ndash; Fight an AI opponent.' },
-    { title: 'Other', body: '<b>Tab</b> to switch between first and third person point of view. <br> <b>More coming soon!</b>' },
+    { title: 'Armor & Shop', body: 'Buy weapons, armor (helmet, breastplate, pants, boots), and consumables in the <b>Shop</b> for an up to 90% damage reduction.<br>Equip your gear before a mission in <b>Loadout</b>.<br><b>Weapons degrade</b> after 10 uses — repair for $50 in the Shop.' },
+    { title: 'Progression', body: 'Kill enemies to earn <b>XP</b> and level up. Each level grants <b>5 stat points</b> to spend in <b>Loadout → Stats</b> on:<br>Health &bull; Speed &bull; Damage &bull; Stamina &bull; Jump &bull; Reload speed<br>Buy <b>XP packages</b> in the Shop to level up faster.' },
+    { title: 'Game Modes', body: '<b>Zombie Apocalypse</b> &ndash; Survive waves. Boss and Giga Zombies operate in coordinated squads.<br><b>Rescue Mission</b> &ndash; Find the hostage with your compass, press <b>E</b> to rescue, then reach the extraction zone.<br><b>PvP Arena</b> &ndash; Fight an AI opponent (3-weapon loadout limit).' },
+    { title: 'Tips & Settings', body: '<b>Tab</b> &ndash; Toggle first / third person view<br><b>Backtick (`)</b> &ndash; Open chat (type to say something; prefix with ` for cheats)<br><b>Keybinds</b> &ndash; Rebind every key from the main menu or pause screen<br><b>Esc</b> &ndash; Pause / resume' },
     { title: "You're Ready!", body: "Kill zombies to earn money. Spend it in the shop between matches. Good luck!" },
 ];
 
@@ -902,3 +926,127 @@ window.tutorialSkip = function () {
     localStorage.setItem('warzone_tutorial_seen', '1');
     document.getElementById('tutorial-overlay').style.display = 'none';
 };
+
+// --- Keybinds Menu ---
+
+const KB_LABELS = {
+    moveForward: 'Move Forward', moveBack: 'Move Back',
+    moveLeft: 'Move Left', moveRight: 'Move Right',
+    jump: 'Jump', sprint: 'Sprint',
+    reload: 'Reload', interact: 'Interact', dropWeapon: 'Drop Weapon',
+    medkit: 'Use Medkit', adrenaline: 'Use Adrenaline', cycleWeapon: 'Cycle Weapon',
+    airstrike: 'Call Airstrike', zoom: 'Toggle Zoom',
+    thirdPerson: 'Third-Person View', chat: 'Open Chat',
+};
+
+function kbDisplay(val) {
+    if (val === ' ') return 'Space';
+    if (val === 'shift') return 'Shift';
+    if (val === 'tab') return 'Tab';
+    if (val === 'escape') return 'Escape';
+    if (val === 'enter') return 'Enter';
+    if (val === 'arrowup') return '↑';
+    if (val === 'arrowdown') return '↓';
+    if (val === 'arrowleft') return '←';
+    if (val === 'arrowright') return '→';
+    return val.toUpperCase();
+}
+
+let _kbListening = null;
+let _kbOnKey = null; // module-level ref so closeKeybindsMenu can remove stale listeners
+
+function _kbDebug(msg) {
+    let el = document.getElementById('_kb_debug');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = '_kb_debug';
+        el.style.cssText = 'position:fixed;bottom:10px;right:10px;background:#000;color:#0f0;font-size:13px;padding:8px 12px;border-radius:6px;z-index:99999;font-family:monospace;pointer-events:none;';
+        document.body.appendChild(el);
+    }
+    el.textContent = msg;
+}
+
+function startKbCapture(action, btn) {
+    _kbDebug('clicked: ' + action + ((_kbListening) ? ' (busy!)' : ''));
+    if (_kbListening) return;
+    _kbListening = action;
+    btn.textContent = '...';
+    btn.style.borderColor = '#ffaa00';
+    btn.style.color = '#ffaa00';
+    document.getElementById('keybinds-list').focus();
+
+    function onKey(ev) {
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        const raw = ev.key;
+        _kbOnKey = null;
+        document.removeEventListener('keydown', onKey, true);
+        if (raw === 'Escape') {
+            _kbDebug('cancelled');
+            _kbListening = null;
+            renderKBList();
+            return;
+        }
+        _kbDebug('set ' + action + ' = ' + raw);
+        keybinds[action] = raw.toLowerCase();
+        saveKeybinds();
+        _kbListening = null;
+        renderKBList();
+    }
+    _kbOnKey = onKey;
+    document.addEventListener('keydown', onKey, true);
+}
+
+function renderKBList() {
+    const list = document.getElementById('keybinds-list');
+    list.innerHTML = '';
+    list.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;';
+    for (const [action, label] of Object.entries(KB_LABELS)) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.05);border:1px solid #333;border-radius:8px;padding:10px 14px;gap:8px;';
+
+        const span = document.createElement('span');
+        span.style.cssText = 'color:#ccc;font-size:0.88rem;flex:1;';
+        span.textContent = label;
+
+        const btn = document.createElement('button');
+        btn.dataset.action = action;
+        btn.className = 'kb-btn';
+        btn.style.cssText = 'min-width:76px;padding:5px 8px;border:1px solid #00aaff;background:rgba(0,170,255,0.1);color:#00aaff;border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;';
+        btn.textContent = kbDisplay(keybinds[action]);
+        // mousedown never fires from keyboard (Enter/Space), so no phantom re-trigger is possible
+        btn.addEventListener('mousedown', () => {
+            startKbCapture(action, btn);
+        });
+
+        row.appendChild(span);
+        row.appendChild(btn);
+        list.appendChild(row);
+    }
+}
+
+export function setupKeybindsMenu() {
+    document.getElementById('keybinds-reset-btn').addEventListener('click', () => {
+        Object.assign(keybinds, DEFAULT_KEYBINDS);
+        saveKeybinds();
+        renderKBList();
+    });
+
+    document.getElementById('keybinds-close-btn').addEventListener('click', closeKeybindsMenu);
+    renderKBList();
+}
+
+export function openKeybindsMenu() {
+    window._keybindsMenuOpen = true;
+    renderKBList();
+    document.getElementById('keybinds-overlay').style.display = 'flex';
+}
+window.openKeybindsMenu = openKeybindsMenu;
+
+export function closeKeybindsMenu() {
+    window._keybindsMenuOpen = false;
+    _kbListening = null;
+    if (_kbOnKey) { document.removeEventListener('keydown', _kbOnKey, true); _kbOnKey = null; }
+    document.getElementById('keybinds-overlay').style.display = 'none';
+}
+window.closeKeybindsMenu = closeKeybindsMenu;
