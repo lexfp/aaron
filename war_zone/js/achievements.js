@@ -115,7 +115,7 @@ function showAchievementToast(name, reward) {
     if (!hud) return;
 
     const toast = document.createElement('div');
-    const offset = _toastCount * 90;
+    const offset = Math.min(_toastCount, 3) * 90;
     _toastCount++;
 
     toast.style.cssText = `

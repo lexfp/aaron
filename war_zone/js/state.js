@@ -52,7 +52,8 @@ function loadPlayerData() {
                 equippedLoadout: Array.isArray(d.equippedLoadout) ? d.equippedLoadout : def.equippedLoadout,
                 ownedArmor: Array.isArray(d.ownedArmor) ? d.ownedArmor : def.ownedArmor,
                 reserveAmmo: (typeof d.reserveAmmo === 'object' && d.reserveAmmo !== null) ? d.reserveAmmo : def.reserveAmmo,
-                stats: (typeof d.stats === 'object' && d.stats !== null) ? { ...def.stats, ...d.stats } : def.stats
+                stats: (typeof d.stats === 'object' && d.stats !== null) ? { ...def.stats, ...d.stats } : def.stats,
+                achievements: (typeof d.achievements === 'object' && d.achievements !== null) ? d.achievements : def.achievements
             };
         }
     } catch (e) { }
