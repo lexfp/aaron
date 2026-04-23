@@ -2,7 +2,7 @@ import { playerData, savePlayerData } from './state.js';
 import { WEAPONS } from './data.js';
 
 const PURCHASABLE_WEAPONS = Object.keys(WEAPONS).filter(
-    k => !['compass', 'flashlight', 'fists'].includes(k)
+    k => WEAPONS[k].cost > 0 && !['compass', 'flashlight'].includes(k)
 );
 
 export const ACHIEVEMENTS = [
