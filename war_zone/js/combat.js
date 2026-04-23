@@ -124,6 +124,7 @@ function getEnemyMeshes() {
 }
 
 function calculateDamage(def, hit) {
+    _lastHitWasHeadshot = false;
     let dmg = def.damage * (1 + (playerData.stats?.damage || 0) * 0.02);
     const isZoomed = playerState.isZoomed;
     if (isZoomed && def.zoomedDamage) dmg = def.zoomedDamage;
@@ -236,8 +237,8 @@ export function useMedkit() {
     const eq = EQUIPMENT.med_kit;
     playerState.hp = Math.min(playerState.maxHp, playerState.hp + eq.hpRestore);
     playerData.ownedEquipment.splice(idx, 1);
-    savePlayerData();
     playerData.totalMedkitsUsed = (playerData.totalMedkitsUsed || 0) + 1;
+    savePlayerData();
     checkAchievements();
     playPickup();
     updateHUD();
