@@ -13,13 +13,14 @@ import { buildMap, spawnSinglePickup, spawnExtractionZone, updateCityChunks, upd
 import {
     showScreen, updateHomeStats, showShop, showLoadout,
     renderMapScreen, updateHUD, renderWeaponSlots,
-    showRoundOverlay, buildCheats, initTutorial
+    showRoundOverlay, buildCheats, initTutorial, setupKeybindsMenu
 } from './ui.js';
 import { createWeaponModel, getCurrentWeapon, switchWeapon, updateReload, refillAllAmmo, setAllAmmo } from './weapons.js';
 import { spawnPvPEnemy, updatePvPEnemy, killZombie, spawnZombie, updateZombies, spawnHostage } from './entities.js';
-import { shoot, updateFireZones, checkPvPEnd, damagePlayer, updateTracers } from './combat.js';
+import { shoot, updateFireZones, updateProjectiles, checkPvPEnd, damagePlayer, updateTracers } from './combat.js';
 import { setupInput, checkInteractionPrompt, isMouseDown } from './input.js';
 import { register } from './callbacks.js';
+import { checkAchievements, initAchievementsUI, openAchievementsScreen } from './achievements.js';
 
 // --- Register callbacks to break circular deps ---
 
@@ -118,6 +119,12 @@ function getFloorHeight(pos, allowUncapped = false) {
     for (const pit of (gameState.craterPits || [])) {
         const dx = pos.x - pit.cx, dz = pos.z - pit.cz;
         if (dx * dx + dz * dz < pit.r * pit.r) { floor = -pit.depth; break; }
+    }
+    for (const zone of (gameState.undergroundZones || [])) {
+        if (pos.x >= zone.minX && pos.x <= zone.maxX && pos.z >= zone.minZ && pos.z <= zone.maxZ) {
+            if (-zone.depth < floor) floor = -zone.depth;
+            break;
+        }
     }
     const feetY = pos.y - 1.7;
 
@@ -941,12 +948,15 @@ function startGame(mode, mapId) {
         spawnPvPEnemy();
     }
 
+    gameState.missionStartTime = performance.now();
+    gameState.tookDamageThisGame = false;
     gameState.active = true;
     gameState.paused = false;
     updateHUD();
     controls.lock();
 }
 window.startGame = startGame;
+window._openAchievements = openAchievementsScreen;
 
 window._toggleThirdPerson = function () {
     thirdPerson = !thirdPerson;
@@ -983,6 +993,7 @@ function quitToMenu() {
     gameState.ammoPickups = [];
     gameState.pvpEnemy = null;
     gameState.craterPits = [];
+    gameState.undergroundZones = [];
     showScreen('homepage');
 }
 window.quitToMenu = quitToMenu;
@@ -1106,8 +1117,17 @@ function animate() {
         const mapAmbBase = MAPS[gameState.currentMap]?.ambientLight || 0.5;
         const indoorMap = gameState.currentMap === 'warehouse' || gameState.currentMap === 'hallway';
         const ambIntensity = indoorMap ? mapAmbBase : (mapAmbBase * 0.15 + dayFactor * mapAmbBase * 1.3);
-        gameState.ambientLightRef.color.setRGB(ambR, ambG, ambB);
-        gameState.ambientLightRef.intensity = ambIntensity;
+        if (playerState.nightVision) {
+            gameState.ambientLightRef.color.setRGB(0.1, 1.0, 0.15);
+            gameState.ambientLightRef.intensity = Math.max(4.0, ambIntensity);
+        } else if (indoorMap) {
+            // Indoor maps use fixed warm-white fluorescent light — unaffected by day/night colour
+            gameState.ambientLightRef.color.setRGB(1.0, 1.0, 0.95);
+            gameState.ambientLightRef.intensity = mapAmbBase;
+        } else {
+            gameState.ambientLightRef.color.setRGB(ambR, ambG, ambB);
+            gameState.ambientLightRef.intensity = ambIntensity;
+        }
 
         // Sun directional light — arc across sky
         // Offset by -PI/2 so that dn=0.5 (noon, dayFactor=1) places sun overhead (+Y)
@@ -1195,7 +1215,7 @@ function animate() {
                     const _isHeld = _pressT > _upT; // press happened more recently than release
                     const _heldSec = _isHeld ? (performance.now() - _pressT) / 1000 : 0;
                     const _chargeProgress = Math.min(Math.max(0, _heldSec - JUMP_CHARGE_DELAY) / _dynChargeMax, 1);
-                    if (_isHeld && _heldSec > JUMP_CHARGE_DELAY) {
+                    if (_isHeld && _heldSec > JUMP_CHARGE_DELAY && !playerState.flyMode) {
                         _chargeBar.style.display = 'block';
                         document.getElementById('jump-charge-fill').style.width = (_chargeProgress * 100) + '%';
                     } else {
@@ -1329,6 +1349,14 @@ function animate() {
                 }
             }
 
+            // Hard ceiling for indoor maps whose roof is visual-only (not an obstacle)
+            if (gameState.indoorCeilY != null && velocity.y > 0) {
+                if (camera.position.y + 0.2 >= gameState.indoorCeilY) {
+                    camera.position.y = gameState.indoorCeilY - 0.2;
+                    velocity.y = 0;
+                }
+            }
+
             // CCD: if falling on mountain/cave map, sweep the full vertical path for slope surfaces
             // so the player can't phase through them when moving fast
             if ((gameState.currentMap === 'mountain' || gameState.currentMap === 'cave') && velocity.y < 0) {
@@ -1389,6 +1417,7 @@ function animate() {
             if (isMouseDown() && def.fireRate <= 0.15) shoot();
 
             updateReload();
+            updateProjectiles(dt);
             updateFireZones(dt);
             updateTracers();
 
@@ -1414,7 +1443,15 @@ function animate() {
                         controls.unlock();
                         playerData.missions++;
                         playerData.money += 3000;
+                        playerData.totalMoneyEarned = (playerData.totalMoneyEarned || 0) + 3000;
+                        playerData.totalRescueCompletions = (playerData.totalRescueCompletions || 0) + 1;
+                        if (!gameState.tookDamageThisGame) playerData.flawlessRuns = (playerData.flawlessRuns || 0) + 1;
+                        const elapsedSec = (performance.now() - (gameState.missionStartTime || performance.now())) / 1000;
+                        if (playerData.bestRescueTime === null || elapsedSec < playerData.bestRescueTime) {
+                            playerData.bestRescueTime = elapsedSec;
+                        }
                         savePlayerData();
+                        checkAchievements();
                         showRoundOverlay('MISSION ACCOMPLISHED', 'Hostage Extracted! +$3000', 0, true);
                     }
                 }
@@ -1758,6 +1795,8 @@ document.getElementById('btn-pvp').addEventListener('click', () => { gameState.p
 document.getElementById('btn-shop').addEventListener('click', showShop);
 document.getElementById('btn-loadout').addEventListener('click', showLoadout);
 setupInput(CHEATS, resumeGame);
+setupKeybindsMenu();
 updateHomeStats();
 initTutorial();
+initAchievementsUI();
 animate();
