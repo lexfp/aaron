@@ -19,7 +19,22 @@ function defaultPlayerData() {
         level: 1,
         xp: 0,
         statPoints: 0,
-        stats: { health: 0, speed: 0, damage: 0, stamina: 0, staminaRegen: 0, jump: 0, reload: 0 }
+        stats: { health: 0, speed: 0, damage: 0, stamina: 0, staminaRegen: 0, jump: 0, reload: 0 },
+        achievements: {},
+        totalZombieKills: 0,
+        bestRescueTime: null,
+        totalRescueCompletions: 0,
+        totalPvpWins: 0,
+        bestZombieSession: 0,
+        totalMoneyEarned: 0,
+        totalDamageDealt: 0,
+        totalHeadshotKills: 0,
+        flawlessRuns: 0,
+        totalAirstrikes: 0,
+        totalExplosiveKills: 0,
+        apexKills: 0,
+        gigaKills: 0,
+        totalMedkitsUsed: 0,
     };
 }
 
@@ -55,7 +70,7 @@ export const playerState = {
     headshotReduction: 0,
     weapons: [], currentWeaponIndex: 0,
     weaponStates: {},
-    isZoomed: false, godMode: false, noClip: false, flyMode: false, speedMult: 1,
+    isZoomed: false, godMode: false, noClip: false, flyMode: false, nightVision: false, speedMult: 1,
     maxSlots: 4,
     stamina: 100, maxStamina: 100
 };
@@ -64,7 +79,7 @@ export function resetPlayerState(overrides = {}) {
     Object.assign(playerState, {
         hp: 100, maxHp: 100, armor: 0, maxArmor: 0, damageReduction: 0,
         headshotReduction: 0, weapons: [], currentWeaponIndex: 0,
-        weaponStates: {}, isZoomed: false, godMode: false, noClip: false, flyMode: false,
+        weaponStates: {}, isZoomed: false, godMode: false, noClip: false, flyMode: false, nightVision: false,
         speedMult: 1, maxSlots: 4, stamina: 100, maxStamina: 100, ...overrides
     });
 }
@@ -109,7 +124,11 @@ export const gameState = {
     // Cave map
     zombieSpawnCavern: null,  // { cx, cz, radius } — set by buildCaveMap, read by spawnZombie
     cavePlayerSpawn: null,    // { x, z } — center of a non-zombie cavern, set by buildCaveMap
-    caveAmbientNode: null     // AudioNode reference for cave ambient sound; null if Web Audio unavailable
+    caveAmbientNode: null,    // AudioNode reference for cave ambient sound; null if Web Audio unavailable
+    undergroundZones: [],    // [{minX,maxX,minZ,maxZ,depth}] — rectangular zones where floor = -depth
+    hiveMind: { squads: [], _nextSquadId: 0 },
+    missionStartTime: null,
+    tookDamageThisGame: false,
 };
 
 // --- Leveling ---
