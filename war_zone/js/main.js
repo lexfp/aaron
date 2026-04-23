@@ -1446,9 +1446,11 @@ function animate() {
                         playerData.totalMoneyEarned = (playerData.totalMoneyEarned || 0) + 3000;
                         playerData.totalRescueCompletions = (playerData.totalRescueCompletions || 0) + 1;
                         if (!gameState.tookDamageThisGame) playerData.flawlessRuns = (playerData.flawlessRuns || 0) + 1;
-                        const elapsedSec = (performance.now() - (gameState.missionStartTime || performance.now())) / 1000;
-                        if (playerData.bestRescueTime === null || elapsedSec < playerData.bestRescueTime) {
-                            playerData.bestRescueTime = elapsedSec;
+                        if (gameState.missionStartTime) {
+                            const elapsedSec = (performance.now() - gameState.missionStartTime) / 1000;
+                            if (playerData.bestRescueTime == null || elapsedSec < playerData.bestRescueTime) {
+                                playerData.bestRescueTime = elapsedSec;
+                            }
                         }
                         savePlayerData();
                         checkAchievements();
