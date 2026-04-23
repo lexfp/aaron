@@ -20,6 +20,8 @@
         <button id="btn-shop" class="menu-btn">Shop</button>
         <button id="btn-loadout" class="menu-btn">Loadout</button>
         <button class="menu-btn" style="font-size:15px;opacity:0.75" onclick="showTutorial()">Tutorial</button>
+        <button class="menu-btn" style="font-size:15px;opacity:0.75" onclick="openKeybindsMenu()">Keybinds</button>
+        <button class="menu-btn" style="font-size:15px;opacity:0.75" onclick="window._openAchievements && window._openAchievements()">Achievements</button>
         <div class="player-stats">
             Money: <span id="home-money">$100</span><br>
             Missions: <span id="home-missions">0</span><br>
@@ -118,6 +120,10 @@
         <div id="damage-overlay"></div>
         <div id="cheat-console"><input id="cheat-input" placeholder="Say something... (` for commands)" /></div>
         <div id="cheat-msg"></div>
+        <div id="admin-overlay" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.9);border:1px solid #555;border-radius:8px;padding:20px 28px;color:#fff;font-family:monospace;font-size:15px;z-index:2000;text-align:center;">
+            <div style="margin-bottom:10px;color:#aaa;">Enter access code:</div>
+            <input id="admin-code-input" type="password" autocomplete="off" style="background:#111;border:1px solid #555;border-radius:4px;color:#fff;font-family:monospace;font-size:14px;padding:6px 12px;width:180px;outline:none;" />
+        </div>
         <div id="chat-bubble"
             style="display:none;position:fixed;top:38%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.75);color:#fff;font-family:monospace;font-size:15px;padding:8px 18px;border-radius:20px;border:1px solid rgba(255,255,255,0.3);max-width:400px;text-align:center;z-index:80;pointer-events:none;">
         </div>
@@ -153,6 +159,21 @@
         </div>
     </div>
 
+    <!-- Achievements overlay -->
+    <div id="achievements-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:2100;justify-content:center;align-items:center;"></div>
+
+    <!-- Keybinds overlay -->
+    <div id="keybinds-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:2100;justify-content:center;align-items:center;">
+        <div style="background:linear-gradient(135deg,#0a0a1a,#1a1a2e);border:1px solid #444;border-radius:14px;padding:32px 40px;max-width:660px;width:92%;max-height:84vh;overflow-y:auto;">
+            <h2 style="color:#ffaa00;margin:0 0 20px;font-size:1.4rem;text-align:center;letter-spacing:2px;">KEYBINDS</h2>
+            <div id="keybinds-list" tabindex="-1" style="outline:none;"></div>
+            <div style="text-align:center;margin-top:22px;display:flex;gap:12px;justify-content:center;">
+                <button id="keybinds-reset-btn" style="padding:10px 26px;border:2px solid #666;background:transparent;color:#aaa;border-radius:8px;cursor:pointer;font-family:inherit;font-size:0.9rem;">Reset Defaults</button>
+                <button id="keybinds-close-btn" style="padding:10px 26px;border:2px solid #ffaa00;background:rgba(255,170,0,0.1);color:#ffaa00;border-radius:8px;cursor:pointer;font-family:inherit;font-size:0.9rem;">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Round overlay -->
     <div id="round-overlay">
         <div id="round-text"></div>
@@ -165,6 +186,7 @@
     <div id="pause-menu">
         <h2>PAUSED</h2>
         <button class="menu-btn" onclick="resumeGame()">Resume</button>
+        <button class="menu-btn" style="font-size:15px;opacity:0.85" onclick="openKeybindsMenu()">Keybinds</button>
         <button class="menu-btn" onclick="quitToMenu()">Quit to Menu</button>
     </div>
 
