@@ -8,8 +8,107 @@ import { playGunshot } from './audio.js';
 import { addKillFeed, updateHUD, showRoundOverlay } from './ui.js';
 import { dropWeapon } from './weapons.js';
 import { damagePlayer, checkPvPEnd } from './combat.js';
+import { checkAchievements } from './achievements.js';
 
 // --- Zombies ---
+
+const SQUAD_ADJ  = ['Rotting','Crimson','Plague','Shadow','Feral','Hollow','Dread','Vile','Rotten','Undead'];
+const SQUAD_NOUN = ['Horde','Pack','Tide','Surge','Swarm','Brood','Mob','Siege','Band','Drift'];
+function generateSquadName() {
+    return SQUAD_ADJ[Math.floor(Math.random() * SQUAD_ADJ.length)]
+         + ' ' + SQUAD_NOUN[Math.floor(Math.random() * SQUAD_NOUN.length)];
+}
+
+function addSquadNameSprite(zombie, name) {
+    if (zombie.nameSprite) zombie.mesh.remove(zombie.nameSprite);
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 48;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 256, 48);
+    ctx.font = 'bold 28px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ff6600';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 4;
+    ctx.strokeText(name, 128, 36);
+    ctx.fillText(name, 128, 36);
+    const tex = new THREE.CanvasTexture(canvas);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+    const bs = zombie.isApex ? 4.5 : (zombie.isGiga ? 4.05 : (zombie.isBoss ? 2.5 : 0.9));
+    sprite.scale.set(3, 0.6, 1);
+    sprite.position.y = bs * 2.2 + 0.5;
+    zombie.mesh.add(sprite);
+    zombie.nameSprite = sprite;
+}
+
+const _ROLE_SLOTS = ['flanker_l', 'flanker_l', 'flanker_r', 'flanker_r', 'charger', 'charger', 'support', 'support', 'support'];
+
+function assignSquad(zombie) {
+    const pos = zombie.mesh.position;
+    const squads = gameState.hiveMind.squads;
+
+    if (zombie.isBoss) {
+        const squad = {
+            id: gameState.hiveMind._nextSquadId++,
+            name: generateSquadName(),
+            members: [zombie],
+            state: 'assembling',
+            leaderId: zombie.mesh.uuid,
+            commanderId: null,
+            executeTimer: 0
+        };
+        zombie.squadId = squad.id;
+        zombie.squadRole = 'leader';
+        addSquadNameSprite(zombie, squad.name);
+        squads.push(squad);
+
+        // Auto-assign to a nearby commander that has room
+        for (const z of gameState.zombieEntities) {
+            if ((z.isGiga || z.isApex) && !z.dead && z.commandedSquads) {
+                const limit = z.isApex ? 10 : 5;
+                if (z.commandedSquads.length < limit) {
+                    const ddx = z.mesh.position.x - pos.x;
+                    const ddz = z.mesh.position.z - pos.z;
+                    if (Math.sqrt(ddx * ddx + ddz * ddz) <= 80) {
+                        z.commandedSquads.push(squad.id);
+                        squad.commanderId = z.mesh.uuid;
+                        break;
+                    }
+                }
+            }
+        }
+    } else {
+        // Regular zombie: join nearest squad with a boss leader and room
+        let best = null, bestDist = Infinity;
+        for (const squad of squads) {
+            if (!squad.leaderId || squad.members.length >= 10) continue;
+            const leaderZ = squad.members.find(m => m.squadRole === 'leader');
+            if (!leaderZ || leaderZ.dead) continue;
+            const ddx = leaderZ.mesh.position.x - pos.x;
+            const ddz = leaderZ.mesh.position.z - pos.z;
+            const d = Math.sqrt(ddx * ddx + ddz * ddz);
+            if (d <= 30 && d < bestDist) { best = squad; bestDist = d; }
+        }
+        if (best) {
+            const roleIndex = best.members.length - 1;
+            zombie.squadRole = _ROLE_SLOTS[Math.min(roleIndex, _ROLE_SLOTS.length - 1)];
+            zombie.squadId = best.id;
+            best.members.push(zombie);
+            addSquadNameSprite(zombie, best.name);
+        }
+    }
+}
+
+function assignCommander(zombie) {
+    const limit = zombie.isApex ? 10 : 5;
+    zombie.commandedSquads = [];
+    for (const squad of gameState.hiveMind.squads) {
+        if (!squad.commanderId && zombie.commandedSquads.length < limit) {
+            squad.commanderId = zombie.mesh.uuid;
+            zombie.commandedSquads.push(squad.id);
+        }
+    }
+}
 
 export function spawnZombie(isBoss, isGiga = false, speedOverride = null, isApex = false) {
     const mapSize = MAPS[gameState.currentMap].size;
@@ -113,9 +212,27 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null, isApex
     mouth.rotation.z = (Math.random() - 0.5) * 0.4;
     head.add(mouth);
 
-    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.15, bodySize * 0.7, bodySize * 0.15), shirtMat);
-    leftArm.position.set(-bodySize * 0.4, bodySize * 0.7, 0); group.add(leftArm);
-    const rightArm = leftArm.clone(); rightArm.position.x = bodySize * 0.4; group.add(rightArm);
+    // Left arm — shoulder pivot + elbow joint
+    const leftArmGroup = new THREE.Group();
+    leftArmGroup.position.set(-bodySize * 0.4, bodySize * 1.05, 0);
+    const leftUpperArm = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.15, bodySize * 0.42, bodySize * 0.15), shirtMat);
+    leftUpperArm.position.y = -bodySize * 0.21; leftUpperArm.castShadow = true; leftArmGroup.add(leftUpperArm);
+    const leftForearmGroup = new THREE.Group();
+    leftForearmGroup.position.y = -bodySize * 0.42;
+    const leftForearmMesh = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.13, bodySize * 0.35, bodySize * 0.13), bodyMat);
+    leftForearmMesh.position.y = -bodySize * 0.175; leftForearmMesh.castShadow = true; leftForearmGroup.add(leftForearmMesh);
+    leftArmGroup.add(leftForearmGroup); group.add(leftArmGroup);
+
+    // Right arm — shoulder pivot + elbow joint
+    const rightArmGroup = new THREE.Group();
+    rightArmGroup.position.set(bodySize * 0.4, bodySize * 1.05, 0);
+    const rightUpperArm = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.15, bodySize * 0.42, bodySize * 0.15), shirtMat);
+    rightUpperArm.position.y = -bodySize * 0.21; rightUpperArm.castShadow = true; rightArmGroup.add(rightUpperArm);
+    const rightForearmGroup = new THREE.Group();
+    rightForearmGroup.position.y = -bodySize * 0.42;
+    const rightForearmMesh = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.13, bodySize * 0.35, bodySize * 0.13), bodyMat);
+    rightForearmMesh.position.y = -bodySize * 0.175; rightForearmMesh.castShadow = true; rightForearmGroup.add(rightForearmMesh);
+    rightArmGroup.add(rightForearmGroup); group.add(rightArmGroup);
 
     const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(bodySize * 0.18, bodySize * 0.5, bodySize * 0.18), pantMat);
     leftLeg.position.set(-bodySize * 0.15, bodySize * 0.25, 0); group.add(leftLeg);
@@ -227,6 +344,12 @@ export function spawnZombie(isBoss, isGiga = false, speedOverride = null, isApex
         stuckTimer: 0, prevHp: hp,
         wanderAngle: Math.random() * Math.PI * 2, wanderTimer: 0
     });
+    const _newZombie = gameState.zombieEntities[gameState.zombieEntities.length - 1];
+    if (isGiga || isApex) {
+        assignCommander(_newZombie);
+    } else {
+        assignSquad(_newZombie);
+    }
     gameState.zombiesAlive++;
 }
 
@@ -318,7 +441,7 @@ function hasLineOfSight(from, to) {
     return hits[0].distance > distToTarget - 0.5;
 }
 
-export function killZombie(z, idx) {
+export function killZombie(z, idx, isExplosive = false) {
     if (z.dead) return;
     z.dead = true; z.hp = 0;
     if (gameState.mode === 'zombie') {
@@ -329,7 +452,14 @@ export function killZombie(z, idx) {
             gameState.zombiesToSpawn += 3;
         }
         document.getElementById('wave-hud').textContent = `Kills: ${gameState.zombieTotalKills}`;
+        const sessionKills = gameState.zombieTotalKills;
+        if (sessionKills > (playerData.bestZombieSession || 0)) playerData.bestZombieSession = sessionKills;
     }
+    playerData.totalZombieKills = (playerData.totalZombieKills || 0) + 1;
+    playerData.totalMoneyEarned = (playerData.totalMoneyEarned || 0) + z.dropMoney;
+    if (isExplosive) playerData.totalExplosiveKills = (playerData.totalExplosiveKills || 0) + 1;
+    if (z.isApex) playerData.apexKills = (playerData.apexKills || 0) + 1;
+    if (z.isGiga) playerData.gigaKills = (playerData.gigaKills || 0) + 1;
     playerData.money += z.dropMoney;
     if (z.hpSprite) { z.mesh.remove(z.hpSprite); z.hpSprite = null; }
     if (z.weaponId) dropWeapon(z.weaponId, z.mesh.position.clone());
@@ -349,6 +479,7 @@ export function killZombie(z, idx) {
     const xp = z.isApex ? (300 + (playerData.level - 1) * 50) : (z.isGiga ? 200 : z.isBoss ? 50 : (gameState.mode === 'rescue' ? 15 : 10));
     awardXP(xp);
     savePlayerData();
+    checkAchievements();
 }
 
 function checkZombieCollision(pos, radius) {
@@ -432,6 +563,171 @@ const ZOMBIE_STEER_OFFSETS = [
     Math.PI * 0.85, -Math.PI * 0.85,
 ];
 
+function updateSquads() {
+    const squads = gameState.hiveMind.squads;
+    const playerPos = camera.position;
+
+    // Clear commandedSquads on dead commanders to free their squads
+    for (const z of gameState.zombieEntities) {
+        if ((z.isGiga || z.isApex) && z.dead && z.commandedSquads && z.commandedSquads.length > 0) {
+            for (const squadId of z.commandedSquads) {
+                const sq = squads.find(s => s.id === squadId);
+                if (sq) sq.commanderId = null;
+            }
+            z.commandedSquads = [];
+        }
+    }
+
+    for (let si = squads.length - 1; si >= 0; si--) {
+        const squad = squads[si];
+
+        // Prune dead members
+        squad.members = squad.members.filter(m => !m.dead);
+
+        if (squad.members.length === 0) {
+            squads.splice(si, 1);
+            continue;
+        }
+
+        // Promote new leader if current one died
+        let currentLeader = squad.members.find(m => m.squadRole === 'leader');
+        if (!currentLeader) {
+            squad.members[0].squadRole = 'leader';
+            squad.leaderId = squad.members[0].mesh.uuid;
+            currentLeader = squad.members[0];
+        }
+
+        // Try to merge a 1-member squad into another
+        if (squad.members.length === 1) {
+            const loner = squad.members[0];
+            let merged = false;
+            for (const other of squads) {
+                if (other === squad || other.members.length >= 10 || !other.leaderId) continue;
+                const ref = other.members[0];
+                if (!ref || ref.dead) continue;
+                const ddx = ref.mesh.position.x - loner.mesh.position.x;
+                const ddz = ref.mesh.position.z - loner.mesh.position.z;
+                if (Math.sqrt(ddx * ddx + ddz * ddz) < 50) {
+                    const roleIndex = other.members.length - 1;
+                    loner.squadRole = _ROLE_SLOTS[Math.min(roleIndex, _ROLE_SLOTS.length - 1)];
+                    loner.squadId = other.id;
+                    other.members.push(loner);
+                    addSquadNameSprite(loner, other.name);
+                    squads.splice(si, 1);
+                    merged = true;
+                    break;
+                }
+            }
+            if (merged) continue;
+        }
+
+        // State machine
+        const leaderPos = currentLeader.mesh.position;
+        const leaderDist = Math.sqrt(
+            (playerPos.x - leaderPos.x) ** 2 + (playerPos.z - leaderPos.z) ** 2
+        );
+
+        if (squad.state === 'assembling') {
+            if (squad.members.some(m => m.attracted)) {
+                squad.members.forEach(m => { m.attracted = true; });
+                squad.state = 'approaching';
+            }
+            // Dynamic recruitment: every 2s pull in nearby squadless zombies
+            squad._recruitTimer = (squad._recruitTimer || 0) + 1;
+            if (squad._recruitTimer >= 120 && squad.members.length < 10) {
+                squad._recruitTimer = 0;
+                for (const z of gameState.zombieEntities) {
+                    if (squad.members.length >= 10) break;
+                    if (z.dead || z.squadId !== undefined || z.isBoss || z.isGiga || z.isApex) continue;
+                    let near = false;
+                    for (const m of squad.members) {
+                        const ddx = z.mesh.position.x - m.mesh.position.x;
+                        const ddz = z.mesh.position.z - m.mesh.position.z;
+                        if (ddx * ddx + ddz * ddz <= 3600) { near = true; break; } // 60 units
+                    }
+                    if (near) {
+                        const roleIndex = squad.members.length - 1;
+                        z.squadRole = _ROLE_SLOTS[Math.min(roleIndex, _ROLE_SLOTS.length - 1)];
+                        z.squadId = squad.id;
+                        squad.members.push(z);
+                        addSquadNameSprite(z, squad.name);
+                    }
+                }
+            }
+        } else if (squad.state === 'approaching') {
+            if (leaderDist < 18) {
+                squad.state = 'executing';
+                squad.members.forEach(m => {
+                    m.mesh.traverse(c => { if (c.material) c.material.emissiveIntensity = 1.5; });
+                    setTimeout(() => m.mesh.traverse(c => { if (c.material) c.material.emissiveIntensity = 0; }), 500);
+                });
+            }
+        } else if (squad.state === 'executing') {
+            const allFar = squad.members.every(m => {
+                const ddx = playerPos.x - m.mesh.position.x;
+                const ddz = playerPos.z - m.mesh.position.z;
+                return Math.sqrt(ddx * ddx + ddz * ddz) > 30;
+            });
+            if (allFar) squad.state = 'approaching';
+        }
+
+        // Set squad move angles for executing members
+        if (squad.state === 'executing') {
+            const ldx = playerPos.x - leaderPos.x;
+            const ldz = playerPos.z - leaderPos.z;
+            const playerAngle = Math.atan2(ldx, ldz);
+            for (const m of squad.members) {
+                if (m.dead) continue;
+                switch (m.squadRole) {
+                    case 'leader':
+                    case 'charger':
+                        m._squadMoveAngle = playerAngle;
+                        break;
+                    case 'flanker_l':
+                        m._squadMoveAngle = playerAngle + Math.PI / 2;
+                        break;
+                    case 'flanker_r':
+                        m._squadMoveAngle = playerAngle - Math.PI / 2;
+                        break;
+                    case 'support': {
+                        const sdx = playerPos.x - m.mesh.position.x;
+                        const sdz = playerPos.z - m.mesh.position.z;
+                        if (Math.sqrt(sdx * sdx + sdz * sdz) > 25) {
+                            m._holdPosition = true;
+                        } else {
+                            m._squadMoveAngle = playerAngle;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // Commander broadcast: when Giga/Apex engages player, activate all commanded squads
+    for (const z of gameState.zombieEntities) {
+        if (!(z.isGiga || z.isApex) || z.dead || !z.attracted || !z.commandedSquads) continue;
+        let didBroadcast = false;
+        for (const squadId of z.commandedSquads) {
+            const sq = squads.find(s => s.id === squadId);
+            if (sq && sq.state === 'assembling') {
+                sq.members.forEach(m => { m.attracted = true; });
+                sq.state = 'approaching';
+                didBroadcast = true;
+            }
+        }
+        if (didBroadcast && !z._broadcastPulsed) {
+            z._broadcastPulsed = true;
+            z.mesh.traverse(c => { if (c.material) c.material.emissiveIntensity = 3.0; });
+            const resetIntensity = z.isApex ? 0.7 : 0;
+            setTimeout(() => {
+                z.mesh.traverse(c => { if (c.material) c.material.emissiveIntensity = resetIntensity; });
+                z._broadcastPulsed = false;
+            }, 1000);
+        }
+    }
+}
+
 export function updateZombies(dt) {
     const playerPos = camera.position;
 
@@ -444,13 +740,14 @@ export function updateZombies(dt) {
             const guaranteedGigas = Math.floor(rawGigaChance);
             const extraGigaChance = rawGigaChance - guaranteedGigas;
             const gigaCount = guaranteedGigas + (Math.random() < extraGigaChance ? 1 : 0);
-            const apexChance = (gameState.mode === 'zombie' && playerData.level >= 3 && kills >= 20) ? Math.min(0.10, (playerData.level - 2) * 0.01) : 0;
+            const apexChance = (gameState.mode === 'zombie' && playerData.level >= 3 && kills >= 35) ? Math.min(0.05, (playerData.level - 2) * 0.005) : 0;
             if (gigaCount > 0 && Math.random() < apexChance) {
                 spawnZombie(false, false, null, true);
             } else if (gigaCount > 0) {
                 for (let g = 0; g < gigaCount; g++) spawnZombie(false, true);
             } else {
-                const isBoss = kills >= 20 && Math.random() < Math.min(0.3, 0.08 + kills * 0.003);
+                let isBoss = kills >= 20 && Math.random() < Math.min(0.3, 0.08 + kills * 0.003);
+                if (!isBoss && gameState.mode === 'zombie' && gameState.hiveMind.squads.length < 2) isBoss = true;
                 spawnZombie(isBoss, false);
             }
             gameState.zombiesToSpawn--;
@@ -459,6 +756,8 @@ export function updateZombies(dt) {
     }
 
     // No wave system in zombie mode — 3 new zombies spawn per 2 kills (handled in killZombie)
+
+    updateSquads();
 
     // Cache obstacle meshes across frames — only rebuild when obstacle count changes
     if (!updateZombies._rayMeshes || updateZombies._rayMeshLen !== obstacles.length) {
@@ -629,17 +928,26 @@ export function updateZombies(dt) {
                 z.wanderAngle += Math.PI * (0.5 + Math.random() * 0.5);
             }
             z.mesh.rotation.y = z.wanderAngle;
-        } else if (dist > stopDist) {
+        } else if (dist > stopDist && !z._holdPosition) {
             const zombieRadius = z.zombieRadius || (z.isBoss ? 0.7 : 0.5);
             let moveAngle = Math.atan2(dx, dz);
 
-            if (z.aiState === 'flank') {
-                const blendFactor = Math.min(1, dist / 16);
-                moveAngle += z.flankAngle * blendFactor;
-            } else if (z.aiState === 'strafe') {
-                const perpAngle = moveAngle + Math.PI / 2 * z.strafeDir;
-                const blendFactor = dist > 11 ? 0.22 : 0.42;
-                moveAngle = moveAngle * (1 - blendFactor) + perpAngle * blendFactor;
+            const hasSquadAngle = z._squadMoveAngle !== undefined;
+            if (hasSquadAngle) {
+                moveAngle = z._squadMoveAngle;
+                if (z.squadRole === 'charger') z.aiState = 'charge';
+                delete z._squadMoveAngle;
+            }
+
+            if (!hasSquadAngle) {
+                if (z.aiState === 'flank') {
+                    const blendFactor = Math.min(1, dist / 16);
+                    moveAngle += z.flankAngle * blendFactor;
+                } else if (z.aiState === 'strafe') {
+                    const perpAngle = moveAngle + Math.PI / 2 * z.strafeDir;
+                    const blendFactor = dist > 11 ? 0.22 : 0.42;
+                    moveAngle = moveAngle * (1 - blendFactor) + perpAngle * blendFactor;
+                }
             }
 
             const step = z.speed * nightSpeedMult * dt;
@@ -694,40 +1002,53 @@ export function updateZombies(dt) {
 
             z.mesh.rotation.y = Math.atan2(dx, dz);
         }
+        if (z._holdPosition) z._holdPosition = false;
 
         // Anim
         const walkPhase = Date.now() * 0.006 + i * 1.7;
         const isInCombat = !isWandering && canReachPlayer && dist < attackDist;
+        const lArm = z.mesh.children[2]; // shoulder group
+        const rArm = z.mesh.children[3];
+        const lFore = lArm.children[1];  // elbow group
+        const rFore = rArm.children[1];
 
         if (isInCombat && useWeapon && wDef.type === 'gun') {
-            // Left arm raised, right arm extended forward holding gun
-            z.mesh.children[2].rotation.x = -0.3;
-            z.mesh.children[3].rotation.x = -1.2; // right arm forward
-            z.mesh.children[2].rotation.z = 0.15;
-            z.mesh.children[3].rotation.z = -0.1;
+            // Right arm aims forward, left arm raised as support — both elbows bent
+            lArm.rotation.x = -0.4; lArm.rotation.z = 0.3; lArm.rotation.y = 0;
+            rArm.rotation.x = -1.1; rArm.rotation.z = -0.12; rArm.rotation.y = 0;
+            lFore.rotation.x = 0.55; // support elbow bent inward
+            rFore.rotation.x = 0.15; // trigger elbow nearly straight
             z.mesh.children[0].rotation.z = 0;
-            z.mesh.children[0].rotation.x = 0;
+            z.mesh.children[0].rotation.x = -0.1;
             z.mesh.children[1].rotation.x = 0;
         } else if (isInCombat && (!useWeapon || (wDef && wDef.type === 'melee'))) {
             const punchPhase = (Date.now() * 0.008) % (Math.PI * 2);
             const punchA = Math.sin(punchPhase);
             const punchB = Math.sin(punchPhase + Math.PI);
-            // Arms swing hard forward and back
-            z.mesh.children[2].rotation.x = -Math.PI * 0.85 * Math.max(0, punchA);
-            z.mesh.children[3].rotation.x = -Math.PI * 0.85 * Math.max(0, punchB);
-            // Arms flare out slightly on the backswing
-            z.mesh.children[2].rotation.z = 0.15 + 0.25 * Math.max(0, -punchA);
-            z.mesh.children[3].rotation.z = -0.15 - 0.25 * Math.max(0, -punchB);
-            // Body rocks side to side with each punch
-            z.mesh.children[0].rotation.z = Math.sin(punchPhase) * 0.18;
-            z.mesh.children[0].rotation.x = -0.15 + Math.abs(Math.sin(punchPhase)) * 0.2;
-            // Head bobs forward aggressively
-            z.mesh.children[1].rotation.x = 0.15 + Math.abs(Math.sin(punchPhase)) * 0.25;
+            // Shoulders alternate hard forward punches
+            lArm.rotation.x = -Math.PI * 0.8 * Math.max(0, punchA) - 0.2;
+            rArm.rotation.x = -Math.PI * 0.8 * Math.max(0, punchB) - 0.2;
+            lArm.rotation.y = 0; rArm.rotation.y = 0;
+            // Elbows: extend on forward punch, bend sharply on backswing
+            lFore.rotation.x = 0.35 + 0.5 * Math.max(0, -punchA);
+            rFore.rotation.x = 0.35 + 0.5 * Math.max(0, -punchB);
+            // Arms flare outward on backswing
+            lArm.rotation.z = 0.18 + 0.3 * Math.max(0, -punchA);
+            rArm.rotation.z = -0.18 - 0.3 * Math.max(0, -punchB);
+            // Body rocks and lunges
+            z.mesh.children[0].rotation.z = Math.sin(punchPhase) * 0.2;
+            z.mesh.children[0].rotation.x = -0.15 + Math.abs(Math.sin(punchPhase)) * 0.25;
+            z.mesh.children[1].rotation.x = 0.2 + Math.abs(Math.sin(punchPhase)) * 0.3;
         } else {
-            z.mesh.children[2].rotation.x = Math.sin(walkPhase) * 0.6;
-            z.mesh.children[3].rotation.x = Math.sin(walkPhase + Math.PI) * 0.6;
-            z.mesh.children[2].rotation.z = 0.15;
-            z.mesh.children[3].rotation.z = -0.15;
+            // Walk — arms slightly raised forward (classic zombie reach), elbows naturally bent
+            const forwardLift = isWandering ? 0.05 : 0.3;
+            lArm.rotation.x = -forwardLift + Math.sin(walkPhase) * 0.55;
+            rArm.rotation.x = -forwardLift + Math.sin(walkPhase + Math.PI) * 0.55;
+            lArm.rotation.z = 0.18; rArm.rotation.z = -0.18;
+            lArm.rotation.y = 0; rArm.rotation.y = 0;
+            // Elbow bends on the backswing, relaxes on the forward swing
+            lFore.rotation.x = 0.2 + Math.max(0, -Math.sin(walkPhase)) * 0.25;
+            rFore.rotation.x = 0.2 + Math.max(0, -Math.sin(walkPhase + Math.PI)) * 0.25;
             z.mesh.children[0].rotation.z = Math.sin(walkPhase * 0.5) * 0.05;
             z.mesh.children[0].rotation.x = 0;
             z.mesh.children[1].rotation.x = 0;
