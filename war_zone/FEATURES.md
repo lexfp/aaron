@@ -147,5 +147,22 @@ Persistent achievement system stored in `playerData.achievements` (localStorage)
 
 **Module:** `js/achievements.js` — leaf module (imports only `state.js`, `data.js`). Exports: `checkAchievements()`, `initAchievementsUI()`, `openAchievementsScreen()`.
 
+## Homepage UI
+
+The `#homepage` div uses a **two-panel split layout** with a dark military visual style (near-black backgrounds: `#0d0b0b` / `#0b0b0b`).
+
+**Left panel** (`.home-left`, 280px wide):
+- Thin red accent bar on the left edge
+- "WAR / ZONE" title in a red gradient (`#ff4444 → #cc2222 → #8a1515`) with subtitle text
+- Player stat display: Money, Level, Missions
+- 5 utility buttons at the bottom (class `.util-btn`): **Shop**, **Loadout**, **Tutorial**, **Keybinds**, **Achievements**
+
+**Right panel** (`.home-right`, `flex: 1`):
+- Three game-mode rows (class `.mode-row`): **Zombie Apocalypse**, **Rescue Mission**, **PvP Arena**
+- Each row contains: animated left stripe, icon, mode name, description, and an arrow indicator
+- On hover: row slides right and accent color turns bright red (`#ff4444`)
+
+**Visual style:** No glow effects. Muted red accents at rest, bright red on hover. Scanline texture overlay. The `.menu-btn` class is **not** used on the homepage — it is reserved for the pause menu and round overlay buttons.
+
 ## Module Map
 `engine.js` scene/camera/renderer · `data.js` all constants · `state.js` player+game state, leveling · `map.js` terrain+chunk streaming · `entities.js` enemy AI+spawning · `weapons.js` view models+reload · `combat.js` shooting+damage+explosions · `input.js` keyboard/mouse/chat · `ui.js` shop/loadout/HUD · `audio.js` Web Audio synth · `main.js` game loop+collision+3rd-person camera

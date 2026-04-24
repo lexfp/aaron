@@ -20,6 +20,8 @@ Don't rely on console debug statements. The cursor is locked, so use alerts inst
 
 **Feature documentation:** `war_zone/FEATURES.md` is the authoritative reference for every game system (weapons, maps, modes, combat, progression, controls, rendering, etc.). **Update `war_zone/FEATURES.md` every time any war_zone feature is added, changed, or removed** — it must stay in sync with the code.
 
+**Homepage layout:** The `#homepage` div uses a two-panel split layout (dark military style, near-black backgrounds). Left panel (`.home-left`, 280px): red accent bar, "WAR / ZONE" red-gradient title, player stats (Money, Level, Missions), and 5 utility buttons (Shop, Loadout, Tutorial, Keybinds, Achievements — class `.util-btn`). Right panel (`.home-right`, flex: 1): three game-mode rows (class `.mode-row`) for Zombie Apocalypse, Rescue Mission, PvP Arena — each with animated stripe, icon, name, description, and arrow; slides right and turns red on hover. The `.menu-btn` class is used only by the pause menu and round overlay, not the homepage.
+
 ### tic-tac-toe-bot/ — Bot with Minimax AI (Vanilla JS + Jest)
 ```bash
 npm install --prefix tic-tac-toe-bot   # first time only
