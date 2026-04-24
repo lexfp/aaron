@@ -12,20 +12,70 @@
 <body>
     <!-- Homepage -->
     <div id="homepage">
-        <h1>WARZONE</h1>
-        <div class="subtitle">3D Tactical Shooter</div>
-        <button id="btn-zombie" class="menu-btn">Zombie Apocalypse</button>
-        <button id="btn-rescue" class="menu-btn">Rescue Mission</button>
-        <button id="btn-pvp" class="menu-btn">PvP Arena</button>
-        <button id="btn-shop" class="menu-btn">Shop</button>
-        <button id="btn-loadout" class="menu-btn">Loadout</button>
-        <button class="menu-btn" style="font-size:15px;opacity:0.75" onclick="showTutorial()">Tutorial</button>
-        <button class="menu-btn" style="font-size:15px;opacity:0.75" onclick="openKeybindsMenu()">Keybinds</button>
-        <button class="menu-btn" style="font-size:15px;opacity:0.75" onclick="window._openAchievements && window._openAchievements()">Achievements</button>
-        <div class="player-stats">
-            Money: <span id="home-money">$100</span><br>
-            Missions: <span id="home-missions">0</span><br>
-            Level: <span id="home-level">1</span>
+        <div class="home-left">
+            <div class="home-brand">
+                <div class="home-title">WAR<br>ZONE</div>
+                <div class="home-subtitle">3D Tactical Shooter</div>
+                <div class="home-divider"></div>
+                <div class="home-stats">
+                    <div class="home-stat-row">
+                        <span class="home-stat-label">Money</span>
+                        <span class="home-stat-value" id="home-money">$100</span>
+                    </div>
+                    <div class="home-stat-row">
+                        <span class="home-stat-label">Level</span>
+                        <span class="home-stat-value" id="home-level">1</span>
+                    </div>
+                    <div class="home-stat-row">
+                        <span class="home-stat-label">Missions</span>
+                        <span class="home-stat-value" id="home-missions">0</span>
+                    </div>
+                </div>
+            </div>
+            <div class="home-utils">
+                <div class="home-utils-label">Options</div>
+                <button id="btn-shop" class="util-btn"><span class="util-icon">🛒</span>Shop</button>
+                <button id="btn-loadout" class="util-btn"><span class="util-icon">⚙️</span>Loadout</button>
+                <button class="util-btn" onclick="showTutorial()"><span class="util-icon">📖</span>Tutorial</button>
+                <button class="util-btn" onclick="openKeybindsMenu()"><span class="util-icon">⌨️</span>Keybinds</button>
+                <button class="util-btn" onclick="window._openAchievements && window._openAchievements()"><span class="util-icon">🏆</span>Achievements</button>
+            </div>
+        </div>
+        <div class="home-right">
+            <div class="home-modes-label">Select Game Mode</div>
+            <button id="btn-zombie" class="mode-row">
+                <div class="mode-stripe"></div>
+                <div class="mode-inner">
+                    <span class="mode-icon">🧟</span>
+                    <div class="mode-text">
+                        <div class="mode-name">Zombie Apocalypse</div>
+                        <div class="mode-desc">Survive endless waves of the undead</div>
+                    </div>
+                    <span class="mode-arrow">›</span>
+                </div>
+            </button>
+            <button id="btn-rescue" class="mode-row">
+                <div class="mode-stripe"></div>
+                <div class="mode-inner">
+                    <span class="mode-icon">🚁</span>
+                    <div class="mode-text">
+                        <div class="mode-name">Rescue Mission</div>
+                        <div class="mode-desc">Locate and extract the hostage</div>
+                    </div>
+                    <span class="mode-arrow">›</span>
+                </div>
+            </button>
+            <button id="btn-pvp" class="mode-row">
+                <div class="mode-stripe"></div>
+                <div class="mode-inner">
+                    <span class="mode-icon">⚔️</span>
+                    <div class="mode-text">
+                        <div class="mode-name">PvP Arena</div>
+                        <div class="mode-desc">Fight for dominance in the arena</div>
+                    </div>
+                    <span class="mode-arrow">›</span>
+                </div>
+            </button>
         </div>
     </div>
 
