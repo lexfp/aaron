@@ -1012,6 +1012,21 @@ canvas {
 .lo-stat-bar      { height: 3px; border-radius: 2px; transition: width 0.2s; }
 .lo-stat-effect   { font-size: 9px; color: #333; margin-top: 4px; }
 
+.lo-stat-step {
+    width: 38px;
+    background: #1a0a0a;
+    border: 1px solid #cc2200;
+    color: #fff;
+    font-size: 12px;
+    font-family: inherit;
+    text-align: center;
+    padding: 2px 0;
+    border-radius: 2px;
+}
+.lo-stat-step::-webkit-inner-spin-button,
+.lo-stat-step::-webkit-outer-spin-button { display: none; }
+.lo-stat-step:focus { outline: none; border-color: #ff4422; }
+
 .start-btn {
     display: block;
     margin: 30px auto;
