@@ -1023,6 +1023,7 @@ canvas {
     padding: 2px 0;
     border-radius: 2px;
     -moz-appearance: textfield;
+    margin-right: 10px;
 }
 .lo-stat-step::-webkit-inner-spin-button,
 .lo-stat-step::-webkit-outer-spin-button { display: none; }
