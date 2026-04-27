@@ -559,8 +559,14 @@ export function showLoadout() {
     const ptsBanner = document.createElement('div');
     ptsBanner.className = 'lo-pts-banner';
     ptsBanner.innerHTML = `
-        <div class="lo-pts-label">Available Points</div>
-        <div class="lo-pts-val" id="lo-stat-pts-val">${playerData.statPoints}</div>
+        <div class="lo-pts-left">
+            <div class="lo-pts-label">Available Points</div>
+            <div class="lo-pts-val" id="lo-stat-pts-val">${playerData.statPoints}</div>
+        </div>
+        <div class="lo-pts-step-wrap">
+            <div class="lo-pts-label">Step</div>
+            <input class="lo-stat-step" id="lo-stat-step-global" type="number" value="1" min="1">
+        </div>
     `;
     statsBody.appendChild(ptsBanner);
 
@@ -583,7 +589,6 @@ export function showLoadout() {
         row.innerHTML = `
             <div class="lo-stat-top">
                 <div class="lo-stat-name">${label}</div>
-                <input class="lo-stat-step" type="number" value="1" min="1" title="Step size">
                 <div class="lo-stat-controls">
                     <button class="lo-stat-btn lo-btn-rem" ${pts < 1 ? 'disabled' : ''}>−</button>
                     <div class="lo-stat-val">${pts}</div>
@@ -600,10 +605,9 @@ export function showLoadout() {
         const addBtn = row.querySelector('.lo-btn-add');
         const valEl  = row.querySelector('.lo-stat-val');
         const barEl  = row.querySelector('.lo-stat-bar');
-        const stepEl = row.querySelector('.lo-stat-step');
 
         remBtn.onclick = () => {
-            const step = Math.max(1, parseInt(stepEl.value) || 1);
+            const step = Math.max(1, parseInt(document.getElementById('lo-stat-step-global').value) || 1);
             const remove = Math.min(step, playerData.stats[key]);
             if (remove < 1) return;
             playerData.stats[key] -= remove;
@@ -618,7 +622,7 @@ export function showLoadout() {
         };
 
         addBtn.onclick = () => {
-            const step = Math.max(1, parseInt(stepEl.value) || 1);
+            const step = Math.max(1, parseInt(document.getElementById('lo-stat-step-global').value) || 1);
             const add = Math.min(step, playerData.statPoints);
             if (add < 1) return;
             playerData.stats[key] += add;
@@ -640,45 +644,94 @@ window.showLoadout = showLoadout;
 // --- Map Screen ---
 
 export function renderMapScreen(startGameFn) {
-    const grid = document.getElementById('map-grid');
-    grid.innerHTML = '';
-    for (const [id, m] of Object.entries(MAPS)) {
-        const card = document.createElement('div');
-        card.className = 'map-card';
+    const modeNames = { zombie: 'Zombie Apocalypse', rescue: 'Rescue Mission', pvp: 'PvP Arena' };
+    document.getElementById('ms-mode-badge').textContent = 'Mode: ' + (modeNames[gameState.pendingMode] || '—');
 
-        let bgUrl = '';
-        if (id === 'warehouse') bgUrl = 'linear-gradient(135deg, #222, #444)';
-        else if (id === 'desert') bgUrl = 'linear-gradient(135deg, #c2a645, #dcb95e)';
-        else if (id === 'city') bgUrl = 'linear-gradient(135deg, #555, #888)';
-        else if (id === 'forest') bgUrl = 'linear-gradient(135deg, #1d3a1e, #2d5a2e)';
-        else if (id === 'mountain') bgUrl = 'linear-gradient(135deg, #444, #777)';
-        else if (id === 'fortress') bgUrl = 'linear-gradient(135deg, #5a4a3c, #887868)';
-        else if (id === 'hallway') bgUrl = 'linear-gradient(135deg, #111, #222)';
+    const mapImages = {
+        warehouse: 'Pictures/warehouse.png',
+        city:      'Pictures/city.png',
+        desert:    'Pictures/desert.png',
+        forest:    'Pictures/forest.png',
+        mountain:  'Pictures/mountains.png',
+        fortress:  'Pictures/fortress.png',
+        hallway:   'Pictures/hallway.png',
+    };
 
-        card.style.background = bgUrl;
+    const mapMeta = {
+        warehouse: { size: 'Small',  env: 'Indoor'      },
+        city:      { size: 'Large',  env: 'Outdoor'     },
+        desert:    { size: 'Large',  env: 'Outdoor'     },
+        forest:    { size: 'Large',  env: 'Outdoor'     },
+        mountain:  { size: 'Large',  env: 'Outdoor'     },
+        fortress:  { size: 'Medium', env: 'Mixed'       },
+        hallway:   { size: 'Medium', env: 'Indoor'      },
+        cave:      { size: 'Medium', env: 'Underground' },
+    };
 
-        const mapImages = {
-            warehouse: 'Pictures/warehouse.png',
-            desert: 'Pictures/desert.png',
-            city: 'Pictures/city.png',
-            forest: 'Pictures/forest.png',
-            mountain: 'Pictures/mountains.png',
-            fortress: 'Pictures/fortress.png',
-            hallway: 'Pictures/hallway.png',
-        };
-        const imgHtml = mapImages[id]
-            ? `<img src="${mapImages[id]}" alt="${m.name}" style="width:100%; border-radius:5px; margin-top:10px; display:block; object-fit:cover; max-height:120px;">`
-            : '';
-        card.innerHTML = `
-            <div style="background:rgba(0,0,0,0.6); padding: 15px; border-radius: 8px; height: 100%;">
-                <h3 style="color:#fff; text-shadow: 1px 1px 2px #000;">${m.name}</h3>
-                <p style="color:#ddd;">${m.description}</p>
-                ${imgHtml}
-            </div>
-        `;
-        card.onclick = () => startGameFn(gameState.pendingMode, id);
-        grid.appendChild(card);
+    const list = document.getElementById('ms-list');
+    // Clear all items but keep the label header
+    list.querySelectorAll('.ms-item').forEach(el => el.remove());
+
+    const mapIds = Object.keys(MAPS);
+    document.getElementById('ms-list-label').textContent = `${mapIds.length} Maps Available`;
+
+    let selectedId = null;
+
+    function selectMap(id) {
+        selectedId = id;
+        list.querySelectorAll('.ms-item').forEach(el => el.classList.remove('active'));
+        const item = list.querySelector(`[data-map="${id}"]`);
+        if (item) item.classList.add('active');
+
+        const m = MAPS[id];
+        const imgEl = document.getElementById('ms-preview-img');
+        const src = mapImages[id];
+        if (src) {
+            imgEl.src = src;
+            imgEl.style.display = '';
+        } else {
+            imgEl.src = '';
+            imgEl.style.display = 'none';
+        }
+        document.getElementById('ms-preview-name').textContent = m.name;
+        document.getElementById('ms-preview-desc').textContent = m.description;
+
+        const meta = mapMeta[id] || {};
+        const tagsEl = document.getElementById('ms-preview-tags');
+        tagsEl.innerHTML = '';
+        [meta.size, meta.env].filter(Boolean).forEach(label => {
+            const t = document.createElement('div');
+            t.className = 'ms-tag';
+            t.textContent = label;
+            tagsEl.appendChild(t);
+        });
+
+        document.getElementById('ms-deploy-btn').textContent = `Deploy to ${m.name} →`;
     }
+
+    for (const [id, m] of Object.entries(MAPS)) {
+        const meta = mapMeta[id] || {};
+        const item = document.createElement('div');
+        item.className = 'ms-item';
+        item.dataset.map = id;
+        item.innerHTML = `
+            <div class="ms-item-dot"></div>
+            <div class="ms-item-info">
+                <div class="ms-item-name">${m.name}</div>
+                <div class="ms-item-size">${meta.size || ''} · ${meta.env || ''}</div>
+            </div>
+            <div class="ms-item-arrow">›</div>
+        `;
+        item.onclick = () => selectMap(id);
+        list.appendChild(item);
+    }
+
+    document.getElementById('ms-deploy-btn').onclick = () => {
+        if (selectedId) startGameFn(gameState.pendingMode, selectedId);
+    };
+
+    selectMap(mapIds[0]);
+    showScreen('map-screen');
 }
 
 // --- HUD ---
