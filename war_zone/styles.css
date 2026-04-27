@@ -974,7 +974,7 @@ canvas {
     margin-bottom: 5px;
 }
 
-.lo-stat-name { font-size: 11px; color: #aaa; }
+.lo-stat-name { font-size: 11px; color: #aaa; flex: 1; }
 .lo-stat-controls { display: flex; align-items: center; gap: 5px; }
 
 .lo-stat-btn {
