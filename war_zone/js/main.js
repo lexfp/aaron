@@ -1778,6 +1778,7 @@ function animate() {
 // --- Initialize ---
 
 document.getElementById('btn-zombie').addEventListener('click', () => { gameState.pendingMode = 'zombie'; renderMapScreen(startGame); });
+// Rescue bypasses the map screen — level-gated and always uses mountain map
 document.getElementById('btn-rescue').addEventListener('click', () => {
     if (playerData.level < 10) {
         const overlay = document.getElementById('rescue-warning-overlay');
