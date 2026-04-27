@@ -655,6 +655,7 @@ export function renderMapScreen(startGameFn) {
         mountain:  'Pictures/mountains.png',
         fortress:  'Pictures/fortress.png',
         hallway:   'Pictures/hallway.png',
+        // cave intentionally omitted — enclosed map has no screenshot; img is hidden in selectMap
     };
 
     const mapMeta = {
