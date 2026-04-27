@@ -600,31 +600,36 @@ export function showLoadout() {
         const addBtn = row.querySelector('.lo-btn-add');
         const valEl  = row.querySelector('.lo-stat-val');
         const barEl  = row.querySelector('.lo-stat-bar');
+        const stepEl = row.querySelector('.lo-stat-step');
 
         remBtn.onclick = () => {
-            if (playerData.stats[key] < 1) return;
-            playerData.stats[key]--;
-            playerData.statPoints++;
+            const step = Math.max(1, parseInt(stepEl.value) || 1);
+            const remove = Math.min(step, playerData.stats[key]);
+            if (remove < 1) return;
+            playerData.stats[key] -= remove;
+            playerData.statPoints += remove;
             savePlayerData();
             valEl.textContent = playerData.stats[key];
             barEl.style.width = `${Math.min(100, (playerData.stats[key] / 10) * 100)}%`;
             document.getElementById('lo-stat-pts-val').textContent = playerData.statPoints;
             document.getElementById('lo-meta-pts').textContent = playerData.statPoints;
             remBtn.disabled = playerData.stats[key] < 1;
-            addBtn.disabled = false;
+            addBtn.disabled = playerData.statPoints < 1;
         };
 
         addBtn.onclick = () => {
-            if (playerData.statPoints < 1) return;
-            playerData.stats[key]++;
-            playerData.statPoints--;
+            const step = Math.max(1, parseInt(stepEl.value) || 1);
+            const add = Math.min(step, playerData.statPoints);
+            if (add < 1) return;
+            playerData.stats[key] += add;
+            playerData.statPoints -= add;
             savePlayerData();
             valEl.textContent = playerData.stats[key];
             barEl.style.width = `${Math.min(100, (playerData.stats[key] / 10) * 100)}%`;
             document.getElementById('lo-stat-pts-val').textContent = playerData.statPoints;
             document.getElementById('lo-meta-pts').textContent = playerData.statPoints;
             addBtn.disabled = playerData.statPoints < 1;
-            remBtn.disabled = false;
+            remBtn.disabled = playerData.stats[key] < 1;
         };
 
         statsBody.appendChild(row);
