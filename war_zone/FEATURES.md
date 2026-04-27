@@ -14,6 +14,9 @@ All controls (except 1–9 weapon slots) are rebindable via the **Keybinds** men
 | PvP Arena | Kill the AI enemy; first to win rounds wins | 3-slot loadout limit |
 
 ## Maps
+
+**Map selection screen:** Accessed after selecting a game mode on the homepage. Uses a two-column split layout: left scrollable list (220px) shows all available maps (Warehouse, City Ruins, Desert Outpost, Dark Forest, Rocky Mountains, Fortress, The Hallway, Cave) with map name and size; right side displays a full-bleed preview image (gradient overlay), map name, description, and tags. Clicking a map in the list updates the preview. The "Deploy to [Map] →" red button launches the game. Cave map has no preview image due to enclosed layout. Theme matches homepage/shop with dark military style and red accents.
+
 | Map | Size | Key Feature |
 |-----|------|-------------|
 | Warehouse | 120 | Pitch dark, flickering ceiling lights |
