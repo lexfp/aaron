@@ -1777,9 +1777,7 @@ function animate() {
 
 // --- Initialize ---
 
-renderMapScreen(startGame);
-
-document.getElementById('btn-zombie').addEventListener('click', () => { gameState.pendingMode = 'zombie'; showScreen('map-screen'); });
+document.getElementById('btn-zombie').addEventListener('click', () => { gameState.pendingMode = 'zombie'; renderMapScreen(startGame); });
 document.getElementById('btn-rescue').addEventListener('click', () => {
     if (playerData.level < 10) {
         const overlay = document.getElementById('rescue-warning-overlay');
@@ -1793,7 +1791,7 @@ document.getElementById('btn-rescue').addEventListener('click', () => {
         startGame('rescue', 'mountain');
     }
 });
-document.getElementById('btn-pvp').addEventListener('click', () => { gameState.pendingMode = 'pvp'; showScreen('map-screen'); });
+document.getElementById('btn-pvp').addEventListener('click', () => { gameState.pendingMode = 'pvp'; renderMapScreen(startGame); });
 document.getElementById('btn-shop').addEventListener('click', showShop);
 document.getElementById('btn-loadout').addEventListener('click', showLoadout);
 setupInput(CHEATS, resumeGame);
