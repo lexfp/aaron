@@ -345,30 +345,50 @@ function getArmorSVG(type, name, small = false) {
 export function showLoadout() {
     showScreen('loadout-screen');
     const maxSlots = gameState.pendingMode === 'pvp' ? 3 : 4;
-    document.getElementById('slots-info').textContent =
-        `Select up to ${maxSlots} weapons (${playerData.equippedLoadout.length}/${maxSlots} equipped)`;
-    const grid = document.getElementById('loadout-grid');
-    grid.innerHTML = '';
+
+    // ── Header meta ──
+    const modeNames = { zombie: 'Zombie Apocalypse', rescue: 'Rescue Mission', pvp: 'PvP Arena' };
+    document.getElementById('lo-meta-mode').textContent = modeNames[gameState.pendingMode] || '—';
+    document.getElementById('lo-meta-slots').textContent = `${playerData.equippedLoadout.length} / ${maxSlots}`;
+    document.getElementById('lo-meta-pts').textContent = playerData.statPoints;
+    document.getElementById('lo-weapons-sub').textContent = `Click to equip · max ${maxSlots} slots`;
+
+    // ── WEAPONS ──
+    const weaponsBody = document.getElementById('lo-col-weapons-body');
+    weaponsBody.innerHTML = '';
+
     for (const id of playerData.ownedWeapons) {
         const w = WEAPONS[id];
-        if (w.type === 'utility') continue; // hide utility items (compass, flashlight) from loadout
+        if (w.type === 'utility') continue;
         const equipped = playerData.equippedLoadout.includes(id);
         const needsRepair = (playerData.weaponUsage[id] || 0) >= DAMAGE_THRESHOLD;
-        const attachments = (playerData.weaponAttachments[id] || []).map(a => ATTACHMENTS[a].name).join(', ');
 
-        const item = document.createElement('div');
-        item.className = 'loadout-item' + (equipped ? ' equipped' : '') + (needsRepair ? ' needs-repair' : '');
-        item.innerHTML = `
-            <h4>${w.name}</h4>
-            <div class="ammo-info">${w.type === 'melee' ? 'Melee' : `Ammo: ${w.maxAmmo}`}</div>
-            ${attachments ? `<div class="ammo-info" style="color:#ff88ff">${attachments}</div>` : ''}
-            ${needsRepair ? '<div style="color:#ff4444;font-size:12px">NEEDS REPAIR</div>' : ''}
-            ${needsRepair ? `<button class="repair-btn" style="width:100%;padding:8px;margin-top:6px;background:#ff8800;color:#000;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer" data-repair-id="${id}">Repair ($50)</button>` : ''}
-            <div style="margin-top:6px;font-size:12px;color:#888">${equipped ? 'EQUIPPED' : 'Click to equip'}</div>
+        const card = document.createElement('div');
+        card.className = 'lo-w-card' +
+            (equipped ? ' lo-equipped' : '') +
+            (needsRepair ? ' lo-damaged' : '');
+
+        const ammoText = w.type === 'melee' ? 'Melee' : `${w.maxAmmo} / ${w.maxAmmo}`;
+        let badgeClass, badgeText, badgeTag;
+        if (needsRepair) {
+            badgeClass = 'lo-badge-rep'; badgeText = '⚠ REPAIR $50'; badgeTag = 'button';
+        } else if (equipped) {
+            badgeClass = 'lo-badge-on'; badgeText = 'EQUIPPED'; badgeTag = 'div';
+        } else {
+            badgeClass = 'lo-badge-off'; badgeText = 'equip'; badgeTag = 'div';
+        }
+
+        card.innerHTML = `
+            <div class="lo-w-icon">⚔</div>
+            <div class="lo-w-info">
+                <div class="lo-w-name">${w.name}</div>
+                <div class="lo-w-ammo">${ammoText}</div>
+            </div>
+            <${badgeTag} class="lo-w-badge ${badgeClass}">${badgeText}</${badgeTag}>
         `;
-        const repairBtn = item.querySelector('[data-repair-id]');
-        if (repairBtn) {
-            repairBtn.onclick = (e) => {
+
+        if (needsRepair) {
+            card.querySelector('.lo-w-badge').onclick = (e) => {
                 e.stopPropagation();
                 if (playerData.money >= 50) {
                     playerData.money -= 50;
@@ -377,82 +397,84 @@ export function showLoadout() {
                     showLoadout();
                 }
             };
+        } else {
+            card.onclick = () => {
+                if (equipped) {
+                    playerData.equippedLoadout = playerData.equippedLoadout.filter(x => x !== id);
+                } else {
+                    if (playerData.equippedLoadout.length >= maxSlots) return;
+                    playerData.equippedLoadout.push(id);
+                }
+                savePlayerData();
+                showLoadout();
+            };
         }
-        item.onclick = () => {
-            if (needsRepair) return;
-            if (equipped) {
-                playerData.equippedLoadout = playerData.equippedLoadout.filter(x => x !== id);
-            } else {
-                if (playerData.equippedLoadout.length >= maxSlots) return;
-                playerData.equippedLoadout.push(id);
-            }
-            savePlayerData();
-            showLoadout();
-        };
-        grid.appendChild(item);
+        weaponsBody.appendChild(card);
     }
 
-    // --- Armor equip slots (drag-drop targets) ---
-    document.getElementById('loadout-armor-section')?.remove();
-    const armorSection = document.createElement('div');
-    armorSection.id = 'loadout-armor-section';
-    armorSection.style.cssText = 'max-width:760px;margin:30px auto 0;';
-    armorSection.innerHTML = '<h3 style="color:#00aaff;font-size:22px;text-align:center;margin-bottom:6px">Armor Slots</h3><p style="color:#666;font-size:12px;text-align:center;margin:0 0 14px">Drag armor from your inventory below into a slot, or click Remove to unequip</p>';
+    // ── ARMOR ──
+    const armorBody = document.getElementById('lo-col-armor-body');
+    armorBody.innerHTML = '';
 
-    const armorSlotContainer = document.createElement('div');
-    armorSlotContainer.style.cssText = 'display:flex;gap:16px;justify-content:center;flex-wrap:wrap;';
+    // Retroactively sync equipped armor into ownedArmor (legacy data support)
+    for (const eqKey of ['equippedHelmet', 'equippedArmor', 'equippedPants', 'equippedBoots']) {
+        const id = playerData[eqKey];
+        if (id && !playerData.ownedArmor.includes(id)) playerData.ownedArmor.push(id);
+    }
 
-    const armorSlots = [
-        { key: 'equippedHelmet', label: 'HELMET', color: '#aa88ff', slotType: 'head' },
-        { key: 'equippedArmor', label: 'BREASTPLATE', color: '#00aaff', slotType: 'armor' },
-        { key: 'equippedPants', label: 'PANTS', color: '#00cc66', slotType: 'pants' },
-        { key: 'equippedBoots', label: 'BOOTS', color: '#ffaa00', slotType: 'boots' }
+    const slotDefs = [
+        { key: 'equippedHelmet', label: 'Helmet', slotType: 'head' },
+        { key: 'equippedArmor',  label: 'Chest',  slotType: 'armor' },
+        { key: 'equippedPants',  label: 'Legs',   slotType: 'pants' },
+        { key: 'equippedBoots',  label: 'Boots',  slotType: 'boots' }
     ];
 
-    for (const { key, label, color, slotType } of armorSlots) {
-        const slotDiv = document.createElement('div');
-        slotDiv.style.cssText = `background:rgba(0,0,0,0.55);border:2px dashed ${color};border-radius:10px;padding:14px 20px;text-align:center;min-width:170px;transition:border-style 0.15s,background 0.15s;`;
+    const slotsGrid = document.createElement('div');
+    slotsGrid.className = 'lo-armor-slots';
+
+    for (const { key, label, slotType } of slotDefs) {
         const eq = playerData[key] ? EQUIPMENT[playerData[key]] : null;
+        const slotDiv = document.createElement('div');
+        slotDiv.className = 'lo-a-slot' + (eq ? ' lo-a-filled' : '');
+        slotDiv.dataset.slotType = slotType;
+
         let statsHtml = '';
         if (eq) {
-            if (eq.armor) statsHtml += `<div style="color:#aaa;font-size:12px;margin-top:3px">+${eq.armor} armor</div>`;
-            if (eq.damageReduction) statsHtml += `<div style="color:#aaa;font-size:12px">-${eq.damageReduction * 100}% dmg</div>`;
-            if (eq.headshotReduction) statsHtml += `<div style="color:#aaa;font-size:12px">-${eq.headshotReduction * 100}% headshots</div>`;
+            const parts = [];
+            if (eq.armor) parts.push(`${eq.armor} armor`);
+            if (eq.damageReduction) parts.push(`${Math.round(eq.damageReduction * 100)}% DR`);
+            if (parts.length) statsHtml = `<div class="lo-a-slot-stats">${parts.join(' · ')}</div>`;
         }
-        const svg = getArmorSVG(slotType, eq ? eq.name : null);
+
         slotDiv.innerHTML = `
-            <div style="font-size:10px;color:#888;letter-spacing:1px;margin-bottom:6px">${label}</div>
-            ${svg}
-            <div style="font-weight:700;font-size:14px;color:${eq ? color : '#444'};margin-top:6px">${eq ? eq.name : '— Empty —'}</div>
+            <div class="lo-a-slot-label">${label}</div>
+            <div class="lo-a-slot-name">${eq ? eq.name : '— empty —'}</div>
             ${statsHtml}
-            <div style="margin-top:8px">
-                ${eq
-                ? `<button data-remove-key="${key}" style="background:#cc2222;color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:12px;cursor:pointer">Remove</button>`
-                : `<div style="color:#555;font-size:11px;margin-top:2px">Drop armor here</div>`}
-            </div>`;
-        const removeBtn = slotDiv.querySelector('[data-remove-key]');
-        if (removeBtn) {
-            removeBtn.onclick = () => {
+            ${eq ? `<button class="lo-a-remove">✕ remove</button>` : ''}
+        `;
+
+        if (eq) {
+            slotDiv.querySelector('.lo-a-remove').onclick = (e) => {
+                e.stopPropagation();
                 playerData[key] = null;
                 savePlayerData();
                 showLoadout();
             };
         }
 
-        // Drag-drop target
         slotDiv.addEventListener('dragover', e => {
             e.preventDefault();
             slotDiv.style.borderStyle = 'solid';
-            slotDiv.style.background = 'rgba(255,255,255,0.08)';
+            slotDiv.style.background = 'rgba(255,255,255,0.05)';
         });
         slotDiv.addEventListener('dragleave', () => {
-            slotDiv.style.borderStyle = 'dashed';
-            slotDiv.style.background = 'rgba(0,0,0,0.55)';
+            slotDiv.style.borderStyle = playerData[key] ? 'solid' : 'dashed';
+            slotDiv.style.background = playerData[key] ? 'rgba(204,34,0,0.04)' : '';
         });
         slotDiv.addEventListener('drop', e => {
             e.preventDefault();
-            slotDiv.style.borderStyle = 'dashed';
-            slotDiv.style.background = 'rgba(0,0,0,0.55)';
+            slotDiv.style.borderStyle = playerData[key] ? 'solid' : 'dashed';
+            slotDiv.style.background = playerData[key] ? 'rgba(204,34,0,0.04)' : '';
             const armorId = e.dataTransfer.getData('armorId');
             const armorType = e.dataTransfer.getData('armorType');
             if (armorType === slotType) {
@@ -461,235 +483,140 @@ export function showLoadout() {
                 window._updateTpArmor?.();
                 showLoadout();
             } else {
-                // Flash red to indicate wrong slot
                 slotDiv.style.borderColor = '#ff2222';
-                setTimeout(() => { slotDiv.style.borderColor = color; }, 600);
+                setTimeout(() => { slotDiv.style.borderColor = ''; }, 600);
             }
         });
-        armorSlotContainer.appendChild(slotDiv);
-    }
 
-    armorSection.appendChild(armorSlotContainer);
-
-    // --- Owned Armor Inventory ---
-    // Retroactively add any currently-equipped armor that might pre-date ownedArmor tracking
-    for (const [eqKey, slotType] of [['equippedHelmet', 'head'], ['equippedArmor', 'armor'], ['equippedPants', 'pants'], ['equippedBoots', 'boots']]) {
-        const id = playerData[eqKey];
-        if (id && !playerData.ownedArmor.includes(id)) playerData.ownedArmor.push(id);
+        slotsGrid.appendChild(slotDiv);
     }
+    armorBody.appendChild(slotsGrid);
+
+    const divider = document.createElement('div');
+    divider.className = 'lo-divider';
+    armorBody.appendChild(divider);
+
+    const invLabel = document.createElement('div');
+    invLabel.className = 'lo-inv-label';
+    invLabel.textContent = 'Owned Armor — drag to equip';
+    armorBody.appendChild(invLabel);
+
+    const typeToKey = { head: 'equippedHelmet', armor: 'equippedArmor', pants: 'equippedPants', boots: 'equippedBoots' };
+    const typeLabel = { head: 'Head', armor: 'Chest', pants: 'Legs', boots: 'Boots' };
 
     if (playerData.ownedArmor.length > 0) {
-        const invSection = document.createElement('div');
-        invSection.style.cssText = 'margin-top:22px;';
-        invSection.innerHTML = '<h4 style="color:#aaa;font-size:16px;text-align:center;margin:0 0 10px">INVENTORY — Drag to equip</h4>';
-        const invGrid = document.createElement('div');
-        invGrid.style.cssText = 'display:flex;gap:12px;justify-content:center;flex-wrap:wrap;';
-
-        const typeGroups = { head: [], armor: [], pants: [], boots: [] };
         for (const id of playerData.ownedArmor) {
             const eq = EQUIPMENT[id];
-            if (eq && typeGroups[eq.type]) typeGroups[eq.type].push(id);
-        }
+            if (!eq) continue;
+            const eqKey = typeToKey[eq.type];
+            const isEquipped = playerData[eqKey] === id;
 
-        for (const [type, ids] of Object.entries(typeGroups)) {
-            for (const id of ids) {
-                const eq = EQUIPMENT[id];
-                if (!eq) continue;
-                const equippedKey = type === 'head' ? 'equippedHelmet' : type === 'armor' ? 'equippedArmor' : type === 'pants' ? 'equippedPants' : 'equippedBoots';
-                const isEquipped = playerData[equippedKey] === id;
-                const slotColor = type === 'head' ? '#aa88ff' : type === 'armor' ? '#00aaff' : type === 'pants' ? '#00cc66' : '#ffaa00';
+            const card = document.createElement('div');
+            card.className = 'lo-a-inv-card' + (isEquipped ? ' lo-inv-equipped' : '');
+            card.draggable = true;
 
-                const card = document.createElement('div');
-                card.draggable = true;
-                card.style.cssText = `background:rgba(0,0,0,0.6);border:2px solid ${isEquipped ? slotColor : '#555'};border-radius:8px;padding:12px 16px;text-align:center;min-width:130px;cursor:grab;transition:border-color 0.15s,transform 0.1s;`;
-                const svg = getArmorSVG(type, eq.name, true);
-                let statsHtml2 = '';
-                if (eq.armor) statsHtml2 += `<div style="color:#aaa;font-size:11px">+${eq.armor} arm</div>`;
-                if (eq.damageReduction) statsHtml2 += `<div style="color:#aaa;font-size:11px">-${eq.damageReduction * 100}% dmg</div>`;
-                card.innerHTML = `
-                    ${svg}
-                    <div style="font-size:13px;font-weight:700;color:${slotColor};margin-top:4px">${eq.name}</div>
-                    ${statsHtml2}
-                    ${isEquipped ? `<div style="color:${slotColor};font-size:10px;margin-top:4px">✓ EQUIPPED</div>` : ''}
-                `;
-                card.addEventListener('dragstart', e => {
-                    e.dataTransfer.setData('armorId', id);
-                    e.dataTransfer.setData('armorType', type);
-                    card.style.opacity = '0.5';
-                });
-                card.addEventListener('dragend', () => { card.style.opacity = '1'; });
-                // Also allow click-to-equip as fallback
-                card.addEventListener('click', () => {
-                    const eqKey = type === 'head' ? 'equippedHelmet' : type === 'armor' ? 'equippedArmor' : type === 'pants' ? 'equippedPants' : 'equippedBoots';
-                    playerData[eqKey] = isEquipped ? null : id;
-                    savePlayerData();
-                    window._updateTpArmor?.();
-                    showLoadout();
-                });
-                invGrid.appendChild(card);
-            }
+            const parts = [];
+            if (eq.armor) parts.push(`${eq.armor} arm`);
+            if (eq.damageReduction) parts.push(`${Math.round(eq.damageReduction * 100)}% DR`);
+
+            card.innerHTML = `
+                <div class="lo-a-inv-type">${typeLabel[eq.type] || eq.type}</div>
+                <div class="lo-a-inv-name">${eq.name}</div>
+                <div class="lo-a-inv-stat">${parts.join(' · ')}</div>
+            `;
+
+            card.addEventListener('dragstart', e => {
+                e.dataTransfer.setData('armorId', id);
+                e.dataTransfer.setData('armorType', eq.type);
+                card.style.opacity = '0.5';
+            });
+            card.addEventListener('dragend', () => { card.style.opacity = ''; });
+
+            armorBody.appendChild(card);
         }
-        invSection.appendChild(invGrid);
-        armorSection.appendChild(invSection);
     } else {
-        const noArmor = document.createElement('p');
-        noArmor.style.cssText = 'color:#555;text-align:center;margin-top:12px;font-size:13px;';
-        noArmor.textContent = 'No armor owned — visit the Shop to purchase armor.';
-        armorSection.appendChild(noArmor);
+        const empty = document.createElement('div');
+        empty.style.cssText = 'color:#555;font-size:12px;font-style:italic;padding:4px 0;';
+        empty.textContent = 'No armor owned — visit the Shop to purchase.';
+        armorBody.appendChild(empty);
     }
 
-    const loadoutScreen = document.getElementById('loadout-screen');
-    const backBtn = loadoutScreen.querySelector('.back-btn');
-    loadoutScreen.insertBefore(armorSection, backBtn);
+    // ── STATS ──
+    const statsBody = document.getElementById('lo-col-stats-body');
+    statsBody.innerHTML = '';
 
-    // --- Stats section ---
-    document.getElementById('loadout-stats-section')?.remove();
-    const statsSection = document.createElement('div');
-    statsSection.id = 'loadout-stats-section';
-    statsSection.style.cssText = 'max-width:700px;margin:30px auto 0;';
-
-    const needed = xpToNextLevel(playerData.level);
-    const xpPct = Math.floor((playerData.xp / needed) * 10);
-    const xpBar = '█'.repeat(xpPct) + '░'.repeat(10 - xpPct);
-    statsSection.innerHTML = `
-        <h3 style="color:#ffdd00;font-size:22px;text-align:center;margin-bottom:6px">Stats</h3>
-        <div style="text-align:center;color:#aaa;font-size:13px;margin-bottom:14px">
-            LVL ${playerData.level} &nbsp; ${xpBar} &nbsp; ${playerData.xp}/${needed} XP
-            <span data-pts-label style="color:#ffdd00;margin-left:10px">${playerData.statPoints > 0 ? `${playerData.statPoints} point${playerData.statPoints !== 1 ? 's' : ''} to spend` : ''}</span>
-        </div>`;
+    const ptsBanner = document.createElement('div');
+    ptsBanner.className = 'lo-pts-banner';
+    ptsBanner.innerHTML = `
+        <div class="lo-pts-label">Available Points</div>
+        <div class="lo-pts-val" id="lo-stat-pts-val">${playerData.statPoints}</div>
+    `;
+    statsBody.appendChild(ptsBanner);
 
     const statDefs = [
-        { key: 'health', label: 'Health', color: '#00ff88', desc: '+5 max HP per point' },
-        { key: 'speed', label: 'Sprint Speed', color: '#00aaff', desc: '+2% sprint speed per point' },
-        { key: 'damage', label: 'Damage', color: '#ff4444', desc: '+2% damage & +5% headshot bonus per point' },
-        { key: 'stamina', label: 'Stamina', color: '#ffaa00', desc: '+10 max stamina per point' },
+        { key: 'health',       label: 'Health',       color: '#00ff88', desc: '+5 max HP per point' },
+        { key: 'speed',        label: 'Speed',         color: '#00aaff', desc: '+2% sprint speed per point' },
+        { key: 'damage',       label: 'Damage',        color: '#ff4444', desc: '+2% dmg · +5% headshot per point' },
+        { key: 'stamina',      label: 'Stamina',       color: '#ffaa00', desc: '+10 max stamina per point' },
         { key: 'staminaRegen', label: 'Stamina Regen', color: '#ffcc44', desc: '+10% regen rate per point' },
-        { key: 'jump', label: 'Jump Height', color: '#aa66ff', desc: '+charge height & +10% charge time per point' },
-        { key: 'reload', label: 'Reload Time', color: '#00ddff', desc: '-5% reload time per point' }
+        { key: 'jump',         label: 'Jump Height',   color: '#aa66ff', desc: '+charge height per point' },
+        { key: 'reload',       label: 'Reload Time',   color: '#00ddff', desc: '-5% reload time per point' }
     ];
-
-    const statGrid = document.createElement('div');
-    statGrid.style.cssText = 'display:flex;gap:16px;justify-content:center;flex-wrap:wrap;';
 
     for (const { key, label, color, desc } of statDefs) {
         const pts = playerData.stats[key];
-        let effectiveLine = '';
-        if (key === 'reload' && pts > 0) {
-            const mult = Math.max(0.2, 1 - pts * 0.05);
-            effectiveLine = `<div style="font-size:11px;color:${color};margin-bottom:4px">${Math.round((1 - mult) * 100)}% faster (${(mult * 100).toFixed(0)}% of base)</div>`;
-        }
-        const card = document.createElement('div');
-        card.style.cssText = `background:rgba(0,0,0,0.5);border:2px solid ${color};border-radius:10px;padding:18px 28px;text-align:center;min-width:170px;`;
-        card.innerHTML = `
-            <div style="font-size:11px;color:#888;letter-spacing:1px;margin-bottom:6px">${label.toUpperCase()}</div>
-            <div data-stat-val style="font-size:28px;font-weight:700;color:${color}">${pts}</div>
-            <div style="font-size:11px;color:#666;margin:4px 0 6px">${desc}</div>
-            ${effectiveLine}
-            <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;">
-                <button data-stat-remove="${key}" ${pts < 1 ? 'disabled' : ''}
-                    style="background:${pts > 0 ? '#cc2222' : '#333'};color:${pts > 0 ? '#fff' : '#555'};border:none;border-radius:5px;padding:6px 14px;font-size:14px;font-weight:700;cursor:${pts > 0 ? 'pointer' : 'default'}">
-                    − Remove
-                </button>
-                <input data-stat-input="${key}" type="number" min="1" max="${Math.max(playerData.statPoints, pts, 1)}" value="1"
-                    style="width:52px;padding:4px 6px;border-radius:5px;border:1px solid ${color};background:#111;color:#fff;font-size:14px;font-weight:700;text-align:center;">
-                <button data-stat="${key}" ${playerData.statPoints < 1 ? 'disabled' : ''}
-                    style="background:${playerData.statPoints > 0 ? color : '#333'};color:${playerData.statPoints > 0 ? '#000' : '#555'};border:none;border-radius:5px;padding:6px 14px;font-size:14px;font-weight:700;cursor:${playerData.statPoints > 0 ? 'pointer' : 'default'}">
-                    + Add
-                </button>
-            </div>`;
-        const btn = card.querySelector('[data-stat]');
-        const removeBtn = card.querySelector(`[data-stat-remove="${key}"]`);
-        const input = card.querySelector(`[data-stat-input="${key}"]`);
+        const barPct = Math.min(100, (pts / 10) * 100);
 
-        // Helper to refresh the reload effective line
-        const updateReloadLine = () => {
-            if (key !== 'reload') return;
-            const mult = Math.max(0.2, 1 - playerData.stats[key] * 0.05);
-            let el = card.querySelector('[data-reload-eff]');
-            if (!el) {
-                el = document.createElement('div');
-                el.dataset.reloadEff = '1';
-                el.style.cssText = `font-size:11px;color:${color};margin-bottom:4px`;
-                card.querySelector('[data-stat-val]').after(el);
-            }
-            if (playerData.stats[key] > 0) {
-                el.textContent = `${Math.round((1 - mult) * 100)}% faster (${(mult * 100).toFixed(0)}% of base)`;
-            } else {
-                el.textContent = '';
-            }
+        const row = document.createElement('div');
+        row.className = 'lo-stat-row';
+        row.innerHTML = `
+            <div class="lo-stat-top">
+                <div class="lo-stat-name">${label}</div>
+                <div class="lo-stat-controls">
+                    <button class="lo-stat-btn lo-btn-rem" ${pts < 1 ? 'disabled' : ''}>−</button>
+                    <div class="lo-stat-val">${pts}</div>
+                    <button class="lo-stat-btn lo-btn-add" ${playerData.statPoints < 1 ? 'disabled' : ''}>+</button>
+                </div>
+            </div>
+            <div class="lo-stat-bar-wrap">
+                <div class="lo-stat-bar" style="background:${color};width:${barPct}%"></div>
+            </div>
+            <div class="lo-stat-effect">${desc}</div>
+        `;
+
+        const remBtn = row.querySelector('.lo-btn-rem');
+        const addBtn = row.querySelector('.lo-btn-add');
+        const valEl  = row.querySelector('.lo-stat-val');
+        const barEl  = row.querySelector('.lo-stat-bar');
+
+        remBtn.onclick = () => {
+            if (playerData.stats[key] < 1) return;
+            playerData.stats[key]--;
+            playerData.statPoints++;
+            savePlayerData();
+            valEl.textContent = playerData.stats[key];
+            barEl.style.width = `${Math.min(100, (playerData.stats[key] / 10) * 100)}%`;
+            document.getElementById('lo-stat-pts-val').textContent = playerData.statPoints;
+            document.getElementById('lo-meta-pts').textContent = playerData.statPoints;
+            remBtn.disabled = playerData.stats[key] < 1;
+            addBtn.disabled = false;
         };
 
-        // Helper to refresh the global points-to-spend label
-        const updatePtsLabel = () => {
-            const header = document.querySelector('#loadout-stats-section [data-pts-label]');
-            if (header) {
-                header.textContent = playerData.statPoints > 0
-                    ? `${playerData.statPoints} point${playerData.statPoints !== 1 ? 's' : ''} to spend`
-                    : '';
-            }
+        addBtn.onclick = () => {
+            if (playerData.statPoints < 1) return;
+            playerData.stats[key]++;
+            playerData.statPoints--;
+            savePlayerData();
+            valEl.textContent = playerData.stats[key];
+            barEl.style.width = `${Math.min(100, (playerData.stats[key] / 10) * 100)}%`;
+            document.getElementById('lo-stat-pts-val').textContent = playerData.statPoints;
+            document.getElementById('lo-meta-pts').textContent = playerData.statPoints;
+            addBtn.disabled = playerData.statPoints < 1;
+            remBtn.disabled = false;
         };
 
-        if (btn) {
-            btn.onclick = () => {
-                if (playerData.statPoints < 1) return;
-                const amount = Math.min(Math.max(1, parseInt(input.value) || 1), playerData.statPoints);
-                playerData.statPoints -= amount;
-                playerData.stats[key] += amount;
-                savePlayerData();
-
-                card.querySelector('[data-stat-val]').textContent = playerData.stats[key];
-                input.max = Math.max(playerData.statPoints, playerData.stats[key], 1);
-                if (playerData.statPoints < 1) {
-                    btn.disabled = true;
-                    btn.style.background = '#333';
-                    btn.style.color = '#555';
-                    btn.style.cursor = 'default';
-                }
-                // Enable remove button now that stat has points
-                removeBtn.disabled = false;
-                removeBtn.style.background = '#cc2222';
-                removeBtn.style.color = '#fff';
-                removeBtn.style.cursor = 'pointer';
-
-                updateReloadLine();
-                updatePtsLabel();
-            };
-        }
-
-        if (removeBtn) {
-            removeBtn.onclick = () => {
-                const amount = Math.min(Math.max(1, parseInt(input.value) || 1), playerData.stats[key]);
-                if (amount < 1) return;
-                playerData.stats[key] -= amount;
-                playerData.statPoints += amount;
-                savePlayerData();
-
-                card.querySelector('[data-stat-val]').textContent = playerData.stats[key];
-                input.max = Math.max(playerData.statPoints, playerData.stats[key], 1);
-
-                // Re-enable add button
-                btn.disabled = false;
-                btn.style.background = color;
-                btn.style.color = '#000';
-                btn.style.cursor = 'pointer';
-
-                // Disable remove button if stat is now 0
-                if (playerData.stats[key] < 1) {
-                    removeBtn.disabled = true;
-                    removeBtn.style.background = '#333';
-                    removeBtn.style.color = '#555';
-                    removeBtn.style.cursor = 'default';
-                }
-
-                updateReloadLine();
-                updatePtsLabel();
-            };
-        }
-        statGrid.appendChild(card);
+        statsBody.appendChild(row);
     }
-
-    statsSection.appendChild(statGrid);
-    loadoutScreen.insertBefore(statsSection, backBtn);
 }
 window.showLoadout = showLoadout;
 
