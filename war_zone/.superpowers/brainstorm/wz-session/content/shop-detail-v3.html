@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shop — v3</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#111; font-family:'Segoe UI',Arial,sans-serif; display:flex; flex-direction:column; align-items:center; padding:24px; gap:16px; }
+h2 { color:#ffaa00; font-size:18px; letter-spacing:2px; }
+.note { color:#555; font-size:12px; }
+
+.screen {
+  width:min(900px,100%); height:580px;
+  background:#090909; border:1px solid #222; border-radius:8px;
+  overflow:hidden; display:flex; flex-direction:column; position:relative;
+}
+.screen::after {
+  content:''; position:absolute; inset:0; pointer-events:none; z-index:10;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.04) 2px,rgba(0,0,0,0.04) 4px);
+}
+
+.shop-header {
+  background:#0d0b0b; border-bottom:1px solid #1e1515;
+  padding:14px 24px; display:flex; align-items:center; justify-content:space-between;
+  flex-shrink:0; position:relative;
+}
+.shop-header::before {
+  content:''; position:absolute; left:0; top:0; bottom:0; width:3px;
+  background:linear-gradient(180deg,transparent,#cc2222 30%,#cc2222 70%,transparent);
+}
+.shop-title {
+  font-size:28px; font-weight:900; letter-spacing:5px;
+  background:linear-gradient(160deg,#ff4444 0%,#cc2222 60%,#8a1515 100%);
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+}
+.shop-meta { display:flex; align-items:center; gap:20px; }
+.shop-balance .lbl { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:#664444; }
+.shop-balance .val { font-size:18px; font-weight:700; color:#ff4444; }
+.shop-back {
+  font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
+  color:#442222; border:1px solid #2a1a1a; border-radius:3px; padding:7px 14px; cursor:pointer;
+  transition:color .15s, border-color .15s;
+}
+.shop-back:hover { color:#ff4444; border-color:#cc3333; }
+
+.tab-bar { background:#0b0b0b; border-bottom:2px solid #1a1010; display:flex; flex-shrink:0; }
+.tab {
+  padding:11px 18px; font-size:10px; font-weight:700; letter-spacing:1.5px;
+  text-transform:uppercase; color:#3a2222; cursor:pointer;
+  border-bottom:2px solid transparent; margin-bottom:-2px;
+  transition:color .15s, border-color .15s; display:flex; align-items:center; gap:5px;
+}
+.tab:hover { color:#664444; }
+.tab.active { color:#ff4444; border-bottom-color:#ff4444; }
+.tab.consumables-tab.active { color:#cc8822; border-bottom-color:#cc8822; }
+.tab.consumables-tab:hover { color:#886633; }
+
+.tab-content { flex:1; overflow-y:auto; padding:18px 22px; display:none; }
+.tab-content.active { display:block; }
+
+.section-header {
+  font-size:9px; letter-spacing:3px; text-transform:uppercase; color:#664444;
+  margin:20px 0 10px; padding-bottom:6px; border-bottom:1px solid #1e1515;
+}
+.section-header:first-child { margin-top:0; }
+
+.cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(185px,1fr)); gap:10px; }
+
+.item-card {
+  background:#100d0d; border:1px solid #2e1a1a; border-radius:5px; padding:13px;
+  transition:border-color .15s, transform .12s;
+}
+.item-card:hover { border-color:#663333; transform:translateY(-2px); }
+
+.item-card.consumable { border-color:#2a1e0a; background:#100e08; }
+.item-card.consumable:hover { border-color:#884400; }
+
+.card-name { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#884444; margin-bottom:4px; }
+.item-card.consumable .card-name { color:#886633; }
+.card-price { font-size:15px; font-weight:700; color:#ff4444; margin-bottom:7px; }
+.item-card.consumable .card-price { color:#cc8822; }
+.card-stats { font-size:10px; color:#442222; line-height:1.7; margin-bottom:10px; }
+.item-card.consumable .card-stats { color:#443322; }
+
+.card-btn {
+  width:100%; padding:7px; font-size:9px; font-weight:700; letter-spacing:1.5px;
+  text-transform:uppercase; background:#1a0808; border:1px solid #3a1515;
+  color:#cc4444; border-radius:3px; cursor:pointer; font-family:inherit;
+  transition:background .15s, border-color .15s, color .15s; appearance:none;
+}
+.card-btn:hover { background:#2a0d0d; border-color:#cc3333; color:#ff4444; }
+.card-btn.consumable-btn { background:#1a1000; border-color:#3a2800; color:#cc8822; }
+.card-btn.consumable-btn:hover { background:#2a1800; border-color:#cc8800; color:#ffaa00; }
+
+/* XP */
+.xp-header { background:#100d0d; border:1px solid #2e1a1a; border-radius:5px; padding:14px 18px; margin-bottom:16px; }
+.xp-header .xp-lbl { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:#664444; margin-bottom:4px; }
+.xp-header .xp-val { font-size:16px; font-weight:700; color:#ff4444; }
+.xp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; }
+.xp-card { background:#100d0d; border:1px solid #2e1a1a; border-radius:5px; padding:14px; text-align:center; }
+.xp-amount { font-size:22px; font-weight:900; color:#ff4444; }
+.xp-label { font-size:9px; letter-spacing:1px; text-transform:uppercase; color:#664444; margin-bottom:8px; }
+.xp-cost { font-size:12px; font-weight:700; color:#884444; margin-bottom:10px; }
+
+/* Attachments */
+.attach-card { background:#100d0d; border:1px solid #2e1a1a; border-radius:5px; padding:16px; margin-bottom:12px; }
+.attach-name { font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:1.5px; color:#884444; margin-bottom:4px; }
+.attach-price { font-size:14px; font-weight:700; color:#ff4444; margin-bottom:6px; }
+.attach-desc { font-size:11px; color:#442222; margin-bottom:12px; }
+.attach-weapons { display:flex; flex-wrap:wrap; gap:6px; }
+.attach-weapon-btn {
+  font-size:9px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+  padding:6px 12px; border:1px solid #3a1515; border-radius:3px;
+  background:#1a0808; color:#cc4444; cursor:pointer; font-family:inherit;
+  transition:background .15s, border-color .15s, color .15s; appearance:none;
+}
+.attach-weapon-btn:hover { background:#2a0d0d; border-color:#cc3333; color:#ff4444; }
+</style>
+</head>
+<body>
+
+<h2>SHOP — v3 (5 tabs)</h2>
+<p class="note">Consumables now its own tab · Real prices from data.js</p>
+
+<div class="screen">
+
+  <div class="shop-header">
+    <div class="shop-title">SHOP</div>
+    <div class="shop-meta">
+      <div class="shop-balance">
+        <div class="lbl">Balance</div>
+        <div class="val">$12,500</div>
+      </div>
+      <div class="shop-back">← Back</div>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab active"            onclick="switchTab('weapons',this)">⚔️ Weapons</div>
+    <div class="tab"                   onclick="switchTab('equipment',this)">🛡️ Equipment</div>
+    <div class="tab consumables-tab"   onclick="switchTab('consumables',this)">💊 Consumables</div>
+    <div class="tab"                   onclick="switchTab('attachments',this)">🔧 Attachments</div>
+    <div class="tab"                   onclick="switchTab('xp',this)">⭐ XP</div>
+  </div>
+
+  <!-- WEAPONS -->
+  <div class="tab-content active" id="tab-weapons">
+    <div class="cards-grid">
+      <div class="item-card"><div class="card-name">Revolver</div><div class="card-price">$750</div><div class="card-stats">DMG 18 · Range Mid<br>Ammo 6 · Fire 0.4s</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Molotov</div><div class="card-price">$750</div><div class="card-stats">DMG 8/tick · 4s fire<br>Throwable · AoE</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Grenade</div><div class="card-price">$1,000</div><div class="card-stats">DMG 80 · Radius 5<br>Explosive</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Shotgun</div><div class="card-price">$2,500</div><div class="card-stats">DMG 28 · Range Close<br>Ammo 6 · Fire 0.8s</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Axe</div><div class="card-price">$4,000</div><div class="card-stats">DMG 55 · Melee<br>Reach 2.5</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Crossbow</div><div class="card-price">$4,750</div><div class="card-stats">DMG 55 · Range Long<br>Ammo 1 · Silent</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Knife</div><div class="card-price">$5,000</div><div class="card-stats">DMG 45 · Melee<br>Headshot ×3</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">SMG</div><div class="card-price">$6,000</div><div class="card-stats">DMG 5 · Range Mid<br>Ammo 30 · Fire 0.08s</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Katana</div><div class="card-price">$7,500</div><div class="card-stats">DMG 55 · Melee</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Assault Rifle</div><div class="card-price">$10,000</div><div class="card-stats">DMG 22 · Range Long<br>Ammo 30 · Fire 0.12s</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Longsword</div><div class="card-price">$10,000</div><div class="card-stats">DMG 70 · Melee<br>Long reach</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Chainsaw</div><div class="card-price">$15,000</div><div class="card-stats">DMG 30 · Melee<br>Continuous</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">RPG</div><div class="card-price">$25,000</div><div class="card-stats">DMG 150 · Radius 8<br>Ammo 1</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Sniper</div><div class="card-price">$100,000</div><div class="card-stats">DMG 75 · Long<br>Zoom DMG 150</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Minigun</div><div class="card-price">$110,000</div><div class="card-stats">DMG 15 · Range Long<br>Ammo 200 · Fire 0.06s</div><div class="card-btn">Buy</div></div>
+    </div>
+  </div>
+
+  <!-- EQUIPMENT (armor only) -->
+  <div class="tab-content" id="tab-equipment">
+    <div class="section-header">Helmets</div>
+    <div class="cards-grid">
+      <div class="item-card"><div class="card-name">Light Helmet</div><div class="card-price">$1,500</div><div class="card-stats">Armor +40<br>Headshot −40%</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Chainmail Helmet</div><div class="card-price">$11,000</div><div class="card-stats">Armor +70<br>Headshot −60%</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Heavy Helmet</div><div class="card-price">$30,000</div><div class="card-stats">Armor +100<br>Headshot −85%</div><div class="card-btn">Buy</div></div>
+    </div>
+    <div class="section-header">Breastplates</div>
+    <div class="cards-grid">
+      <div class="item-card"><div class="card-name">Light Breastplate</div><div class="card-price">$4,500</div><div class="card-stats">Armor +100<br>DMG Reduction 30%</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Chainmail Breastplate</div><div class="card-price">$27,500</div><div class="card-stats">Armor +175<br>DMG Reduction 45%</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Heavy Breastplate</div><div class="card-price">$50,000</div><div class="card-stats">Armor +250<br>DMG Reduction 60%</div><div class="card-btn">Buy</div></div>
+    </div>
+    <div class="section-header">Pants</div>
+    <div class="cards-grid">
+      <div class="item-card"><div class="card-name">Light Pants</div><div class="card-price">$1,500</div><div class="card-stats">Armor +50<br>DMG Reduction 15%</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Chainmail Pants</div><div class="card-price">$10,000</div><div class="card-stats">Armor +90<br>DMG Reduction 25%</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Heavy Pants</div><div class="card-price">$20,000</div><div class="card-stats">Armor +130<br>DMG Reduction 35%</div><div class="card-btn">Buy</div></div>
+    </div>
+    <div class="section-header">Boots</div>
+    <div class="cards-grid">
+      <div class="item-card"><div class="card-name">Light Boots</div><div class="card-price">$1,125</div><div class="card-stats">Armor +30<br>DMG Reduction 10%</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Chainmail Boots</div><div class="card-price">$7,500</div><div class="card-stats">Armor +60<br>DMG Reduction 20%</div><div class="card-btn">Buy</div></div>
+      <div class="item-card"><div class="card-name">Heavy Boots</div><div class="card-price">$12,000</div><div class="card-stats">Armor +90<br>DMG Reduction 30%</div><div class="card-btn">Buy</div></div>
+    </div>
+  </div>
+
+  <!-- CONSUMABLES -->
+  <div class="tab-content" id="tab-consumables">
+    <div class="cards-grid">
+      <div class="item-card consumable">
+        <div class="card-name">Med Kit</div>
+        <div class="card-price">$500</div>
+        <div class="card-stats">Restores 50 HP<br>Use in-match [Q]</div>
+        <div class="card-btn consumable-btn">Buy</div>
+      </div>
+      <div class="item-card consumable">
+        <div class="card-name">Adrenaline</div>
+        <div class="card-price">$750</div>
+        <div class="card-stats">+25 Temp HP<br>Use in-match [Y]</div>
+        <div class="card-btn consumable-btn">Buy</div>
+      </div>
+      <div class="item-card consumable">
+        <div class="card-name">Airstrike Targeter</div>
+        <div class="card-price">$5,000</div>
+        <div class="card-stats">+1 Airstrike use<br>Use in-match [F]</div>
+        <div class="card-btn consumable-btn">Buy</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ATTACHMENTS -->
+  <div class="tab-content" id="tab-attachments">
+    <div class="attach-card">
+      <div class="attach-name">Silencer</div>
+      <div class="attach-price">$500 per weapon</div>
+      <div class="attach-desc">Suppresses gunshot noise — enemies won't be alerted when you fire.</div>
+      <div class="attach-weapons">
+        <button class="attach-weapon-btn">Attach to Glock</button>
+        <button class="attach-weapon-btn">Attach to Revolver</button>
+        <button class="attach-weapon-btn">Attach to SMG</button>
+      </div>
+    </div>
+    <div class="attach-card">
+      <div class="attach-name">Scope</div>
+      <div class="attach-price">$800 per weapon</div>
+      <div class="attach-desc">+20 bonus damage when zoomed. Cannot be added to Crossbow or Sniper (already scoped).</div>
+      <div class="attach-weapons">
+        <button class="attach-weapon-btn">Attach to Glock</button>
+        <button class="attach-weapon-btn">Attach to Revolver</button>
+        <button class="attach-weapon-btn">Attach to Shotgun</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- XP -->
+  <div class="tab-content" id="tab-xp">
+    <div class="xp-header">
+      <div class="xp-lbl">Current Level</div>
+      <div class="xp-val">Level 1 — 0 / 500 XP to next level</div>
+    </div>
+    <div class="xp-grid">
+      <div class="xp-card"><div class="xp-amount">+100</div><div class="xp-label">XP</div><div class="xp-cost">$2,500</div><div class="card-btn">Buy</div></div>
+      <div class="xp-card"><div class="xp-amount">+300</div><div class="xp-label">XP</div><div class="xp-cost">$6,000</div><div class="card-btn">Buy</div></div>
+      <div class="xp-card"><div class="xp-amount">+750</div><div class="xp-label">XP</div><div class="xp-cost">$12,500</div><div class="card-btn">Buy</div></div>
+      <div class="xp-card"><div class="xp-amount">+2,000</div><div class="xp-label">XP</div><div class="xp-cost">$25,000</div><div class="card-btn">Buy</div></div>
+      <div class="xp-card"><div class="xp-amount">+6,000</div><div class="xp-label">XP</div><div class="xp-cost">$50,000</div><div class="card-btn">Buy</div></div>
+    </div>
+  </div>
+
+</div>
+
+<p style="color:#444;font-size:12px;text-align:center">5 tabs: Weapons · Equipment · Consumables · Attachments · XP</p>
+
+<script>
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+</script>
+</body>
+</html>

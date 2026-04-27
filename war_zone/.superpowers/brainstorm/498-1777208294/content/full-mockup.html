@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a0a;
+    color: #fff;
+    font-family: 'Segoe UI', sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  .lh-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 28px;
+    background: #0d0d0d;
+    border-bottom: 2px solid #cc2200;
+    flex-shrink: 0;
+  }
+  .lh-title {
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 6px;
+    color: #cc2200;
+    text-transform: uppercase;
+  }
+  .lh-meta {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+  }
+  .lh-meta-item {
+    text-align: right;
+  }
+  .lh-meta-label { font-size: 9px; color: #555; letter-spacing: 1px; text-transform: uppercase; }
+  .lh-meta-value { font-size: 15px; font-weight: 700; color: #fff; }
+  .lh-meta-value.pts { color: #ffaa00; }
+  .lh-back {
+    background: none;
+    border: 1px solid #333;
+    color: #666;
+    padding: 7px 18px;
+    font-size: 12px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  .lh-back:hover { border-color: #fff; color: #fff; }
+
+  /* ── Body ── */
+  .lh-body {
+    display: flex;
+    flex: 1;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  /* ── Column ── */
+  .lh-col {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-right: 1px solid #1a1a1a;
+  }
+  .lh-col:last-child { border-right: none; }
+  .lh-col.weapons { flex: 1.2; }
+  .lh-col.armor   { flex: 1.1; }
+  .lh-col.stats   { flex: 1; }
+
+  .lh-col-header {
+    padding: 12px 18px 10px;
+    background: #0d0d0d;
+    border-bottom: 1px solid #1a1a1a;
+    flex-shrink: 0;
+  }
+  .lh-col-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: #cc2200;
+    text-transform: uppercase;
+  }
+  .lh-col-sub {
+    font-size: 10px;
+    color: #444;
+    margin-top: 2px;
+    letter-spacing: 0.5px;
+  }
+
+  .lh-col-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+    scrollbar-width: thin;
+    scrollbar-color: #222 #0d0d0d;
+  }
+
+  /* ── Weapon cards ── */
+  .w-card {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 7px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .w-card:hover { border-color: #444; background: #141414; }
+  .w-card.equipped {
+    border-color: #cc2200;
+    background: rgba(204,34,0,0.07);
+  }
+  .w-card.damaged {
+    border-color: #ff4444;
+    background: rgba(255,68,68,0.05);
+  }
+  .w-icon {
+    width: 32px;
+    height: 32px;
+    background: #1a1a1a;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .w-info { flex: 1; }
+  .w-name { font-size: 13px; font-weight: 600; color: #e0e0e0; }
+  .w-card.equipped .w-name { color: #fff; }
+  .w-ammo { font-size: 10px; color: #444; margin-top: 1px; }
+  .w-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .w-badge.on  { background: rgba(204,34,0,0.2); color: #cc2200; border: 1px solid rgba(204,34,0,0.4); }
+  .w-badge.off { color: #333; border: 1px solid #222; }
+  .w-badge.rep { background: rgba(255,68,68,0.15); color: #ff6666; border: 1px solid rgba(255,68,68,0.3); }
+
+  /* ── Armor ── */
+  .armor-slots {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .a-slot {
+    background: #111;
+    border: 1px dashed #2a2a2a;
+    border-radius: 6px;
+    padding: 10px;
+    text-align: center;
+    transition: border-color 0.15s, background 0.15s;
+    min-height: 68px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .a-slot.filled {
+    border-style: solid;
+    background: rgba(204,34,0,0.05);
+  }
+  .a-slot[data-type="head"]  { border-color: #7755aa; }
+  .a-slot[data-type="chest"] { border-color: #cc2200; }
+  .a-slot[data-type="legs"]  { border-color: #226644; }
+  .a-slot[data-type="boots"] { border-color: #664400; }
+  .a-slot.empty { border-color: #222; }
+  .a-slot-label {
+    font-size: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .a-slot[data-type="head"]  .a-slot-label { color: #7755aa; }
+  .a-slot[data-type="chest"] .a-slot-label { color: #cc2200; }
+  .a-slot[data-type="legs"]  .a-slot-label { color: #226644; }
+  .a-slot[data-type="boots"] .a-slot-label { color: #664400; }
+  .a-slot.empty .a-slot-label { color: #333; }
+  .a-slot-name { font-size: 10px; color: #888; }
+  .a-slot.filled .a-slot-name { color: #ddd; }
+  .a-slot-stats { font-size: 9px; color: #444; margin-top: 2px; }
+  .a-slot.filled .a-slot-stats { color: #555; }
+
+  .armor-inv-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: #333;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .a-inv-card {
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 5px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: border-color 0.15s;
+  }
+  .a-inv-card:hover { border-color: #333; }
+  .a-inv-card.equipped-inv { border-color: #cc2200; opacity: 0.5; }
+  .a-inv-type {
+    font-size: 8px;
+    letter-spacing: 1px;
+    color: #444;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    width: 34px;
+  }
+  .a-inv-name { font-size: 11px; color: #bbb; flex: 1; }
+  .a-inv-stat { font-size: 9px; color: #444; }
+
+  /* ── Stats ── */
+  .stat-points-bar {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 5px;
+    padding: 8px 12px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .stat-pts-label { font-size: 10px; color: #555; letter-spacing: 1px; }
+  .stat-pts-val { font-size: 18px; font-weight: 700; color: #ffaa00; }
+
+  .stat-row {
+    margin-bottom: 10px;
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 5px;
+    padding: 9px 11px;
+  }
+  .stat-row-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 5px;
+  }
+  .stat-name { font-size: 11px; color: #aaa; }
+  .stat-controls { display: flex; align-items: center; gap: 4px; }
+  .stat-btn {
+    width: 20px; height: 20px;
+    border-radius: 3px;
+    border: 1px solid #2a2a2a;
+    background: #1a1a1a;
+    color: #666;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    line-height: 1;
+    transition: all 0.12s;
+  }
+  .stat-btn.add { border-color: #cc2200; color: #cc2200; }
+  .stat-btn.add:hover { background: rgba(204,34,0,0.15); }
+  .stat-btn.rem:hover { border-color: #555; color: #aaa; }
+  .stat-val { font-size: 13px; font-weight: 700; color: #fff; width: 22px; text-align: center; }
+  .stat-bar-wrap { background: #1a1a1a; border-radius: 2px; height: 3px; }
+  .stat-bar { height: 3px; border-radius: 2px; }
+  .stat-effect { font-size: 9px; color: #333; margin-top: 4px; }
+
+  .lh-divider {
+    height: 1px;
+    background: #1a1a1a;
+    margin: 10px 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="lh-header">
+  <div class="lh-title">Loadout</div>
+  <div class="lh-meta">
+    <div class="lh-meta-item">
+      <div class="lh-meta-label">Mode</div>
+      <div class="lh-meta-value">Zombie Apocalypse</div>
+    </div>
+    <div class="lh-meta-item">
+      <div class="lh-meta-label">Slots</div>
+      <div class="lh-meta-value">2 / 4</div>
+    </div>
+    <div class="lh-meta-item">
+      <div class="lh-meta-label">Stat Points</div>
+      <div class="lh-meta-value pts">3</div>
+    </div>
+  </div>
+  <button class="lh-back">← Back</button>
+</div>
+
+<!-- Body -->
+<div class="lh-body">
+
+  <!-- ── WEAPONS ── -->
+  <div class="lh-col weapons">
+    <div class="lh-col-header">
+      <div class="lh-col-title">Weapons</div>
+      <div class="lh-col-sub">Click to equip · max 4 slots</div>
+    </div>
+    <div class="lh-col-body">
+
+      <div class="w-card equipped">
+        <div class="w-icon">🔫</div>
+        <div class="w-info">
+          <div class="w-name">Glock</div>
+          <div class="w-ammo">17 / 17 · semi-auto</div>
+        </div>
+        <div class="w-badge on">EQUIPPED</div>
+      </div>
+
+      <div class="w-card equipped">
+        <div class="w-icon">⚔️</div>
+        <div class="w-info">
+          <div class="w-name">Assault Rifle</div>
+          <div class="w-ammo">30 / 30 · auto</div>
+        </div>
+        <div class="w-badge on">EQUIPPED</div>
+      </div>
+
+      <div class="w-card">
+        <div class="w-icon">🎯</div>
+        <div class="w-info">
+          <div class="w-name">Sniper</div>
+          <div class="w-ammo">5 / 5 · bolt-action</div>
+        </div>
+        <div class="w-badge off">equip</div>
+      </div>
+
+      <div class="w-card">
+        <div class="w-icon">💥</div>
+        <div class="w-info">
+          <div class="w-name">RPG</div>
+          <div class="w-ammo">3 / 3 · explosive</div>
+        </div>
+        <div class="w-badge off">equip</div>
+      </div>
+
+      <div class="w-card">
+        <div class="w-icon">🔫</div>
+        <div class="w-info">
+          <div class="w-name">SMG</div>
+          <div class="w-ammo">25 / 25 · auto</div>
+        </div>
+        <div class="w-badge off">equip</div>
+      </div>
+
+      <div class="w-card damaged">
+        <div class="w-icon">🔫</div>
+        <div class="w-info">
+          <div class="w-name">Minigun</div>
+          <div class="w-ammo">100 / 100 · auto</div>
+        </div>
+        <div class="w-badge rep">⚠ REPAIR $50</div>
+      </div>
+
+      <div class="w-card">
+        <div class="w-icon">🪃</div>
+        <div class="w-info">
+          <div class="w-name">Katana</div>
+          <div class="w-ammo">Melee</div>
+        </div>
+        <div class="w-badge off">equip</div>
+      </div>
+
+      <div class="w-card">
+        <div class="w-icon">🪓</div>
+        <div class="w-info">
+          <div class="w-name">Axe</div>
+          <div class="w-ammo">Melee</div>
+        </div>
+        <div class="w-badge off">equip</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── ARMOR ── -->
+  <div class="lh-col armor">
+    <div class="lh-col-header">
+      <div class="lh-col-title">Armor</div>
+      <div class="lh-col-sub">Drag inventory → slot to equip</div>
+    </div>
+    <div class="lh-col-body">
+
+      <!-- Equip Slots -->
+      <div class="armor-slots">
+        <div class="a-slot empty" data-type="head">
+          <div class="a-slot-label">Helmet</div>
+          <div class="a-slot-name">— empty —</div>
+        </div>
+        <div class="a-slot filled" data-type="chest">
+          <div class="a-slot-label">Chest</div>
+          <div class="a-slot-name">Light Vest</div>
+          <div class="a-slot-stats">25 armor · 10% DR</div>
+        </div>
+        <div class="a-slot empty" data-type="legs">
+          <div class="a-slot-label">Legs</div>
+          <div class="a-slot-name">— empty —</div>
+        </div>
+        <div class="a-slot empty" data-type="boots">
+          <div class="a-slot-label">Boots</div>
+          <div class="a-slot-name">— empty —</div>
+        </div>
+      </div>
+
+      <div class="lh-divider"></div>
+
+      <!-- Inventory -->
+      <div class="armor-inv-label">Owned Armor — drag to equip</div>
+
+      <div class="a-inv-card equipped-inv" draggable="true">
+        <div class="a-inv-type">Chest</div>
+        <div class="a-inv-name">Light Vest</div>
+        <div class="a-inv-stat">25 · 10% DR</div>
+      </div>
+
+      <div class="a-inv-card" draggable="true">
+        <div class="a-inv-type">Head</div>
+        <div class="a-inv-name">Light Helmet</div>
+        <div class="a-inv-stat">15 · 5% DR</div>
+      </div>
+
+      <div class="a-inv-card" draggable="true">
+        <div class="a-inv-type">Chest</div>
+        <div class="a-inv-name">Chainmail Vest</div>
+        <div class="a-inv-stat">50 · 20% DR</div>
+      </div>
+
+      <div class="a-inv-card" draggable="true">
+        <div class="a-inv-type">Legs</div>
+        <div class="a-inv-name">Light Greaves</div>
+        <div class="a-inv-stat">12 · 4% DR</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── STATS ── -->
+  <div class="lh-col stats">
+    <div class="lh-col-header">
+      <div class="lh-col-title">Stats</div>
+      <div class="lh-col-sub">Spend points to upgrade</div>
+    </div>
+    <div class="lh-col-body">
+
+      <div class="stat-points-bar">
+        <div class="stat-pts-label">AVAILABLE POINTS</div>
+        <div class="stat-pts-val">3</div>
+      </div>
+
+      <!-- Health -->
+      <div class="stat-row">
+        <div class="stat-row-top">
+          <div class="stat-name">Health</div>
+          <div class="stat-controls">
+            <div class="stat-btn rem">−</div>
+            <div class="stat-val">3</div>
+            <div class="stat-btn add">+</div>
+          </div>
+        </div>
+        <div class="stat-bar-wrap"><div class="stat-bar" style="background:#00ff88;width:30%"></div></div>
+        <div class="stat-effect">+15 max HP</div>
+      </div>
+
+      <!-- Speed -->
+      <div class="stat-row">
+        <div class="stat-row-top">
+          <div class="stat-name">Speed</div>
+          <div class="stat-controls">
+            <div class="stat-btn rem">−</div>
+            <div class="stat-val">1</div>
+            <div class="stat-btn add">+</div>
+          </div>
+        </div>
+        <div class="stat-bar-wrap"><div class="stat-bar" style="background:#00aaff;width:10%"></div></div>
+        <div class="stat-effect">+2% sprint speed</div>
+      </div>
+
+      <!-- Damage -->
+      <div class="stat-row">
+        <div class="stat-row-top">
+          <div class="stat-name">Damage</div>
+          <div class="stat-controls">
+            <div class="stat-btn rem">−</div>
+            <div class="stat-val">5</div>
+            <div class="stat-btn add">+</div>
+          </div>
+        </div>
+        <div class="stat-bar-wrap"><div class="stat-bar" style="background:#ff4444;width:50%"></div></div>
+        <div class="stat-effect">+10% dmg · +25% headshot</div>
+      </div>
+
+      <!-- Stamina -->
+      <div class="stat-row">
+        <div class="stat-row-top">
+          <div class="stat-name">Stamina</div>
+          <div class="stat-controls">
+            <div class="stat-btn rem">−</div>
+            <div class="stat-val">0</div>
+            <div class="stat-btn add">+</div>
+          </div>
+        </div>
+        <div class="stat-bar-wrap"><div class="stat-bar" style="background:#ffaa00;width:0%"></div></div>
+        <div class="stat-effect">+10 max stamina</div>
+      </div>
+
+      <!-- Stamina Regen -->
+      <div class="stat-row">
+        <div class="stat-row-top">
+          <div class="stat-name">Stamina Regen</div>
+          <div class="stat-controls">
+            <div class="stat-btn rem">−</div>
+            <div class="stat-val">2</div>
+            <div class="stat-btn add">+</div>
+          </div>
+        </div>
+        <div class="stat-bar-wrap"><div class="stat-bar" style="background:#ffcc44;width:20%"></div></div>
+        <div class="stat-effect">+20% regen rate</div>
+      </div>
+
+      <!-- Jump -->
+      <div class="stat-row">
+        <div class="stat-row-top">
+          <div class="stat-name">Jump Height</div>
+          <div class="stat-controls">
+            <div class="stat-btn rem">−</div>
+            <div class="stat-val">0</div>
+            <div class="stat-btn add">+</div>
+          </div>
+        </div>
+        <div class="stat-bar-wrap"><div class="stat-bar" style="background:#aa66ff;width:0%"></div></div>
+        <div class="stat-effect">+charge height</div>
+      </div>
+
+      <!-- Reload -->
+      <div class="stat-row">
+        <div class="stat-row-top">
+          <div class="stat-name">Reload Time</div>
+          <div class="stat-controls">
+            <div class="stat-btn rem">−</div>
+            <div class="stat-val">1</div>
+            <div class="stat-btn add">+</div>
+          </div>
+        </div>
+        <div class="stat-bar-wrap"><div class="stat-bar" style="background:#00ddff;width:10%"></div></div>
+        <div class="stat-effect">−5% reload time</div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

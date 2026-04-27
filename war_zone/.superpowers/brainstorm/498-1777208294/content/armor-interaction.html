@@ -1,0 +1,111 @@
+<h2>Armor Column — Interaction Model</h2>
+<p class="subtitle">How should equipping armor work in the new layout?</p>
+
+<div class="split">
+
+  <div class="mockup">
+    <div class="mockup-header">A — Click Slot → Inline Picker</div>
+    <div class="mockup-body" style="background:#0d0d0d;padding:14px;font-family:monospace;min-height:280px">
+      <div style="color:#aa88ff;font-size:10px;font-weight:700;letter-spacing:1px;margin-bottom:10px">ARMOR</div>
+
+      <!-- Slots -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+        <div style="background:#1a1a1a;border:1px solid #aa88ff;border-radius:6px;padding:8px;text-align:center">
+          <div style="color:#aa88ff;font-size:9px">HELMET</div>
+          <div style="color:#ddd;font-size:10px;margin-top:2px">— empty —</div>
+        </div>
+        <div style="background:#1a1a1a;border:2px solid #00aaff;border-radius:6px;padding:8px;text-align:center;position:relative">
+          <div style="color:#00aaff;font-size:9px">CHEST</div>
+          <div style="color:#00aaff;font-size:10px;margin-top:2px">Light Vest</div>
+          <div style="position:absolute;top:2px;right:4px;color:#555;font-size:9px;cursor:pointer">✕</div>
+        </div>
+        <div style="background:#1a1a1a;border:1px solid #00cc66;border-radius:6px;padding:8px;text-align:center">
+          <div style="color:#00cc66;font-size:9px">LEGS</div>
+          <div style="color:#555;font-size:10px;margin-top:2px">— empty —</div>
+        </div>
+        <div style="background:#1a1a1a;border:1px solid #ffaa00;border-radius:6px;padding:8px;text-align:center">
+          <div style="color:#ffaa00;font-size:9px">BOOTS</div>
+          <div style="color:#555;font-size:10px;margin-top:2px">— empty —</div>
+        </div>
+      </div>
+
+      <!-- Inline picker (appears when you click a slot) -->
+      <div style="background:#111;border:1px solid #aa88ff;border-radius:6px;padding:8px">
+        <div style="color:#aa88ff;font-size:9px;font-weight:700;margin-bottom:6px">HELMET — select:</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="background:#222;border:1px solid #555;border-radius:4px;padding:5px 8px;color:#ccc;font-size:10px;cursor:pointer;display:flex;justify-content:space-between">
+            <span>Light Helmet</span><span style="color:#555">15 armor</span>
+          </div>
+          <div style="background:#222;border:1px solid #555;border-radius:4px;padding:5px 8px;color:#ccc;font-size:10px;cursor:pointer;display:flex;justify-content:space-between">
+            <span>Chainmail Hood</span><span style="color:#555">30 armor</span>
+          </div>
+          <div style="background:#333;border:1px solid #666;border-radius:4px;padding:5px 8px;color:#888;font-size:10px;display:flex;justify-content:space-between">
+            <span style="color:#555">Heavy Helm</span><span style="color:#cc2200;font-size:9px">not owned</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">B — Always-Visible Compact List</div>
+    <div class="mockup-body" style="background:#0d0d0d;padding:14px;font-family:monospace;min-height:280px">
+      <div style="color:#aa88ff;font-size:10px;font-weight:700;letter-spacing:1px;margin-bottom:10px">ARMOR</div>
+
+      <!-- Each slot is a row with equipped item inline, swap button -->
+      <div style="display:flex;flex-direction:column;gap:5px">
+
+        <div style="background:#1a1a1a;border:1px solid #aa88ff;border-radius:6px;padding:8px;display:flex;align-items:center;gap:8px">
+          <div style="color:#aa88ff;font-size:9px;width:44px;flex-shrink:0">HELMET</div>
+          <div style="flex:1;color:#555;font-size:10px;font-style:italic">empty</div>
+          <div style="color:#555;font-size:9px;border:1px solid #333;border-radius:3px;padding:2px 6px;cursor:pointer">swap</div>
+        </div>
+
+        <div style="background:#1a1a1a;border:1px solid #00aaff;border-radius:6px;padding:8px;display:flex;align-items:center;gap:8px">
+          <div style="color:#00aaff;font-size:9px;width:44px;flex-shrink:0">CHEST</div>
+          <div style="flex:1">
+            <div style="color:#00aaff;font-size:10px">Light Vest</div>
+            <div style="color:#555;font-size:9px">25 armor · 10% DR</div>
+          </div>
+          <div style="color:#555;font-size:9px;border:1px solid #333;border-radius:3px;padding:2px 6px;cursor:pointer">swap</div>
+          <div style="color:#555;font-size:9px;cursor:pointer">✕</div>
+        </div>
+
+        <div style="background:#1a1a1a;border:1px solid #00cc66;border-radius:6px;padding:8px;display:flex;align-items:center;gap:8px">
+          <div style="color:#00cc66;font-size:9px;width:44px;flex-shrink:0">LEGS</div>
+          <div style="flex:1;color:#555;font-size:10px;font-style:italic">empty</div>
+          <div style="color:#555;font-size:9px;border:1px solid #333;border-radius:3px;padding:2px 6px;cursor:pointer">swap</div>
+        </div>
+
+        <div style="background:#1a1a1a;border:1px solid #ffaa00;border-radius:6px;padding:8px;display:flex;align-items:center;gap:8px">
+          <div style="color:#ffaa00;font-size:9px;width:44px;flex-shrink:0">BOOTS</div>
+          <div style="flex:1;color:#555;font-size:10px;font-style:italic">empty</div>
+          <div style="color:#555;font-size:9px;border:1px solid #333;border-radius:3px;padding:2px 6px;cursor:pointer">swap</div>
+        </div>
+
+      </div>
+
+      <div style="margin-top:10px;color:#555;font-size:9px;text-align:center">clicking swap shows a small dropdown of owned armor for that slot</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="options" style="margin-top:20px">
+  <div class="option" data-choice="click-slot" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Click slot → inline picker opens below</h3>
+      <p>Slots are compact; picker expands in-column. Feels interactive and focused — only one slot open at a time.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="compact-rows" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Compact rows with swap button</h3>
+      <p>All 4 slots always visible as rows. "Swap" triggers a small dropdown. Simpler and more scannable at a glance.</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">Either way, the big drag-drop inventory area goes away.</p>

@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Warzone Landing — Layout Direction</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d0d14;
+    color: #fff;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    padding: 24px;
+    min-height: 100vh;
+  }
+  h2 { font-size: 22px; color: #ffaa00; margin-bottom: 6px; text-align: center; letter-spacing: 2px; }
+  .subtitle { color: #888; font-size: 14px; text-align: center; margin-bottom: 24px; }
+
+  .options-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .option-card {
+    border: 2px solid #333;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s;
+    overflow: hidden;
+    background: #111;
+  }
+  .option-card:hover { border-color: #ffaa00; transform: translateY(-3px); }
+  .option-card.selected { border-color: #ffaa00; box-shadow: 0 0 20px rgba(255,170,0,0.3); }
+
+  .option-label {
+    background: #1a1a2e;
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #333;
+  }
+  .option-label .letter {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: #333;
+    color: #ffaa00;
+    font-weight: 900;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .option-label .name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: 1px; }
+  .option-label .tag { font-size: 11px; color: #888; }
+  .option-card.selected .option-label { background: rgba(255,170,0,0.12); }
+
+  .preview {
+    height: 340px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ===== OPTION A: HERO + CARDS ===== */
+  .preview-a {
+    background: linear-gradient(160deg, #0a0a0a 0%, #1a1a2e 60%, #16213e 100%);
+  }
+  .prev-a-hero {
+    padding: 18px 16px 10px;
+    text-align: center;
+    border-bottom: 1px solid #222;
+  }
+  .prev-a-title {
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    background: linear-gradient(90deg, #ff4444, #ff8800, #ffaa00);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .prev-a-sub { font-size: 10px; color: #777; margin-top: 2px; letter-spacing: 2px; }
+  .prev-a-modes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 10px 10px 6px;
+  }
+  .prev-a-mode {
+    background: rgba(255,68,68,0.08);
+    border: 1px solid rgba(255,68,68,0.3);
+    border-radius: 8px;
+    padding: 10px 6px;
+    text-align: center;
+    font-size: 9px;
+    font-weight: 700;
+    color: #ff6666;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .prev-a-mode .icon { font-size: 18px; display: block; margin-bottom: 4px; }
+  .prev-a-utils {
+    display: flex;
+    gap: 6px;
+    padding: 0 10px 8px;
+    justify-content: center;
+  }
+  .prev-a-util {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 9px;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .prev-a-stats {
+    position: absolute;
+    top: 10px; right: 10px;
+    background: rgba(0,0,0,0.7);
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 9px;
+    line-height: 1.7;
+    color: #888;
+  }
+  .prev-a-stats span { color: #ffaa00; }
+
+  /* ===== OPTION B: TWO-COLUMN ===== */
+  .preview-b {
+    background: linear-gradient(135deg, #0a0a0a 0%, #0d1117 100%);
+    flex-direction: row !important;
+  }
+  .prev-b-left {
+    width: 42%;
+    border-right: 1px solid #1e1e2e;
+    padding: 16px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: linear-gradient(180deg, #0d0d1a, #0a0a14);
+  }
+  .prev-b-title {
+    font-size: 24px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    background: linear-gradient(90deg, #ff4444, #ffaa00);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+  }
+  .prev-b-sub { font-size: 9px; color: #555; letter-spacing: 2px; margin-top: 4px; text-transform: uppercase; }
+  .prev-b-divider { width: 40px; height: 2px; background: linear-gradient(90deg,#ff4444,transparent); margin: 10px 0; }
+  .prev-b-stat { font-size: 10px; color: #666; margin-bottom: 3px; }
+  .prev-b-stat span { color: #ffaa00; }
+  .prev-b-utils { margin-top: auto; }
+  .prev-b-util-row { display: flex; flex-wrap: wrap; gap: 4px; }
+  .prev-b-util-btn {
+    font-size: 8px;
+    padding: 3px 7px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .prev-b-right {
+    flex: 1;
+    padding: 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
+  }
+  .prev-b-mode {
+    border: 1px solid rgba(255,68,68,0.25);
+    background: rgba(255,68,68,0.06);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .prev-b-mode .icon { font-size: 20px; }
+  .prev-b-mode-name { font-size: 11px; font-weight: 700; color: #ff6666; text-transform: uppercase; letter-spacing: 1px; }
+  .prev-b-mode-sub { font-size: 9px; color: #555; margin-top: 1px; }
+
+  /* ===== OPTION C: GRID DASHBOARD ===== */
+  .preview-c {
+    background: #080810;
+  }
+  .prev-c-top {
+    background: linear-gradient(90deg, #0d0d1a, #111122);
+    border-bottom: 1px solid #1a1a30;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .prev-c-title {
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    background: linear-gradient(90deg, #ff4444, #ff8800, #ffaa00);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .prev-c-sub { font-size: 8px; color: #555; letter-spacing: 2px; margin-top: 1px; }
+  .prev-c-stat-bar {
+    display: flex;
+    gap: 12px;
+    font-size: 9px;
+    color: #555;
+  }
+  .prev-c-stat-bar span { color: #ffaa00; }
+  .prev-c-modes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 10px;
+    flex: 1;
+  }
+  .prev-c-mode {
+    background: linear-gradient(135deg, rgba(255,68,68,0.08), rgba(255,68,68,0.03));
+    border: 1px solid rgba(255,68,68,0.2);
+    border-radius: 10px;
+    padding: 12px 8px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .prev-c-mode::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #ff4444, transparent);
+  }
+  .prev-c-mode .icon { font-size: 22px; }
+  .prev-c-mode-name { font-size: 9px; font-weight: 700; color: #ff8888; text-transform: uppercase; letter-spacing: 0.8px; }
+  .prev-c-bottom {
+    border-top: 1px solid #1a1a30;
+    padding: 8px 10px;
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    align-items: center;
+    background: #0a0a15;
+  }
+  .prev-c-bottom-btn {
+    font-size: 8px;
+    padding: 4px 10px;
+    border: 1px solid #2a2a3e;
+    border-radius: 4px;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(255,255,255,0.02);
+  }
+
+  .desc {
+    padding: 10px 14px 12px;
+    border-top: 1px solid #222;
+  }
+  .desc p { font-size: 11px; color: #666; line-height: 1.5; }
+  .desc .tag-row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .desc .tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #1e1e2e;
+    color: #888;
+  }
+  .desc .tag.good { background: rgba(0,255,136,0.1); color: #00ff88; }
+
+  .footer-note {
+    text-align: center;
+    margin-top: 20px;
+    color: #444;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<h2>WARZONE — LANDING PAGE REDESIGN</h2>
+<p class="subtitle">Pick a layout direction — click to select, then let me know in the chat</p>
+
+<div class="options-grid">
+
+  <!-- OPTION A -->
+  <div class="option-card" id="opt-a" onclick="selectOption('a', this)">
+    <div class="option-label">
+      <div class="letter">A</div>
+      <div class="name">HERO + CARDS</div>
+      <div class="tag">Classic</div>
+    </div>
+    <div class="preview preview-a">
+      <div class="prev-a-hero">
+        <div class="prev-a-title">WARZONE</div>
+        <div class="prev-a-sub">3D Tactical Shooter</div>
+      </div>
+      <div class="prev-a-modes">
+        <div class="prev-a-mode"><span class="icon">🧟</span>Zombie<br>Apocalypse</div>
+        <div class="prev-a-mode"><span class="icon">🚁</span>Rescue<br>Mission</div>
+        <div class="prev-a-mode"><span class="icon">⚔️</span>PvP<br>Arena</div>
+      </div>
+      <div class="prev-a-utils">
+        <div class="prev-a-util">Shop</div>
+        <div class="prev-a-util">Loadout</div>
+        <div class="prev-a-util">Tutorial</div>
+        <div class="prev-a-util">Keybinds</div>
+        <div class="prev-a-util">Achievements</div>
+      </div>
+      <div class="prev-a-stats">
+        Money: <span>$100</span><br>
+        Missions: <span>0</span><br>
+        Level: <span>1</span>
+      </div>
+    </div>
+    <div class="desc">
+      <p>Title at top, three big game-mode cards below, utility buttons in a compact row. Closest to the current layout — polished and familiar.</p>
+      <div class="tag-row">
+        <span class="tag good">Fits viewport</span>
+        <span class="tag">Single column</span>
+        <span class="tag">Centered layout</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION B -->
+  <div class="option-card" id="opt-b" onclick="selectOption('b', this)">
+    <div class="option-label">
+      <div class="letter">B</div>
+      <div class="name">SPLIT PANEL</div>
+      <div class="tag">Modern</div>
+    </div>
+    <div class="preview preview-b">
+      <div class="prev-b-left">
+        <div>
+          <div class="prev-b-title">WAR<br>ZONE</div>
+          <div class="prev-b-sub">3D Tactical Shooter</div>
+          <div class="prev-b-divider"></div>
+          <div class="prev-b-stat">Money: <span>$100</span></div>
+          <div class="prev-b-stat">Level: <span>1</span></div>
+          <div class="prev-b-stat">Missions: <span>0</span></div>
+        </div>
+        <div class="prev-b-utils">
+          <div class="prev-b-util-row">
+            <div class="prev-b-util-btn">Shop</div>
+            <div class="prev-b-util-btn">Loadout</div>
+            <div class="prev-b-util-btn">Tutorial</div>
+            <div class="prev-b-util-btn">Keybinds</div>
+            <div class="prev-b-util-btn">Achievements</div>
+          </div>
+        </div>
+      </div>
+      <div class="prev-b-right">
+        <div class="prev-b-mode">
+          <span class="icon">🧟</span>
+          <div><div class="prev-b-mode-name">Zombie Apocalypse</div><div class="prev-b-mode-sub">Survive endless waves</div></div>
+        </div>
+        <div class="prev-b-mode">
+          <span class="icon">🚁</span>
+          <div><div class="prev-b-mode-name">Rescue Mission</div><div class="prev-b-mode-sub">Extract the hostage</div></div>
+        </div>
+        <div class="prev-b-mode">
+          <span class="icon">⚔️</span>
+          <div><div class="prev-b-mode-name">PvP Arena</div><div class="prev-b-mode-sub">Fight for dominance</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="desc">
+      <p>Left sidebar: branding + stats + utility links. Right panel: three tall game-mode rows. No vertical overflow possible.</p>
+      <div class="tag-row">
+        <span class="tag good">Fits viewport</span>
+        <span class="tag good">No scrolling needed</span>
+        <span class="tag">Two-column</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION C -->
+  <div class="option-card" id="opt-c" onclick="selectOption('c', this)">
+    <div class="option-label">
+      <div class="letter">C</div>
+      <div class="name">DASHBOARD HQ</div>
+      <div class="tag">Tactical</div>
+    </div>
+    <div class="preview preview-c">
+      <div class="prev-c-top">
+        <div>
+          <div class="prev-c-title">WARZONE</div>
+          <div class="prev-c-sub">3D Tactical Shooter</div>
+        </div>
+        <div class="prev-c-stat-bar">
+          <span>$<span>100</span></span>
+          <span>Lv <span>1</span></span>
+          <span><span>0</span> Missions</span>
+        </div>
+      </div>
+      <div class="prev-c-modes">
+        <div class="prev-c-mode"><span class="icon">🧟</span><div class="prev-c-mode-name">Zombie<br>Apocalypse</div></div>
+        <div class="prev-c-mode"><span class="icon">🚁</span><div class="prev-c-mode-name">Rescue<br>Mission</div></div>
+        <div class="prev-c-mode"><span class="icon">⚔️</span><div class="prev-c-mode-name">PvP<br>Arena</div></div>
+      </div>
+      <div class="prev-c-bottom">
+        <div class="prev-c-bottom-btn">🛒 Shop</div>
+        <div class="prev-c-bottom-btn">⚙️ Loadout</div>
+        <div class="prev-c-bottom-btn">📖 Tutorial</div>
+        <div class="prev-c-bottom-btn">⌨️ Keybinds</div>
+        <div class="prev-c-bottom-btn">🏆 Achievements</div>
+      </div>
+    </div>
+    <div class="desc">
+      <p>Thin header bar with title + live stats. Center grid with three big game-mode cards. Bottom utility strip. Feels like a tactical command center.</p>
+      <div class="tag-row">
+        <span class="tag good">Fits viewport</span>
+        <span class="tag good">Compact & clean</span>
+        <span class="tag">Header + grid + footer</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="footer-note">Click a card to select it, then reply in the terminal with your choice or feedback</p>
+
+<script>
+  let selected = null;
+  function selectOption(id, el) {
+    document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    selected = id;
+    if (window.__companion_select) window.__companion_select(id, el.querySelector('.name').textContent.trim());
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<h2>Loadout — Theme Direction</h2>
+<p class="subtitle">Three column layout, drag-and-drop armor. Pick the color feel.</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="red-military" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0a0a;padding:14px;border-radius:8px;font-family:monospace">
+      <div style="display:flex;gap:6px;height:130px">
+        <!-- Weapons col -->
+        <div style="flex:1.3;background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:8px;border-top:2px solid #cc2200">
+          <div style="color:#cc2200;font-size:9px;font-weight:700;letter-spacing:2px;margin-bottom:6px">WEAPONS</div>
+          <div style="background:#1a1a1a;border:1px solid #cc2200;border-radius:4px;padding:4px 6px;color:#fff;font-size:9px;margin-bottom:3px">Glock <span style="float:right;color:#cc2200">✓</span></div>
+          <div style="background:#1a1a1a;border:1px solid #cc2200;border-radius:4px;padding:4px 6px;color:#fff;font-size:9px;margin-bottom:3px">AR <span style="float:right;color:#cc2200">✓</span></div>
+          <div style="background:#1a1a1a;border:1px solid #333;border-radius:4px;padding:4px 6px;color:#555;font-size:9px">Sniper</div>
+        </div>
+        <!-- Armor col -->
+        <div style="flex:1;background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:8px;border-top:2px solid #cc2200">
+          <div style="color:#cc2200;font-size:9px;font-weight:700;letter-spacing:2px;margin-bottom:6px">ARMOR</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
+            <div style="background:#1a1a1a;border:1px dashed #333;border-radius:4px;padding:5px;text-align:center;color:#333;font-size:8px">HEAD</div>
+            <div style="background:#1a1a1a;border:1px solid #cc2200;border-radius:4px;padding:5px;text-align:center;color:#cc2200;font-size:8px">VEST ✓</div>
+            <div style="background:#1a1a1a;border:1px dashed #333;border-radius:4px;padding:5px;text-align:center;color:#333;font-size:8px">LEGS</div>
+            <div style="background:#1a1a1a;border:1px dashed #333;border-radius:4px;padding:5px;text-align:center;color:#333;font-size:8px">FEET</div>
+          </div>
+        </div>
+        <!-- Stats col -->
+        <div style="flex:1;background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:8px;border-top:2px solid #cc2200">
+          <div style="color:#cc2200;font-size:9px;font-weight:700;letter-spacing:2px;margin-bottom:6px">STATS</div>
+          <div style="margin-bottom:5px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#aaa;font-size:8px">Health</span><span style="color:#fff;font-size:8px">3</span></div>
+            <div style="background:#1a1a1a;border-radius:2px;height:3px"><div style="background:#cc2200;width:40%;height:3px;border-radius:2px"></div></div>
+          </div>
+          <div style="margin-bottom:5px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#aaa;font-size:8px">Speed</span><span style="color:#fff;font-size:8px">1</span></div>
+            <div style="background:#1a1a1a;border-radius:2px;height:3px"><div style="background:#cc2200;width:15%;height:3px;border-radius:2px"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#aaa;font-size:8px">Damage</span><span style="color:#fff;font-size:8px">5</span></div>
+            <div style="background:#1a1a1a;border-radius:2px;height:3px"><div style="background:#cc2200;width:70%;height:3px;border-radius:2px"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Red Military</h3>
+      <p>Matches the homepage exactly — near-black bg, red (#cc2200) accents, red column headers. Unified look across the whole game.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="steel-tactical" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0c0f;padding:14px;border-radius:8px;font-family:monospace">
+      <div style="display:flex;gap:6px;height:130px">
+        <div style="flex:1.3;background:#0d1117;border:1px solid #1c2433;border-radius:6px;padding:8px;border-top:2px solid #4a9eff">
+          <div style="color:#4a9eff;font-size:9px;font-weight:700;letter-spacing:2px;margin-bottom:6px">WEAPONS</div>
+          <div style="background:#1c2433;border:1px solid #4a9eff;border-radius:4px;padding:4px 6px;color:#fff;font-size:9px;margin-bottom:3px">Glock <span style="float:right;color:#4a9eff">✓</span></div>
+          <div style="background:#1c2433;border:1px solid #4a9eff;border-radius:4px;padding:4px 6px;color:#fff;font-size:9px;margin-bottom:3px">AR <span style="float:right;color:#4a9eff">✓</span></div>
+          <div style="background:#1c2433;border:1px solid #2a3545;border-radius:4px;padding:4px 6px;color:#445;font-size:9px">Sniper</div>
+        </div>
+        <div style="flex:1;background:#0d1117;border:1px solid #1c2433;border-radius:6px;padding:8px;border-top:2px solid #4a9eff">
+          <div style="color:#4a9eff;font-size:9px;font-weight:700;letter-spacing:2px;margin-bottom:6px">ARMOR</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
+            <div style="background:#1c2433;border:1px dashed #2a3545;border-radius:4px;padding:5px;text-align:center;color:#2a3545;font-size:8px">HEAD</div>
+            <div style="background:#1c2433;border:1px solid #4a9eff;border-radius:4px;padding:5px;text-align:center;color:#4a9eff;font-size:8px">VEST ✓</div>
+            <div style="background:#1c2433;border:1px dashed #2a3545;border-radius:4px;padding:5px;text-align:center;color:#2a3545;font-size:8px">LEGS</div>
+            <div style="background:#1c2433;border:1px dashed #2a3545;border-radius:4px;padding:5px;text-align:center;color:#2a3545;font-size:8px">FEET</div>
+          </div>
+        </div>
+        <div style="flex:1;background:#0d1117;border:1px solid #1c2433;border-radius:6px;padding:8px;border-top:2px solid #4a9eff">
+          <div style="color:#4a9eff;font-size:9px;font-weight:700;letter-spacing:2px;margin-bottom:6px">STATS</div>
+          <div style="margin-bottom:5px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#7a8fa8;font-size:8px">Health</span><span style="color:#fff;font-size:8px">3</span></div>
+            <div style="background:#1c2433;border-radius:2px;height:3px"><div style="background:#4a9eff;width:40%;height:3px;border-radius:2px"></div></div>
+          </div>
+          <div style="margin-bottom:5px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#7a8fa8;font-size:8px">Speed</span><span style="color:#fff;font-size:8px">1</span></div>
+            <div style="background:#1c2433;border-radius:2px;height:3px"><div style="background:#4a9eff;width:15%;height:3px;border-radius:2px"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#7a8fa8;font-size:8px">Damage</span><span style="color:#fff;font-size:8px">5</span></div>
+            <div style="background:#1c2433;border-radius:2px;height:3px"><div style="background:#4a9eff;width:70%;height:3px;border-radius:2px"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Steel Tactical</h3>
+      <p>Dark navy/slate bg, electric blue accents. Cold, technical — feels like a mil-spec terminal or HUD display. Distinct from the homepage red.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="dark-contrast" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#080808;padding:14px;border-radius:8px;font-family:monospace">
+      <div style="display:flex;gap:6px;height:130px">
+        <div style="flex:1.3;background:#101010;border:1px solid #222;border-radius:6px;padding:8px;border-top:2px solid #e8e8e8">
+          <div style="color:#e8e8e8;font-size:9px;font-weight:700;letter-spacing:2px;margin-bottom:6px">WEAPONS</div>
+          <div style="background:#1a1a1a;border:1px solid #e8e8e8;border-radius:4px;padding:4px 6px;color:#fff;font-size:9px;margin-bottom:3px">Glock <span style="float:right;color:#fff">✓</span></div>
+          <div style="background:#1a1a1a;border:1px solid #e8e8e8;border-radius:4px;padding:4px 6px;color:#fff;font-size:9px;margin-bottom:3px">AR <span style="float:right;color:#fff">✓</span></div>
+          <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:4px;padding:4px 6px;color:#444;font-size:9px">Sniper</div>
+        </div>
+        <div style="flex:1;background:#101010;border:1px solid #222;border-radius:6px;padding:8px;border-top:2px solid #e8e8e8">
+          <div style="color:#e8e8e8;font-size:9px;font-weight:700;letter-spacing:2px;margin-bottom:6px">ARMOR</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
+            <div style="background:#1a1a1a;border:1px dashed #2a2a2a;border-radius:4px;padding:5px;text-align:center;color:#2a2a2a;font-size:8px">HEAD</div>
+            <div style="background:#1a1a1a;border:1px solid #e8e8e8;border-radius:4px;padding:5px;text-align:center;color:#e8e8e8;font-size:8px">VEST ✓</div>
+            <div style="background:#1a1a1a;border:1px dashed #2a2a2a;border-radius:4px;padding:5px;text-align:center;color:#2a2a2a;font-size:8px">LEGS</div>
+            <div style="background:#1a1a1a;border:1px dashed #2a2a2a;border-radius:4px;padding:5px;text-align:center;color:#2a2a2a;font-size:8px">FEET</div>
+          </div>
+        </div>
+        <div style="flex:1;background:#101010;border:1px solid #222;border-radius:6px;padding:8px;border-top:2px solid #e8e8e8">
+          <div style="color:#e8e8e8;font-size:9px;font-weight:700;letter-spacing:2px;margin-bottom:6px">STATS</div>
+          <div style="margin-bottom:5px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#666;font-size:8px">Health</span><span style="color:#fff;font-size:8px">3</span></div>
+            <div style="background:#1a1a1a;border-radius:2px;height:3px"><div style="background:#fff;width:40%;height:3px;border-radius:2px"></div></div>
+          </div>
+          <div style="margin-bottom:5px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#666;font-size:8px">Speed</span><span style="color:#fff;font-size:8px">1</span></div>
+            <div style="background:#1a1a1a;border-radius:2px;height:3px"><div style="background:#fff;width:15%;height:3px;border-radius:2px"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#666;font-size:8px">Damage</span><span style="color:#fff;font-size:8px">5</span></div>
+            <div style="background:#1a1a1a;border-radius:2px;height:3px"><div style="background:#fff;width:70%;height:3px;border-radius:2px"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Pure Black &amp; White</h3>
+      <p>Near-black bg, white/grey accents only. Maximum contrast, brutalist military aesthetic. Individual stat bars keep their colors (green/blue/red) as the only color in the UI.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px">Click your pick or reply in the terminal. Can also mix — e.g. "A but with stat bars keeping their colors".</p>

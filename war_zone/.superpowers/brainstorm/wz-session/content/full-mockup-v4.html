@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Warzone — Mockup v4</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #111;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+    gap: 20px;
+  }
+  h2 { color: #ffaa00; font-size: 18px; letter-spacing: 2px; }
+  .note { color: #555; font-size: 12px; text-align: center; }
+
+  .screen {
+    width: min(960px, 100%);
+    height: 540px;
+    background: #0b0b0b;
+    display: flex;
+    border: 1px solid #222;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* ---- LEFT PANEL ---- */
+  .left {
+    width: 280px;
+    flex-shrink: 0;
+    background: #0d0b0b;
+    border-right: 1px solid #1e1515;
+    display: flex;
+    flex-direction: column;
+    padding: 36px 24px 28px;
+    position: relative;
+    gap: 28px;
+  }
+
+  .left::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, transparent, #cc2222 25%, #cc2222 75%, transparent);
+  }
+
+  /* brand */
+  .title {
+    font-size: 52px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    line-height: 0.88;
+    background: linear-gradient(160deg, #ff4444 0%, #cc2222 60%, #8a1515 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-transform: uppercase;
+  }
+  .subtitle {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: #442222;
+    text-transform: uppercase;
+    margin-top: 10px;
+  }
+  .divider {
+    width: 48px;
+    height: 1px;
+    background: linear-gradient(90deg, #662222, transparent);
+    margin: 18px 0 12px;
+  }
+  .stats { display: flex; flex-direction: column; gap: 7px; }
+  .stat-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .stat-label { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: #3a3a3a; }
+  .stat-value { font-size: 14px; font-weight: 700; color: #cc4444; }
+
+  /* utility buttons */
+  .util-label {
+    font-size: 9px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: #2a1a1a;
+    margin-bottom: 8px;
+  }
+
+  .utilities { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
+
+  .util-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border: 1px solid #2a1818;
+    border-radius: 4px;
+    background: #100d0d;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.12s;
+    text-decoration: none;
+  }
+  .util-btn:hover {
+    border-color: #cc3333;
+    background: #150d0d;
+    transform: translateX(3px);
+  }
+  .util-icon { font-size: 14px; flex-shrink: 0; opacity: 0.6; }
+  .util-name {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #664444;
+    transition: color 0.15s;
+  }
+  .util-btn:hover .util-name { color: #ff4444; }
+  .util-btn:hover .util-icon { opacity: 1; }
+
+  /* ---- RIGHT PANEL ---- */
+  .right {
+    flex: 1;
+    background: #0b0b0b;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 32px 40px;
+    gap: 10px;
+  }
+
+  .section-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #2e2020;
+    margin-bottom: 2px;
+  }
+
+  .mode {
+    border: 1px solid #2e1a1a;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.12s;
+    display: flex;
+    align-items: stretch;
+    background: #100d0d;
+    overflow: hidden;
+  }
+  .mode:hover {
+    border-color: #ff4444;
+    background: #130d0d;
+    transform: translateX(4px);
+  }
+
+  .mode-stripe {
+    width: 4px;
+    flex-shrink: 0;
+    background: #3a1515;
+    transition: background 0.15s;
+  }
+  .mode:hover .mode-stripe { background: #ff4444; }
+
+  .mode-inner {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 22px 24px;
+    flex: 1;
+  }
+
+  .mode-icon { font-size: 36px; flex-shrink: 0; width: 48px; text-align: center; }
+
+  .mode-text { flex: 1; }
+  .mode-name {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #884444;
+    transition: color 0.15s;
+  }
+  .mode-desc {
+    font-size: 12px;
+    color: #3a2222;
+    margin-top: 5px;
+    letter-spacing: 0.5px;
+    transition: color 0.15s;
+  }
+  .mode-arrow {
+    color: #2a1515;
+    font-size: 24px;
+    flex-shrink: 0;
+    transition: color 0.15s, transform 0.15s;
+  }
+  .mode:hover .mode-name { color: #ff4444; }
+  .mode:hover .mode-desc { color: #774444; }
+  .mode:hover .mode-arrow { color: #ff4444; transform: translateX(4px); }
+
+  .annotations {
+    width: min(960px, 100%);
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .ann {
+    font-size: 11px;
+    color: #555;
+    background: #0d0d0d;
+    border: 1px solid #1e1e1e;
+    border-radius: 6px;
+    padding: 5px 12px;
+  }
+  .ann strong { color: #888; }
+</style>
+</head>
+<body>
+
+<h2>DARK MILITARY — v4</h2>
+<p class="note">Hover everything — left and right panels both interactive</p>
+
+<div class="screen">
+
+  <div class="left">
+    <div>
+      <div class="title">WAR<br>ZONE</div>
+      <div class="subtitle">3D Tactical Shooter</div>
+      <div class="divider"></div>
+      <div class="stats">
+        <div class="stat-row"><span class="stat-label">Money</span><span class="stat-value">$100</span></div>
+        <div class="stat-row"><span class="stat-label">Level</span><span class="stat-value">1</span></div>
+        <div class="stat-row"><span class="stat-label">Missions</span><span class="stat-value">0</span></div>
+      </div>
+    </div>
+
+    <div class="utilities">
+      <div class="util-label">Options</div>
+      <div class="util-btn"><span class="util-icon">🛒</span><span class="util-name">Shop</span></div>
+      <div class="util-btn"><span class="util-icon">⚙️</span><span class="util-name">Loadout</span></div>
+      <div class="util-btn"><span class="util-icon">📖</span><span class="util-name">Tutorial</span></div>
+      <div class="util-btn"><span class="util-icon">⌨️</span><span class="util-name">Keybinds</span></div>
+      <div class="util-btn"><span class="util-icon">🏆</span><span class="util-name">Achievements</span></div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="section-label">Select Game Mode</div>
+
+    <div class="mode">
+      <div class="mode-stripe"></div>
+      <div class="mode-inner">
+        <span class="mode-icon">🧟</span>
+        <div class="mode-text">
+          <div class="mode-name">Zombie Apocalypse</div>
+          <div class="mode-desc">Survive endless waves of the undead</div>
+        </div>
+        <span class="mode-arrow">›</span>
+      </div>
+    </div>
+
+    <div class="mode">
+      <div class="mode-stripe"></div>
+      <div class="mode-inner">
+        <span class="mode-icon">🚁</span>
+        <div class="mode-text">
+          <div class="mode-name">Rescue Mission</div>
+          <div class="mode-desc">Locate and extract the hostage</div>
+        </div>
+        <span class="mode-arrow">›</span>
+      </div>
+    </div>
+
+    <div class="mode">
+      <div class="mode-stripe"></div>
+      <div class="mode-inner">
+        <span class="mode-icon">⚔️</span>
+        <div class="mode-text">
+          <div class="mode-name">PvP Arena</div>
+          <div class="mode-desc">Fight for dominance in the arena</div>
+        </div>
+        <span class="mode-arrow">›</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="annotations">
+  <span class="ann"><strong>Util buttons</strong> — bordered cards with icon + label</span>
+  <span class="ann"><strong>Hover</strong> — slides right, turns red</span>
+  <span class="ann"><strong>"Options" label</strong> — section header above utils</span>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,103 @@
+<h2>Loadout Screen — Layout Direction</h2>
+<p class="subtitle">The current screen stacks weapons → armor → stats in one long scroll. Pick a structural direction.</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="tabbed" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0d0d0d;padding:16px;border-radius:8px;font-family:monospace">
+      <div style="display:flex;gap:6px;margin-bottom:12px">
+        <div style="background:#cc2200;color:#fff;padding:5px 14px;border-radius:4px;font-size:12px;font-weight:700">WEAPONS</div>
+        <div style="background:#222;color:#888;padding:5px 14px;border-radius:4px;font-size:12px">ARMOR</div>
+        <div style="background:#222;color:#888;padding:5px 14px;border-radius:4px;font-size:12px">STATS</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div style="background:#1a1a1a;border:1px solid #cc2200;border-radius:6px;padding:10px;color:#ffaa00;font-size:11px">⚔ Glock<br><span style="color:#555;font-size:10px">✓ EQUIPPED</span></div>
+        <div style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:10px;color:#aaa;font-size:11px">⚔ AR<br><span style="color:#555;font-size:10px">click to equip</span></div>
+        <div style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:10px;color:#aaa;font-size:11px">⚔ Sniper<br><span style="color:#555;font-size:10px">click to equip</span></div>
+        <div style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:10px;color:#aaa;font-size:11px">⚔ SMG<br><span style="color:#555;font-size:10px">click to equip</span></div>
+        <div style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:10px;color:#aaa;font-size:11px">⚔ RPG<br><span style="color:#555;font-size:10px">click to equip</span></div>
+        <div style="background:#1a1a1a;border:1px solid #ff4444;border-radius:6px;padding:10px;color:#ff6666;font-size:11px">⚔ Minigun<br><span style="color:#ff4444;font-size:10px">⚠ NEEDS REPAIR</span></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Tabbed</h3>
+      <p>Weapons, Armor, and Stats as separate tabs. One section at a time — no scrolling. Clean and focused. Closest to the shop screen's layout.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="columns" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0d0d0d;padding:16px;border-radius:8px;font-family:monospace">
+      <div style="display:flex;gap:8px;height:120px">
+        <div style="flex:1.2;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:8px">
+          <div style="color:#cc2200;font-size:10px;font-weight:700;margin-bottom:6px">WEAPONS</div>
+          <div style="background:#222;border:1px solid #cc2200;border-radius:4px;padding:4px 6px;color:#ffaa00;font-size:10px;margin-bottom:4px">⚔ Glock ✓</div>
+          <div style="background:#222;border:1px solid #333;border-radius:4px;padding:4px 6px;color:#666;font-size:10px;margin-bottom:4px">⚔ AR</div>
+          <div style="background:#222;border:1px solid #333;border-radius:4px;padding:4px 6px;color:#666;font-size:10px">⚔ Sniper</div>
+        </div>
+        <div style="flex:1;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:8px">
+          <div style="color:#aa88ff;font-size:10px;font-weight:700;margin-bottom:6px">ARMOR</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
+            <div style="background:#222;border:1px dashed #555;border-radius:4px;padding:4px;color:#888;font-size:9px;text-align:center">🪖 Helmet</div>
+            <div style="background:#222;border:1px solid #00aaff;border-radius:4px;padding:4px;color:#00aaff;font-size:9px;text-align:center">🛡 Plate</div>
+            <div style="background:#222;border:1px dashed #555;border-radius:4px;padding:4px;color:#888;font-size:9px;text-align:center">👖 Pants</div>
+            <div style="background:#222;border:1px dashed #555;border-radius:4px;padding:4px;color:#888;font-size:9px;text-align:center">👟 Boots</div>
+          </div>
+        </div>
+        <div style="flex:1;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:8px">
+          <div style="color:#00ff88;font-size:10px;font-weight:700;margin-bottom:6px">STATS</div>
+          <div style="margin-bottom:4px"><div style="color:#aaa;font-size:9px">Health</div><div style="background:#333;border-radius:2px;height:4px"><div style="background:#00ff88;width:60%;height:4px;border-radius:2px"></div></div></div>
+          <div style="margin-bottom:4px"><div style="color:#aaa;font-size:9px">Speed</div><div style="background:#333;border-radius:2px;height:4px"><div style="background:#00aaff;width:30%;height:4px;border-radius:2px"></div></div></div>
+          <div><div style="color:#aaa;font-size:9px">Damage</div><div style="background:#333;border-radius:2px;height:4px"><div style="background:#ff4444;width:80%;height:4px;border-radius:2px"></div></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Three Columns</h3>
+      <p>Weapons, Armor, and Stats visible simultaneously side-by-side. Great for quick overview — but tighter space per section, especially on narrower screens.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="character" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0d0d0d;padding:16px;border-radius:8px;font-family:monospace">
+      <div style="display:flex;gap:8px;height:120px">
+        <div style="flex:1;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:8px;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <div style="width:36px;height:52px;background:#333;border-radius:4px;position:relative;margin-bottom:6px">
+            <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:18px;height:18px;background:#444;border-radius:50%"></div>
+            <div style="position:absolute;top:2px;left:50%;transform:translateX(-50%);width:24px;height:30px;background:#555;border-radius:3px"></div>
+            <div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:22px;height:14px;background:#444;border-radius:2px"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;width:100%">
+            <div style="background:#222;border:1px dashed #aa88ff;border-radius:3px;padding:3px;color:#aa88ff;font-size:8px;text-align:center">HEAD</div>
+            <div style="background:#222;border:1px solid #00aaff;border-radius:3px;padding:3px;color:#00aaff;font-size:8px;text-align:center">CHEST ✓</div>
+            <div style="background:#222;border:1px dashed #00cc66;border-radius:3px;padding:3px;color:#555;font-size:8px;text-align:center">LEGS</div>
+            <div style="background:#222;border:1px dashed #ffaa00;border-radius:3px;padding:3px;color:#555;font-size:8px;text-align:center">FEET</div>
+          </div>
+        </div>
+        <div style="flex:2;display:flex;flex-direction:column;gap:4px">
+          <div style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:6px;flex:1">
+            <div style="color:#cc2200;font-size:9px;font-weight:700;margin-bottom:4px">WEAPONS (2/4)</div>
+            <div style="display:flex;gap:4px">
+              <div style="background:#222;border:1px solid #cc2200;border-radius:4px;padding:3px 6px;color:#ffaa00;font-size:9px">Glock ✓</div>
+              <div style="background:#222;border:1px solid #cc2200;border-radius:4px;padding:3px 6px;color:#ffaa00;font-size:9px">AR ✓</div>
+            </div>
+          </div>
+          <div style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:6px;flex:1.5">
+            <div style="color:#00ff88;font-size:9px;font-weight:700;margin-bottom:4px">STATS — 3 pts available</div>
+            <div style="display:flex;gap:3px;flex-wrap:wrap">
+              <div style="background:#222;border:1px solid #00ff88;border-radius:3px;padding:2px 5px;color:#00ff88;font-size:8px">HP +3</div>
+              <div style="background:#222;border:1px solid #00aaff;border-radius:3px;padding:2px 5px;color:#00aaff;font-size:8px">SPD +1</div>
+              <div style="background:#222;border:1px solid #ff4444;border-radius:3px;padding:2px 5px;color:#ff4444;font-size:8px">DMG +5</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Character Sheet</h3>
+      <p>Left panel: character silhouette with clickable armor slots. Right panel: weapon slots + stat summary. RPG-style equipment screen feel — most visual but most complex to build.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:20px">Click your preferred direction, or just reply in the terminal.</p>

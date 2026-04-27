@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shop Layout Options</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0d0d14; color:#fff; font-family:'Segoe UI',Arial,sans-serif; padding:24px; }
+h2 { color:#ffaa00; font-size:18px; letter-spacing:2px; text-align:center; margin-bottom:6px; }
+.subtitle { color:#555; font-size:12px; text-align:center; margin-bottom:24px; }
+
+.options { display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:1100px; margin:0 auto; }
+
+.opt {
+  border:2px solid #2a2a3a; border-radius:10px; overflow:hidden; cursor:pointer;
+  transition:border-color .2s, transform .15s;
+}
+.opt:hover { border-color:#ffaa00; transform:translateY(-2px); }
+.opt.selected { border-color:#ffaa00; box-shadow:0 0 20px rgba(255,170,0,.25); }
+
+.opt-label {
+  padding:10px 14px; background:#12121e; border-bottom:1px solid #1e1e2e;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.opt-label .letter {
+  width:26px; height:26px; border-radius:50%; background:#222; color:#ffaa00;
+  font-weight:900; font-size:13px; display:flex; align-items:center; justify-content:center;
+}
+.opt-label .name { font-size:13px; font-weight:700; letter-spacing:1px; }
+.opt-label .tag { font-size:10px; color:#666; }
+
+/* ─── MOCKUP SHELL ─── */
+.mock { height:340px; display:flex; flex-direction:column; background:#090909; }
+
+/* ══ OPTION A: TOP TABS ══ */
+.a-header {
+  background:#0d0b0b; border-bottom:1px solid #1e1515;
+  padding:12px 18px; display:flex; align-items:center; justify-content:space-between;
+  position:relative;
+}
+.a-header::before {
+  content:''; position:absolute; left:0; top:0; bottom:0; width:3px;
+  background:linear-gradient(180deg,transparent,#cc2222 30%,#cc2222 70%,transparent);
+}
+.a-title { font-size:22px; font-weight:900; letter-spacing:4px;
+  background:linear-gradient(160deg,#ff4444,#cc2222); -webkit-background-clip:text;
+  background-clip:text; -webkit-text-fill-color:transparent; }
+.a-money { font-size:13px; font-weight:700; color:#cc4444; }
+.a-money span { font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#664444; }
+
+.a-tabs {
+  display:flex; background:#0b0b0b; border-bottom:1px solid #1e1515;
+}
+.a-tab {
+  padding:9px 18px; font-size:10px; font-weight:700; letter-spacing:1.5px;
+  text-transform:uppercase; color:#442222; cursor:pointer;
+  border-bottom:2px solid transparent; transition:color .15s;
+}
+.a-tab.active { color:#ff4444; border-bottom-color:#ff4444; }
+.a-tab:hover { color:#884444; }
+
+.a-content {
+  flex:1; padding:14px 16px; overflow-y:auto;
+  display:grid; grid-template-columns:repeat(3,1fr); gap:10px; align-content:start;
+}
+.mock-card {
+  background:#100d0d; border:1px solid #2e1a1a; border-radius:5px; padding:10px;
+}
+.mock-card-name { font-size:10px; font-weight:700; color:#884444; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+.mock-card-price { font-size:12px; font-weight:700; color:#ff4444; margin-bottom:6px; }
+.mock-card-stat { font-size:9px; color:#442222; margin-bottom:2px; }
+.mock-card-btn {
+  width:100%; padding:5px; font-size:9px; font-weight:700; letter-spacing:1px;
+  text-transform:uppercase; background:#1a0808; border:1px solid #3a1515;
+  color:#cc4444; border-radius:3px; cursor:pointer; margin-top:6px;
+}
+.a-back {
+  padding:8px 16px; background:#0d0b0b; border-top:1px solid #1e1515;
+  display:flex; justify-content:flex-end;
+}
+.a-back-btn { font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
+  color:#442222; border:1px solid #2a1a1a; border-radius:3px; padding:5px 12px; cursor:pointer; }
+
+/* ══ OPTION B: LEFT SIDEBAR TABS ══ */
+.b-wrap { display:flex; height:100%; }
+.b-sidebar {
+  width:130px; flex-shrink:0; background:#0d0b0b; border-right:1px solid #1e1515;
+  display:flex; flex-direction:column; padding:16px 0; position:relative;
+}
+.b-sidebar::before {
+  content:''; position:absolute; left:0; top:0; bottom:0; width:3px;
+  background:linear-gradient(180deg,transparent,#cc2222 25%,#cc2222 75%,transparent);
+}
+.b-title { font-size:18px; font-weight:900; letter-spacing:4px; line-height:.9;
+  background:linear-gradient(160deg,#ff4444,#cc2222); -webkit-background-clip:text;
+  background-clip:text; -webkit-text-fill-color:transparent; padding:0 16px; margin-bottom:12px; }
+.b-money { font-size:11px; font-weight:700; color:#cc4444; padding:0 16px; margin-bottom:16px; }
+.b-money span { display:block; font-size:9px; letter-spacing:1px; color:#664444; text-transform:uppercase; }
+.b-divider { width:40px; height:1px; background:linear-gradient(90deg,#662222,transparent); margin:0 16px 14px; }
+.b-tabs { flex:1; display:flex; flex-direction:column; gap:2px; }
+.b-tab {
+  padding:9px 16px; font-size:10px; font-weight:700; letter-spacing:1.5px;
+  text-transform:uppercase; color:#442222; cursor:pointer;
+  border-left:2px solid transparent; transition:color .15s, border-color .15s;
+}
+.b-tab.active { color:#ff4444; border-left-color:#ff4444; background:rgba(255,68,68,.04); }
+.b-tab:hover { color:#884444; }
+.b-back-btn {
+  margin:auto 16px 0; font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
+  color:#442222; border:1px solid #2a1a1a; border-radius:3px; padding:7px 10px;
+  cursor:pointer; text-align:center;
+}
+
+.b-content {
+  flex:1; padding:14px 14px; overflow-y:auto;
+  display:grid; grid-template-columns:repeat(2,1fr); gap:9px; align-content:start;
+}
+
+/* desc area */
+.desc { padding:10px 14px 12px; border-top:1px solid #1a1a2a; }
+.desc p { font-size:11px; color:#555; line-height:1.5; }
+.desc .tags { display:flex; gap:5px; margin-top:6px; flex-wrap:wrap; }
+.desc .tag { font-size:10px; padding:2px 8px; border-radius:10px; background:#1e1e2e; color:#777; }
+.desc .tag.good { background:rgba(0,255,136,.08); color:#00ff88; }
+
+.footer { text-align:center; margin-top:18px; color:#444; font-size:12px; }
+</style>
+</head>
+<body>
+
+<h2>SHOP REDESIGN — LAYOUT</h2>
+<p class="subtitle">Same dark military style, two tab approaches — click to choose</p>
+
+<div class="options">
+
+  <!-- OPTION A: TOP TAB BAR -->
+  <div class="opt" id="opt-a" onclick="pick('a',this)">
+    <div class="opt-label">
+      <div class="letter">A</div>
+      <div class="name">TOP TAB BAR</div>
+      <div class="tag">More content width</div>
+    </div>
+    <div class="mock">
+      <div class="a-header">
+        <div class="a-title">SHOP</div>
+        <div class="a-money"><span>Balance</span> $100</div>
+      </div>
+      <div class="a-tabs">
+        <div class="a-tab active">⚔ Weapons</div>
+        <div class="a-tab">🛡 Equipment</div>
+        <div class="a-tab">🔧 Attachments</div>
+        <div class="a-tab">⭐ XP</div>
+      </div>
+      <div class="a-content">
+        <div class="mock-card">
+          <div class="mock-card-name">Revolver</div>
+          <div class="mock-card-price">$750</div>
+          <div class="mock-card-stat">DMG 18 · Range Mid</div>
+          <div class="mock-card-btn">Buy</div>
+        </div>
+        <div class="mock-card">
+          <div class="mock-card-name">Shotgun</div>
+          <div class="mock-card-price">$2,500</div>
+          <div class="mock-card-stat">DMG 28 · Range Close</div>
+          <div class="mock-card-btn">Buy</div>
+        </div>
+        <div class="mock-card">
+          <div class="mock-card-name">Assault Rifle</div>
+          <div class="mock-card-price">$10,000</div>
+          <div class="mock-card-stat">DMG 22 · Range Long</div>
+          <div class="mock-card-btn">Buy</div>
+        </div>
+        <div class="mock-card">
+          <div class="mock-card-name">SMG</div>
+          <div class="mock-card-price">$6,000</div>
+          <div class="mock-card-stat">DMG 5 · Fast fire</div>
+          <div class="mock-card-btn">Buy</div>
+        </div>
+        <div class="mock-card">
+          <div class="mock-card-name">Katana</div>
+          <div class="mock-card-price">$7,500</div>
+          <div class="mock-card-stat">DMG 45 · Melee</div>
+          <div class="mock-card-btn">Buy</div>
+        </div>
+        <div class="mock-card">
+          <div class="mock-card-name">Sniper</div>
+          <div class="mock-card-price">$100,000</div>
+          <div class="mock-card-stat">DMG 75 · Range Long</div>
+          <div class="mock-card-btn">Buy</div>
+        </div>
+      </div>
+      <div class="a-back"><div class="a-back-btn">← Back</div></div>
+    </div>
+    <div class="desc">
+      <p>Tab bar under the header. Full width for item cards — fits more columns. Familiar browser-style tab UX.</p>
+      <div class="tags">
+        <span class="tag good">Max card width</span>
+        <span class="tag">Top tab bar</span>
+        <span class="tag">3-4 cols possible</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION B: LEFT SIDEBAR TABS -->
+  <div class="opt" id="opt-b" onclick="pick('b',this)">
+    <div class="opt-label">
+      <div class="letter">B</div>
+      <div class="name">LEFT SIDEBAR TABS</div>
+      <div class="tag">Matches homepage feel</div>
+    </div>
+    <div class="mock">
+      <div class="b-wrap">
+        <div class="b-sidebar">
+          <div class="b-title">SHOP</div>
+          <div class="b-money"><span>Balance</span>$100</div>
+          <div class="b-divider"></div>
+          <div class="b-tabs">
+            <div class="b-tab active">⚔ Weapons</div>
+            <div class="b-tab">🛡 Equipment</div>
+            <div class="b-tab">🔧 Attach.</div>
+            <div class="b-tab">⭐ XP</div>
+          </div>
+          <div class="b-back-btn">← Back</div>
+        </div>
+        <div class="b-content">
+          <div class="mock-card">
+            <div class="mock-card-name">Revolver</div>
+            <div class="mock-card-price">$750</div>
+            <div class="mock-card-stat">DMG 18 · Range Mid</div>
+            <div class="mock-card-btn">Buy</div>
+          </div>
+          <div class="mock-card">
+            <div class="mock-card-name">Shotgun</div>
+            <div class="mock-card-price">$2,500</div>
+            <div class="mock-card-stat">DMG 28 · Close</div>
+            <div class="mock-card-btn">Buy</div>
+          </div>
+          <div class="mock-card">
+            <div class="mock-card-name">Assault Rifle</div>
+            <div class="mock-card-price">$10,000</div>
+            <div class="mock-card-stat">DMG 22 · Long</div>
+            <div class="mock-card-btn">Buy</div>
+          </div>
+          <div class="mock-card">
+            <div class="mock-card-name">SMG</div>
+            <div class="mock-card-price">$6,000</div>
+            <div class="mock-card-stat">DMG 5 · Fast</div>
+            <div class="mock-card-btn">Buy</div>
+          </div>
+          <div class="mock-card">
+            <div class="mock-card-name">Katana</div>
+            <div class="mock-card-price">$7,500</div>
+            <div class="mock-card-stat">DMG 45 · Melee</div>
+            <div class="mock-card-btn">Buy</div>
+          </div>
+          <div class="mock-card">
+            <div class="mock-card-name">Sniper</div>
+            <div class="mock-card-price">$100K</div>
+            <div class="mock-card-stat">DMG 75 · Long</div>
+            <div class="mock-card-btn">Buy</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="desc">
+      <p>Sidebar with tabs on the left — same split-panel feel as the homepage. Money + back button live in the sidebar. Consistent visual language.</p>
+      <div class="tags">
+        <span class="tag good">Matches homepage</span>
+        <span class="tag">Left sidebar nav</span>
+        <span class="tag">2-3 cols</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="footer">Click a card to select, then reply in the terminal</p>
+
+<script>
+function pick(id, el) {
+  document.querySelectorAll('.opt').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  if (window.__companion_select) window.__companion_select(id, el.querySelector('.name').textContent.trim());
+}
+</script>
+</body>
+</html>
