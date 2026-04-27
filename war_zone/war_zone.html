@@ -85,9 +85,31 @@
 
     <!-- Map Selection -->
     <div id="map-screen">
-        <h2>Select Map</h2>
-        <div class="map-grid" id="map-grid"></div>
-        <button class="back-btn" onclick="showScreen('homepage')">Back</button>
+        <div class="ms-header">
+            <div class="ms-title">SELECT MAP</div>
+            <div class="ms-mode-badge" id="ms-mode-badge">Mode: —</div>
+            <button class="ms-back-btn" onclick="showScreen('homepage')">← Back</button>
+        </div>
+        <div class="ms-body">
+            <div class="ms-list" id="ms-list">
+                <div class="ms-list-label" id="ms-list-label">Maps</div>
+            </div>
+            <div class="ms-preview">
+                <div class="ms-img-wrap">
+                    <img class="ms-img" id="ms-preview-img" src="" alt="">
+                    <div class="ms-img-overlay"></div>
+                    <div class="ms-img-content">
+                        <div class="ms-map-name" id="ms-preview-name"></div>
+                        <div class="ms-map-desc" id="ms-preview-desc"></div>
+                        <div class="ms-map-tags" id="ms-preview-tags"></div>
+                    </div>
+                </div>
+                <div class="ms-footer">
+                    <div class="ms-footer-hint">Click a map on the left to preview</div>
+                    <button class="ms-deploy-btn" id="ms-deploy-btn">Deploy →</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Shop -->
