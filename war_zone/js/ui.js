@@ -583,11 +583,11 @@ export function showLoadout() {
         row.innerHTML = `
             <div class="lo-stat-top">
                 <div class="lo-stat-name">${label}</div>
+                <input class="lo-stat-step" type="number" value="1" min="1" title="Step size">
                 <div class="lo-stat-controls">
                     <button class="lo-stat-btn lo-btn-rem" ${pts < 1 ? 'disabled' : ''}>−</button>
                     <div class="lo-stat-val">${pts}</div>
                     <button class="lo-stat-btn lo-btn-add" ${playerData.statPoints < 1 ? 'disabled' : ''}>+</button>
-                    <input class="lo-stat-step" type="number" value="1" min="1" title="Step size">
                 </div>
             </div>
             <div class="lo-stat-bar-wrap">
