@@ -1539,7 +1539,7 @@ canvas {
     border-bottom: 1px solid #0f0f0f;
     border-left: 2px solid transparent;
     cursor: pointer;
-    transition: background 0.12s, border-color 0.12s;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
 
 .ms-item:hover {
@@ -1548,7 +1548,7 @@ canvas {
 }
 
 .ms-item.active {
-    background: #130d0d;
+    background: #1e0f0f;
     border-left-color: #cc2200;
 }
 
