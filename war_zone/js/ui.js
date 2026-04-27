@@ -586,6 +586,7 @@ export function showLoadout() {
                 <div class="lo-stat-controls">
                     <button class="lo-stat-btn lo-btn-rem" ${pts < 1 ? 'disabled' : ''}>−</button>
                     <div class="lo-stat-val">${pts}</div>
+                    <input class="lo-stat-step" type="number" value="1" min="1">
                     <button class="lo-stat-btn lo-btn-add" ${playerData.statPoints < 1 ? 'disabled' : ''}>+</button>
                 </div>
             </div>
