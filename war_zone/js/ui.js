@@ -378,11 +378,13 @@ export function showLoadout() {
             badgeClass = 'lo-badge-off'; badgeText = 'equip'; badgeTag = 'div';
         }
 
+        const attachments = (playerData.weaponAttachments[id] || []).map(a => ATTACHMENTS[a]?.name).filter(Boolean).join(', ');
         card.innerHTML = `
             <div class="lo-w-icon">⚔</div>
             <div class="lo-w-info">
                 <div class="lo-w-name">${w.name}</div>
                 <div class="lo-w-ammo">${ammoText}</div>
+                ${attachments ? `<div class="lo-w-ammo" style="color:#ff88ff">${attachments}</div>` : ''}
             </div>
             <${badgeTag} class="lo-w-badge ${badgeClass}">${badgeText}</${badgeTag}>
         `;
@@ -443,6 +445,7 @@ export function showLoadout() {
             const parts = [];
             if (eq.armor) parts.push(`${eq.armor} armor`);
             if (eq.damageReduction) parts.push(`${Math.round(eq.damageReduction * 100)}% DR`);
+            if (eq.headshotReduction) parts.push(`${Math.round(eq.headshotReduction * 100)}% headshot`);
             if (parts.length) statsHtml = `<div class="lo-a-slot-stats">${parts.join(' · ')}</div>`;
         }
 
@@ -467,14 +470,13 @@ export function showLoadout() {
             slotDiv.style.borderStyle = 'solid';
             slotDiv.style.background = 'rgba(255,255,255,0.05)';
         });
-        slotDiv.addEventListener('dragleave', () => {
+        slotDiv.addEventListener('dragleave', (e) => {
+            if (slotDiv.contains(e.relatedTarget)) return;
             slotDiv.style.borderStyle = playerData[key] ? 'solid' : 'dashed';
             slotDiv.style.background = playerData[key] ? 'rgba(204,34,0,0.04)' : '';
         });
         slotDiv.addEventListener('drop', e => {
             e.preventDefault();
-            slotDiv.style.borderStyle = playerData[key] ? 'solid' : 'dashed';
-            slotDiv.style.background = playerData[key] ? 'rgba(204,34,0,0.04)' : '';
             const armorId = e.dataTransfer.getData('armorId');
             const armorType = e.dataTransfer.getData('armorType');
             if (armorType === slotType) {
@@ -483,6 +485,8 @@ export function showLoadout() {
                 window._updateTpArmor?.();
                 showLoadout();
             } else {
+                slotDiv.style.borderStyle = playerData[key] ? 'solid' : 'dashed';
+                slotDiv.style.background = playerData[key] ? 'rgba(204,34,0,0.04)' : '';
                 slotDiv.style.borderColor = '#ff2222';
                 setTimeout(() => { slotDiv.style.borderColor = ''; }, 600);
             }
@@ -518,6 +522,7 @@ export function showLoadout() {
             const parts = [];
             if (eq.armor) parts.push(`${eq.armor} arm`);
             if (eq.damageReduction) parts.push(`${Math.round(eq.damageReduction * 100)}% DR`);
+            if (eq.headshotReduction) parts.push(`${Math.round(eq.headshotReduction * 100)}% hs`);
 
             card.innerHTML = `
                 <div class="lo-a-inv-type">${typeLabel[eq.type] || eq.type}</div>
@@ -531,6 +536,12 @@ export function showLoadout() {
                 card.style.opacity = '0.5';
             });
             card.addEventListener('dragend', () => { card.style.opacity = ''; });
+            card.addEventListener('click', () => {
+                playerData[eqKey] = isEquipped ? null : id;
+                savePlayerData();
+                window._updateTpArmor?.();
+                showLoadout();
+            });
 
             armorBody.appendChild(card);
         }
