@@ -17,7 +17,7 @@ export function showScreen(id) {
     ['homepage', 'shop-screen', 'loadout-screen', 'map-screen'].forEach(s => {
         const el = document.getElementById(s);
         if (s === id) {
-            el.style.display = (s === 'shop-screen' || s === 'loadout-screen') ? 'block' : 'flex';
+            el.style.display = 'flex';
         } else {
             el.style.display = 'none';
         }
@@ -30,20 +30,38 @@ export function updateHomeStats() {
     document.getElementById('home-money').textContent = '$' + playerData.money;
     document.getElementById('home-missions').textContent = playerData.missions;
     document.getElementById('home-level').textContent = playerData.level;
+    const airstrikeRow = document.getElementById('home-airstrike-row');
     if (playerData.airstrikes > 0) {
-        document.getElementById('home-missions').innerHTML += `<br>Airstrikes: <span style="color:#ff4444">${playerData.airstrikes}</span>`;
+        document.getElementById('home-airstrikes').textContent = playerData.airstrikes;
+        airstrikeRow.style.display = '';
+    } else {
+        airstrikeRow.style.display = 'none';
     }
 }
 
 // --- Shop ---
+
+let _shopActiveTab = 'weapons';
+
+window.shopTab = function(id, btn) {
+    _shopActiveTab = id;
+    document.querySelectorAll('.shop-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.shop-panel').forEach(p => p.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    const panel = document.getElementById('shop-panel-' + id);
+    if (panel) panel.classList.add('active');
+};
 
 export function showShop() {
     showScreen('shop-screen');
     document.getElementById('shop-money').textContent = '$' + playerData.money;
     renderWeaponShop();
     renderEquipmentShop();
+    renderConsumableShop();
     renderAttachmentShop();
     renderXPShop();
+    const activeBtn = document.querySelector(`.shop-tab[data-tab="${_shopActiveTab}"]`);
+    window.shopTab(_shopActiveTab, activeBtn);
 }
 window.showShop = showShop;
 
@@ -66,7 +84,7 @@ function renderWeaponShop() {
             <h3>${w.name}</h3>
             <div class="price">$${w.cost}</div>
             <div class="stats">${statsHtml}</div>
-            <button class="buy-btn ${owned ? 'owned' : ''}" ${owned ? 'disabled' : ''} onclick="buyWeapon('${id}')">${owned ? 'OWNED' : 'BUY'}</button>
+            <button class="buy-btn ${owned ? 'owned' : ''}" ${(owned || playerData.money < w.cost) ? 'disabled' : ''} onclick="buyWeapon('${id}')">${owned ? 'OWNED' : playerData.money >= w.cost ? 'BUY' : "Can't afford"}</button>
             ${owned && needsRepair ? `<button class="repair-btn" onclick="repairWeapon('${id}')">Repair ($50)</button>` : ''}
         `;
         grid.appendChild(item);
@@ -82,14 +100,13 @@ function renderEquipmentShop() {
         { title: 'Breastplates', filter: e => e.type === 'armor' },
         { title: 'Pants', filter: e => e.type === 'pants' },
         { title: 'Boots', filter: e => e.type === 'boots' },
-        { title: 'Consumables', filter: e => e.type === 'consumable' }
     ];
 
     for (const { title, filter } of sections) {
         const entries = Object.entries(EQUIPMENT).filter(([, e]) => filter(e));
         if (entries.length === 0) continue;
-        const header = document.createElement('h4');
-        header.style.cssText = 'color:#ffaa00;width:100%;margin:18px 0 8px;font-size:18px;';
+        const header = document.createElement('div');
+        header.className = 'shop-section-header';
         header.textContent = title;
         grid.appendChild(header);
         for (const [id, e] of entries) {
@@ -103,12 +120,33 @@ function renderEquipmentShop() {
             const item = document.createElement('div');
             item.className = 'shop-item';
             item.innerHTML = `
-                <h3>${e.name}</h3><div class="price">$${e.cost}</div>
+                <h3>${e.name}</h3><div class="price">$${e.cost.toLocaleString()}</div>
                 <div class="stats">${desc}</div>
-                <button class="buy-btn" onclick="buyEquipment('${id}')">BUY</button>
+                <button class="buy-btn" ${playerData.money < e.cost ? 'disabled' : ''} onclick="buyEquipment('${id}')">${playerData.money >= e.cost ? 'BUY' : "Can't afford"}</button>
             `;
             grid.appendChild(item);
         }
+    }
+}
+
+function renderConsumableShop() {
+    const grid = document.getElementById('consumable-shop');
+    grid.innerHTML = '';
+    const consumables = Object.entries(EQUIPMENT).filter(([, e]) => e.type === 'consumable');
+    for (const [id, e] of consumables) {
+        let desc = '';
+        if (e.hpRestore) desc += `Restores ${e.hpRestore} HP`;
+        if (e.hpBoost) desc += `+${e.hpBoost} Temporary HP`;
+        if (e.airstrikes) desc += `Call an airstrike — kills all zombies (+${e.airstrikes} use)`;
+        const item = document.createElement('div');
+        item.className = 'shop-item';
+        item.innerHTML = `
+            <h3>${e.name}</h3>
+            <div class="price">$${e.cost.toLocaleString()}</div>
+            <div class="stats">${desc}</div>
+            <button class="buy-btn" ${playerData.money < e.cost ? 'disabled' : ''} onclick="buyEquipment('${id}')">${playerData.money >= e.cost ? 'BUY' : "Can't afford"}</button>
+        `;
+        grid.appendChild(item);
     }
 }
 
@@ -126,9 +164,9 @@ function renderAttachmentShop() {
         item.className = 'shop-item';
         const canAfford = playerData.money >= a.cost;
         const weaponBtns = eligible.length > 0 && canAfford
-            ? eligible.map(wid => `<button class="buy-btn" style="font-size:11px;margin:2px" onclick="attachToWeapon('${id}','${wid}')">Attach to ${WEAPONS[wid].name}</button>`).join('')
-            : eligible.length === 0 ? '<div style="color:#888;font-size:11px">No eligible weapons</div>'
-                : '<div style="color:#f88;font-size:11px">Not enough money</div>';
+            ? eligible.map(wid => `<button class="buy-btn" style="margin-top:4px" onclick="attachToWeapon('${id}','${wid}')">Attach to ${WEAPONS[wid].name}</button>`).join('')
+            : eligible.length === 0 ? '<div style="color:#442222;font-size:10px;letter-spacing:1px">No eligible weapons owned</div>'
+                : '<div style="color:#662222;font-size:10px;letter-spacing:1px">Not enough money</div>';
         item.innerHTML = `
             <h3>${a.name}</h3><div class="price">$${a.cost}</div>
             <div class="stats">${a.description}</div>
@@ -147,25 +185,33 @@ const XP_PACKAGES = [
 ];
 
 function renderXPShop() {
-    const grid = document.getElementById('xp-shop');
-    grid.innerHTML = '';
+    const container = document.getElementById('xp-shop');
+    container.innerHTML = '';
     const needed = xpToNextLevel(playerData.level);
-    const header = document.createElement('p');
-    header.style.cssText = 'color:#aaa;font-size:13px;width:100%;margin:0 0 10px;';
-    header.textContent = `LVL ${playerData.level} — ${playerData.xp}/${needed} XP to next level`;
-    grid.appendChild(header);
+
+    const infoCard = document.createElement('div');
+    infoCard.className = 'xp-info-card';
+    infoCard.innerHTML = `
+        <div class="xp-info-label">Current Level</div>
+        <div class="xp-info-val">Level ${playerData.level} — ${playerData.xp.toLocaleString()} / ${needed.toLocaleString()} XP to next level</div>
+    `;
+    container.appendChild(infoCard);
+
+    const grid = document.createElement('div');
+    grid.className = 'xp-grid';
     for (const pkg of XP_PACKAGES) {
         const canAfford = playerData.money >= pkg.cost;
-        const item = document.createElement('div');
-        item.className = 'shop-item';
-        item.innerHTML = `
-            <h3>+${pkg.xp} XP</h3>
-            <div class="price">$${pkg.cost.toLocaleString()}</div>
-            <div class="stats">Instantly grants ${pkg.xp} XP</div>
-            <button class="buy-btn" ${!canAfford ? 'disabled' : ''} onclick="buyXP(${pkg.xp},${pkg.cost})">${canAfford ? 'BUY' : 'Too expensive'}</button>
+        const card = document.createElement('div');
+        card.className = 'xp-card';
+        card.innerHTML = `
+            <div class="xp-amount">+${pkg.xp.toLocaleString()}</div>
+            <div class="xp-unit">XP</div>
+            <div class="xp-cost">$${pkg.cost.toLocaleString()}</div>
+            <button class="buy-btn" ${!canAfford ? 'disabled' : ''} onclick="buyXP(${pkg.xp},${pkg.cost})">${canAfford ? 'BUY' : "Can't afford"}</button>
         `;
-        grid.appendChild(item);
+        grid.appendChild(card);
     }
+    container.appendChild(grid);
 }
 
 window.buyXP = function (xp, cost) {
