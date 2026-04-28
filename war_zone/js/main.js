@@ -871,6 +871,10 @@ function startGame(mode, mapId) {
     if (gameState.currentMap === 'cave' && gameState.cavePlayerSpawn != null) {
         camera.position.set(gameState.cavePlayerSpawn.x, 1.7, gameState.cavePlayerSpawn.z);
     }
+    // Fortress map: spawn in the south courtyard — (0,0,0) is inside the underground central room zone
+    if (gameState.currentMap === 'fortress') {
+        camera.position.set(0, 1.7, 40);
+    }
     const spawnFloor = getFloorHeight(camera.position);
     camera.position.y = spawnFloor + 1.7;
     scene.add(controls.getObject());

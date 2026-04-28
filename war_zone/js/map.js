@@ -1060,6 +1060,7 @@ function buildFortressMap(obs) {
     addObstacle(obs, stoneMat, 1, 6, 3.5, -75.5, 3, -81.25); // west end cap
     addObstacle(obs, stoneMat, 1, 6, 3.5, -14.5, 3, -81.25); // east end cap
     addObstacle(obs, stoneMat, 62, 1, 4, -45, 6.5, -81, { noCollide: true }); // roof slab
+    addObstacle(obs, pathMat, 60, 0.1, 3.5, -45, 0.05, -81.25, { noCollide: true }); // floor slab
     addTorch(-68, 4, -81); addTorch(-43, 4, -81); addTorch(-20, 4, -81);
 
     // --- Secret Corridor B: alongside east outer wall interior (z=-75 to z=-20, x=79.5 to x=83) ---
@@ -1071,6 +1072,7 @@ function buildFortressMap(obs) {
     addObstacle(obs, stoneMat, 3.5, 6, 1, 81.25, 3, -75.5); // north end cap
     addObstacle(obs, stoneMat, 3.5, 6, 1, 81.25, 3, -19.5); // south end cap
     addObstacle(obs, stoneMat, 4, 1, 57, 81, 6.5, -47.5, { noCollide: true }); // roof slab
+    addObstacle(obs, pathMat, 3.5, 0.1, 55, 81.25, 0.05, -47.5, { noCollide: true }); // floor slab
     addTorch(81, 4, -68); addTorch(81, 4, -43); addTorch(81, 4, -22);
 
     // --- Underground Network: Central Room + 4 Tunnel Corridors ---
