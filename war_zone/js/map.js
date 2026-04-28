@@ -1204,6 +1204,7 @@ function buildFortressMap(obs) {
     addObstacle(obs, darkStoneMat, 18.5, 10, 4, 10.75, 5, 20); // S right
     addObstacle(obs, darkStoneMat, 4, 10, 40, 20, 5, 0); // E sealed
     addObstacle(obs, darkStoneMat, 4, 10, 40, -20, 5, 0); // W sealed
+    addObstacle(obs, darkStoneMat, 36, 0.1, 36, 0, 0.05, 0, { noCollide: true }); // inner courtyard floor
 
     // Inner keep corner towers (r=3.5, h=13, centre y=6.5)
     addCylinder(mossStoneMat, 3.5, 13, -20, 6.5, -20);
