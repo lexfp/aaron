@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Map UI Redesign Options</title>
+<script src="/helper.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #111; color: #ccc; font-family: 'Segoe UI', Arial, sans-serif; padding: 24px; }
+  h1 { font-size: 15px; letter-spacing: 3px; text-transform: uppercase; color: #888; margin-bottom: 6px; }
+  .subtitle { font-size: 12px; color: #555; margin-bottom: 24px; letter-spacing: 1px; }
+
+  .options-row { display: flex; gap: 20px; align-items: flex-start; }
+
+  /* Card wrapper */
+  .option-card {
+    flex: 1;
+    border: 2px solid #222;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    background: #0d0d0d;
+  }
+  .option-card:hover { border-color: #cc2200; }
+  .option-card.selected { border-color: #ff4444; box-shadow: 0 0 0 2px rgba(204,34,0,0.3); }
+
+  .option-label {
+    background: #181818;
+    padding: 10px 14px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #666;
+    border-bottom: 1px solid #1a1a1a;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .option-letter {
+    width: 22px; height: 22px;
+    background: #cc2200;
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+
+  /* ── MOCKUP INTERNALS ── */
+  .mock { background: #0a0a0a; }
+
+  /* Shared header */
+  .m-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid #1e1515;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .m-header::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: #cc2200;
+  }
+  .m-title { font-size: 13px; font-weight: 700; letter-spacing: 2px; color: #fff; padding-left: 6px; }
+  .m-back {
+    font-size: 9px; letter-spacing: 1px; color: #444;
+    border: 1px solid #222; padding: 3px 8px; border-radius: 2px;
+    text-transform: uppercase;
+  }
+
+  /* Option A – Row list */
+  .m-rows { padding: 8px; display: flex; flex-direction: column; gap: 5px; }
+  .m-row {
+    display: flex; align-items: center; gap: 10px;
+    border: 1px solid #1a1a1a; padding: 6px 8px;
+    position: relative; background: #0d0d0d;
+    transition: border-color 0.15s;
+  }
+  .m-row:hover { border-color: #cc2200; background: #130d0d; }
+  .m-row-stripe { width: 3px; align-self: stretch; background: #2a1a1a; flex-shrink: 0; }
+  .m-row:hover .m-row-stripe { background: #cc2200; }
+  .m-thumb {
+    width: 44px; height: 30px; border-radius: 2px; flex-shrink: 0;
+    object-fit: cover;
+  }
+  .m-thumb-placeholder {
+    width: 44px; height: 30px; border-radius: 2px; flex-shrink: 0; background: #222;
+  }
+  .m-row-text { flex: 1; }
+  .m-row-name { font-size: 10px; font-weight: 700; letter-spacing: 1px; color: #ddd; text-transform: uppercase; }
+  .m-row:hover .m-row-name { color: #ff4444; }
+  .m-row-desc { font-size: 8px; color: #444; margin-top: 1px; }
+  .m-arrow { color: #333; font-size: 14px; margin-left: 4px; transition: transform 0.15s; }
+  .m-row:hover .m-arrow { color: #ff4444; transform: translateX(3px); }
+
+  /* Option B – Grid */
+  .m-grid {
+    padding: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .m-grid-card {
+    border: 1px solid #1a1a1a;
+    background: #0d0d0d;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+  }
+  .m-grid-card:hover { border-color: #cc2200; }
+  .m-grid-img {
+    width: 100%; height: 36px; object-fit: cover; display: block; background: #1a1a1a;
+  }
+  .m-grid-body { padding: 4px 6px 5px; }
+  .m-grid-name { font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #ccc; text-transform: uppercase; }
+  .m-grid-card:hover .m-grid-name { color: #ff4444; }
+  .m-grid-desc { font-size: 7px; color: #444; margin-top: 1px; }
+  .m-grid-stripe {
+    position: absolute; top: 0; left: 0; right: 0; height: 2px; background: #1a1a1a;
+  }
+  .m-grid-card:hover .m-grid-stripe { background: #cc2200; }
+
+  /* Option C – Split */
+  .m-split { display: flex; height: 220px; }
+  .m-split-left { width: 38%; border-right: 1px solid #1a1a1a; overflow-y: auto; }
+  .m-split-item {
+    padding: 7px 10px; border-bottom: 1px solid #141414;
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
+  }
+  .m-split-item.active { background: #130d0d; border-left: 2px solid #cc2200; }
+  .m-split-item:not(.active) { border-left: 2px solid transparent; }
+  .m-split-dot { width: 4px; height: 4px; border-radius: 50%; background: #333; flex-shrink: 0; }
+  .m-split-item.active .m-split-dot { background: #cc2200; }
+  .m-split-name { font-size: 9px; letter-spacing: 1px; color: #777; text-transform: uppercase; }
+  .m-split-item.active .m-split-name { color: #fff; }
+  .m-split-right { flex: 1; display: flex; flex-direction: column; }
+  .m-split-preview { flex: 1; position: relative; overflow: hidden; }
+  .m-split-preview img { width: 100%; height: 100%; object-fit: cover; opacity: 0.7; }
+  .m-split-overlay {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.9));
+    padding: 8px 10px;
+  }
+  .m-split-preview-name { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; color: #fff; text-transform: uppercase; }
+  .m-split-preview-desc { font-size: 8px; color: #888; margin-top: 2px; }
+  .m-split-action {
+    padding: 6px 10px; border-top: 1px solid #1a1a1a; background: #0d0d0d;
+    display: flex; justify-content: flex-end;
+  }
+  .m-select-btn {
+    font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+    background: #cc2200; color: #fff; border: none; padding: 5px 14px; cursor: pointer;
+  }
+
+  /* Shared footer */
+  .m-footer {
+    padding: 7px 14px; border-top: 1px solid #1a1a1a; display: flex; justify-content: flex-end;
+    background: #0a0a0a;
+  }
+
+  .option-desc {
+    padding: 10px 14px;
+    font-size: 10px;
+    color: #555;
+    border-top: 1px solid #1a1a1a;
+    letter-spacing: 0.5px;
+    line-height: 1.5;
+  }
+  .option-desc strong { color: #888; }
+</style>
+</head>
+<body>
+
+<h1>Map Screen Redesign</h1>
+<p class="subtitle">Click an option to select it &mdash; all three use the same dark military theme</p>
+
+<div class="options-row">
+
+  <!-- OPTION A: Row List -->
+  <div class="option-card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="option-label">
+      <div class="option-letter">A</div>
+      Row List (like Game Mode select)
+    </div>
+    <div class="mock">
+      <div class="m-header">
+        <div class="m-title">SELECT MAP</div>
+        <div class="m-back">← Back</div>
+      </div>
+      <div class="m-rows">
+        <div class="m-row">
+          <div class="m-row-stripe"></div>
+          <img class="m-thumb" src="/content/../../../Pictures/warehouse.png" onerror="this.style.display='none';this.nextSibling.style.display='block'">
+          <div class="m-thumb-placeholder" style="display:none"></div>
+          <div class="m-row-text">
+            <div class="m-row-name">Warehouse</div>
+            <div class="m-row-desc">Pitch-dark industrial labyrinth.</div>
+          </div>
+          <div class="m-arrow">›</div>
+        </div>
+        <div class="m-row" style="border-color:#cc2200; background:#130d0d;">
+          <div class="m-row-stripe" style="background:#cc2200"></div>
+          <img class="m-thumb" src="/content/../../../Pictures/city.png" onerror="this.style.display='none';this.nextSibling.style.display='block'">
+          <div class="m-thumb-placeholder" style="display:none"></div>
+          <div class="m-row-text">
+            <div class="m-row-name" style="color:#ff4444">City Ruins</div>
+            <div class="m-row-desc">Shattered skyline and ash-grey streets.</div>
+          </div>
+          <div class="m-arrow" style="color:#ff4444">›</div>
+        </div>
+        <div class="m-row">
+          <div class="m-row-stripe"></div>
+          <img class="m-thumb" src="/content/../../../Pictures/forest.png" onerror="this.style.display='none';this.nextSibling.style.display='block'">
+          <div class="m-thumb-placeholder" style="display:none"></div>
+          <div class="m-row-text">
+            <div class="m-row-name">Dark Forest</div>
+            <div class="m-row-desc">The trees close in. By the time you hear them…</div>
+          </div>
+          <div class="m-arrow">›</div>
+        </div>
+        <div class="m-row">
+          <div class="m-row-stripe"></div>
+          <img class="m-thumb" src="/content/../../../Pictures/mountains.png" onerror="this.style.display='none';this.nextSibling.style.display='block'">
+          <div class="m-thumb-placeholder" style="display:none"></div>
+          <div class="m-row-text">
+            <div class="m-row-name">Rocky Mountains</div>
+            <div class="m-row-desc">Brutal peaks, no cover.</div>
+          </div>
+          <div class="m-arrow">›</div>
+        </div>
+        <div class="m-row">
+          <div class="m-row-stripe"></div>
+          <img class="m-thumb" src="/content/../../../Pictures/desert.png" onerror="this.style.display='none';this.nextSibling.style.display='block'">
+          <div class="m-thumb-placeholder" style="display:none"></div>
+          <div class="m-row-text">
+            <div class="m-row-name">Desert Outpost</div>
+            <div class="m-row-desc">Burning sun, zero mercy.</div>
+          </div>
+          <div class="m-arrow">›</div>
+        </div>
+        <div class="m-row">
+          <div class="m-row-stripe"></div>
+          <div class="m-thumb-placeholder"></div>
+          <div class="m-row-text">
+            <div class="m-row-name">+ 3 more maps</div>
+            <div class="m-row-desc">Fortress · Hallway · Cave</div>
+          </div>
+          <div class="m-arrow">›</div>
+        </div>
+      </div>
+      <div class="m-footer">
+        <div class="m-back">← Back</div>
+      </div>
+    </div>
+    <div class="option-desc"><strong>Best for:</strong> Fast selection flow. Matches the game mode select screen exactly. Scrollable list fits all 8 maps.</div>
+  </div>
+
+  <!-- OPTION B: Grid -->
+  <div class="option-card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="option-label">
+      <div class="option-letter">B</div>
+      Card Grid (current layout, restyled)
+    </div>
+    <div class="mock">
+      <div class="m-header">
+        <div class="m-title">SELECT MAP</div>
+        <div class="m-back">← Back</div>
+      </div>
+      <div class="m-grid">
+        <div class="m-grid-card">
+          <div class="m-grid-stripe"></div>
+          <img class="m-grid-img" src="/content/../../../Pictures/warehouse.png" onerror="this.outerHTML='<div class=\'m-grid-img\' style=\'background:#1a1a1a\'></div>'">
+          <div class="m-grid-body">
+            <div class="m-grid-name">Warehouse</div>
+            <div class="m-grid-desc">Industrial labyrinth.</div>
+          </div>
+        </div>
+        <div class="m-grid-card" style="border-color:#cc2200;">
+          <div class="m-grid-stripe" style="background:#cc2200"></div>
+          <img class="m-grid-img" src="/content/../../../Pictures/city.png" onerror="this.outerHTML='<div class=\'m-grid-img\' style=\'background:#1a1a1a\'></div>'">
+          <div class="m-grid-body">
+            <div class="m-grid-name" style="color:#ff4444">City Ruins</div>
+            <div class="m-grid-desc">Ash-grey streets.</div>
+          </div>
+        </div>
+        <div class="m-grid-card">
+          <div class="m-grid-stripe"></div>
+          <img class="m-grid-img" src="/content/../../../Pictures/forest.png" onerror="this.outerHTML='<div class=\'m-grid-img\' style=\'background:#1a1a1a\'></div>'">
+          <div class="m-grid-body">
+            <div class="m-grid-name">Dark Forest</div>
+            <div class="m-grid-desc">Trees close in.</div>
+          </div>
+        </div>
+        <div class="m-grid-card">
+          <div class="m-grid-stripe"></div>
+          <img class="m-grid-img" src="/content/../../../Pictures/mountains.png" onerror="this.outerHTML='<div class=\'m-grid-img\' style=\'background:#1a1a1a\'></div>'">
+          <div class="m-grid-body">
+            <div class="m-grid-name">Rocky Mtn</div>
+            <div class="m-grid-desc">Brutal peaks.</div>
+          </div>
+        </div>
+        <div class="m-grid-card">
+          <div class="m-grid-stripe"></div>
+          <img class="m-grid-img" src="/content/../../../Pictures/desert.png" onerror="this.outerHTML='<div class=\'m-grid-img\' style=\'background:#1a1a1a\'></div>'">
+          <div class="m-grid-body">
+            <div class="m-grid-name">Desert</div>
+            <div class="m-grid-desc">Zero mercy.</div>
+          </div>
+        </div>
+        <div class="m-grid-card">
+          <div class="m-grid-stripe"></div>
+          <img class="m-grid-img" src="/content/../../../Pictures/fortress.png" onerror="this.outerHTML='<div class=\'m-grid-img\' style=\'background:#1a1a1a\'></div>'">
+          <div class="m-grid-body">
+            <div class="m-grid-name">Fortress</div>
+            <div class="m-grid-desc">Stone walls.</div>
+          </div>
+        </div>
+      </div>
+      <div class="m-footer">
+        <div class="m-back">← Back</div>
+      </div>
+    </div>
+    <div class="option-desc"><strong>Best for:</strong> Seeing all maps at a glance. Images are prominent. Closest to the current layout — low disruption.</div>
+  </div>
+
+  <!-- OPTION C: Split -->
+  <div class="option-card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="option-label">
+      <div class="option-letter">C</div>
+      Two-Column Split (select &amp; preview)
+    </div>
+    <div class="mock">
+      <div class="m-header">
+        <div class="m-title">SELECT MAP</div>
+        <div class="m-back">← Back</div>
+      </div>
+      <div class="m-split">
+        <div class="m-split-left">
+          <div class="m-split-item active">
+            <div class="m-split-dot"></div>
+            <div class="m-split-name">City Ruins</div>
+          </div>
+          <div class="m-split-item">
+            <div class="m-split-dot"></div>
+            <div class="m-split-name">Warehouse</div>
+          </div>
+          <div class="m-split-item">
+            <div class="m-split-dot"></div>
+            <div class="m-split-name">Dark Forest</div>
+          </div>
+          <div class="m-split-item">
+            <div class="m-split-dot"></div>
+            <div class="m-split-name">Rocky Mtn</div>
+          </div>
+          <div class="m-split-item">
+            <div class="m-split-dot"></div>
+            <div class="m-split-name">Desert</div>
+          </div>
+          <div class="m-split-item">
+            <div class="m-split-dot"></div>
+            <div class="m-split-name">Fortress</div>
+          </div>
+          <div class="m-split-item">
+            <div class="m-split-dot"></div>
+            <div class="m-split-name">Hallway</div>
+          </div>
+          <div class="m-split-item">
+            <div class="m-split-dot"></div>
+            <div class="m-split-name">Cave</div>
+          </div>
+        </div>
+        <div class="m-split-right">
+          <div class="m-split-preview">
+            <img src="/content/../../../Pictures/city.png" alt="City Ruins" onerror="this.style.background='#1a1a1a'">
+            <div class="m-split-overlay">
+              <div class="m-split-preview-name">City Ruins</div>
+              <div class="m-split-preview-desc">Shattered skyline and ash-grey streets. Something lurks in every ruin.</div>
+            </div>
+          </div>
+          <div class="m-split-action">
+            <button class="m-select-btn">Deploy Here →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="option-desc"><strong>Best for:</strong> Large previews and reading descriptions. Requires a hover/click selection step before launching.</div>
+  </div>
+
+</div>
+
+</body>
+</html>

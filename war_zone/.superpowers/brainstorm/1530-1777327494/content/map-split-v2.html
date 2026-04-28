@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Map Screen – Option C Detail</title>
+<script src="/helper.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #111;
+    color: #ccc;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  h1 { font-size: 13px; letter-spacing: 3px; text-transform: uppercase; color: #666; }
+  .hint { font-size: 11px; color: #444; letter-spacing: 1px; }
+
+  .mockup-frame {
+    border: 1px solid #2a2a2a;
+    overflow: hidden;
+    background: #0a0a0a;
+    display: flex;
+    flex-direction: column;
+    height: 520px;
+  }
+
+  /* Header */
+  .ms-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid #1e1515;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .ms-header::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: #cc2200;
+  }
+  .ms-title {
+    font-size: 18px; font-weight: 900; letter-spacing: 4px;
+    color: #fff; padding-left: 8px;
+    background: linear-gradient(135deg, #fff 60%, #cc4444);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .ms-mode-badge {
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+    color: #444; border: 1px solid #1a1a1a; padding: 4px 10px;
+  }
+  .ms-back {
+    font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: #555; border: 1px solid #222; padding: 5px 14px; cursor: pointer;
+    background: none; font-family: inherit;
+  }
+
+  /* Body */
+  .ms-body { display: flex; flex: 1; overflow: hidden; }
+
+  /* Left list */
+  .ms-list {
+    width: 220px;
+    flex-shrink: 0;
+    border-right: 1px solid #1a1a1a;
+    overflow-y: auto;
+    background: #080808;
+  }
+  .ms-list-label {
+    font-size: 8px; letter-spacing: 2.5px; text-transform: uppercase;
+    color: #333; padding: 10px 14px 6px;
+    border-bottom: 1px solid #111;
+  }
+  .ms-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px;
+    border-bottom: 1px solid #0f0f0f;
+    border-left: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .ms-item:hover { background: #0f0808; border-left-color: #662200; }
+  .ms-item.active { background: #130d0d; border-left-color: #cc2200; }
+  .ms-item-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: #222; flex-shrink: 0;
+  }
+  .ms-item.active .ms-item-dot { background: #cc2200; }
+  .ms-item-info { flex: 1; }
+  .ms-item-name {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+    color: #666; text-transform: uppercase;
+  }
+  .ms-item.active .ms-item-name { color: #fff; }
+  .ms-item:hover:not(.active) .ms-item-name { color: #994444; }
+  .ms-item-size { font-size: 8px; color: #333; margin-top: 1px; }
+  .ms-item.active .ms-item-size { color: #553333; }
+  .ms-item-arrow { color: #222; font-size: 12px; }
+  .ms-item.active .ms-item-arrow { color: #cc2200; }
+
+  /* Right preview */
+  .ms-preview { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .ms-img-wrap { flex: 1; position: relative; overflow: hidden; background: #0d0d0d; }
+  .ms-img { width: 100%; height: 100%; object-fit: cover; opacity: 0.65; display: block; }
+  .ms-img-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.5) 65%, rgba(0,0,0,0.92) 100%);
+  }
+  .ms-img-content {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 20px 24px 18px;
+  }
+  .ms-map-name {
+    font-size: 26px; font-weight: 900; letter-spacing: 3px;
+    color: #fff; text-transform: uppercase;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.8); line-height: 1;
+  }
+  .ms-map-desc {
+    font-size: 11px; color: #888; margin-top: 6px; letter-spacing: 0.5px;
+    line-height: 1.5; max-width: 420px;
+  }
+  .ms-map-tags { display: flex; gap: 6px; margin-top: 10px; }
+  .ms-tag {
+    font-size: 8px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: #444; border: 1px solid #1a1a1a; padding: 2px 8px;
+  }
+  .ms-tag.red { color: #cc4444; border-color: #331111; }
+
+  /* Footer */
+  .ms-footer {
+    padding: 12px 24px;
+    border-top: 1px solid #1a1a1a;
+    background: #080808;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .ms-footer-hint { font-size: 9px; letter-spacing: 1px; color: #333; text-transform: uppercase; }
+  .ms-deploy-btn {
+    font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    background: #cc2200; color: #fff; border: none;
+    padding: 10px 28px; cursor: pointer; font-family: inherit;
+  }
+
+  /* Notes */
+  .notes { display: flex; gap: 16px; }
+  .note { flex: 1; background: #0d0d0d; border: 1px solid #1a1a1a; padding: 12px 14px; }
+  .note-label { font-size: 8px; letter-spacing: 2px; text-transform: uppercase; color: #cc2200; margin-bottom: 6px; }
+  .note-text { font-size: 10px; color: #555; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<h1>Map Screen — Option C (full mockup)</h1>
+<p class="hint">This is what the redesigned screen will look like in-game</p>
+
+<div class="mockup-frame">
+  <div class="ms-header">
+    <div class="ms-title">SELECT MAP</div>
+    <div class="ms-mode-badge">Mode: Zombie Apocalypse</div>
+    <button class="ms-back">← Back</button>
+  </div>
+
+  <div class="ms-body">
+    <div class="ms-list">
+      <div class="ms-list-label">8 Maps Available</div>
+      <div class="ms-item">
+        <div class="ms-item-dot"></div>
+        <div class="ms-item-info"><div class="ms-item-name">Warehouse</div><div class="ms-item-size">Small · Indoor</div></div>
+        <div class="ms-item-arrow">›</div>
+      </div>
+      <div class="ms-item active">
+        <div class="ms-item-dot"></div>
+        <div class="ms-item-info"><div class="ms-item-name">City Ruins</div><div class="ms-item-size">Large · Outdoor</div></div>
+        <div class="ms-item-arrow">›</div>
+      </div>
+      <div class="ms-item">
+        <div class="ms-item-dot"></div>
+        <div class="ms-item-info"><div class="ms-item-name">Desert Outpost</div><div class="ms-item-size">Large · Outdoor</div></div>
+        <div class="ms-item-arrow">›</div>
+      </div>
+      <div class="ms-item">
+        <div class="ms-item-dot"></div>
+        <div class="ms-item-info"><div class="ms-item-name">Dark Forest</div><div class="ms-item-size">Large · Outdoor</div></div>
+        <div class="ms-item-arrow">›</div>
+      </div>
+      <div class="ms-item">
+        <div class="ms-item-dot"></div>
+        <div class="ms-item-info"><div class="ms-item-name">Rocky Mountains</div><div class="ms-item-size">Large · Outdoor</div></div>
+        <div class="ms-item-arrow">›</div>
+      </div>
+      <div class="ms-item">
+        <div class="ms-item-dot"></div>
+        <div class="ms-item-info"><div class="ms-item-name">Fortress</div><div class="ms-item-size">Medium · Mixed</div></div>
+        <div class="ms-item-arrow">›</div>
+      </div>
+      <div class="ms-item">
+        <div class="ms-item-dot"></div>
+        <div class="ms-item-info"><div class="ms-item-name">The Hallway</div><div class="ms-item-size">Medium · Indoor</div></div>
+        <div class="ms-item-arrow">›</div>
+      </div>
+      <div class="ms-item">
+        <div class="ms-item-dot"></div>
+        <div class="ms-item-info"><div class="ms-item-name">Cave</div><div class="ms-item-size">Medium · Underground</div></div>
+        <div class="ms-item-arrow">›</div>
+      </div>
+    </div>
+
+    <div class="ms-preview">
+      <div class="ms-img-wrap">
+        <img class="ms-img" src="/files/city.png" alt="City Ruins">
+        <div class="ms-img-overlay"></div>
+        <div class="ms-img-content">
+          <div class="ms-map-name">City Ruins</div>
+          <div class="ms-map-desc">Shattered skyline and ash-grey streets. Something lurks in every ruin.</div>
+          <div class="ms-map-tags">
+            <div class="ms-tag">Large Map</div>
+            <div class="ms-tag red">High Intensity</div>
+            <div class="ms-tag">Open Combat</div>
+          </div>
+        </div>
+      </div>
+      <div class="ms-footer">
+        <div class="ms-footer-hint">Click a map on the left to preview</div>
+        <button class="ms-deploy-btn">Deploy to City Ruins →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="notes">
+  <div class="note">
+    <div class="note-label">What changes</div>
+    <div class="note-text">
+      Header: red left bar + "SELECT MAP" title + current mode badge + back button<br><br>
+      Left: scrollable map list with active state (red left border + dot)<br><br>
+      Right: full-bleed preview image with gradient overlay, name, description, tags<br><br>
+      Footer: "Deploy to [Map] →" red button — updates as you select maps
+    </div>
+  </div>
+  <div class="note">
+    <div class="note-label">Interaction flow</div>
+    <div class="note-text">
+      Hover a map → preview updates on the right<br><br>
+      Click "Deploy to [Map] →" to launch the game<br><br>
+      Cave falls back to a dark placeholder (no image yet)<br><br>
+      First map is pre-selected when screen opens
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

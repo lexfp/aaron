@@ -89,6 +89,55 @@ const UPGRADES = [
   { id:48, name:'Galactic Overdrive',  icon:'🌀', desc:'All income x5',    cost:1e22,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=5},   req:()=>state.totalEarned>=1e21 },
   { id:49, name:'Cosmic Singularity',  icon:'🕳️', desc:'All income x7',    cost:1e27,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=7},   req:()=>state.totalEarned>=1e26 },
   { id:50, name:'Decillion Dividend',  icon:'💎', desc:'All income x10',   cost:1e32,        effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=10},  req:()=>state.totalEarned>=1e31 },
+  // LATE-GAME BUSINESS TIERS
+  { id:61, name:'Plasma Lemonade',       icon:'🌡️', desc:'Lemonade x15',     cost:1e30,  effect:()=>{state.bizMult[0]*=15},                       req:()=>state.owned[0]>=250 },
+  { id:62, name:'Void Citrus',           icon:'🌑', desc:'Lemonade x25',     cost:1e33,  effect:()=>{state.bizMult[0]*=25},                       req:()=>state.owned[0]>=500 },
+  { id:63, name:'Omnilemon',             icon:'🍋', desc:'Lemonade x50',     cost:1e36,  effect:()=>{state.bizMult[0]*=50},                       req:()=>state.owned[0]>=1000 },
+  { id:64, name:'Neutron Drill',         icon:'⚡', desc:'Mine x15',         cost:1e31,  effect:()=>{state.bizMult[1]*=15},                       req:()=>state.owned[1]>=250 },
+  { id:65, name:'Black Hole Bore',       icon:'🕳️', desc:'Mine x25',         cost:1e34,  effect:()=>{state.bizMult[1]*=25},                       req:()=>state.owned[1]>=500 },
+  { id:66, name:'Reality Miner',         icon:'💫', desc:'Mine x50',         cost:1e37,  effect:()=>{state.bizMult[1]*=50},                       req:()=>state.owned[1]>=1000 },
+  { id:67, name:'Quantum Harvest',       icon:'🧬', desc:'Farm x15',         cost:1e32,  effect:()=>{state.bizMult[2]*=15},                       req:()=>state.owned[2]>=250 },
+  { id:68, name:'Stellar Seeds',         icon:'🌟', desc:'Farm x25',         cost:1e35,  effect:()=>{state.bizMult[2]*=25},                       req:()=>state.owned[2]>=500 },
+  { id:69, name:'Universe Farm',         icon:'🌌', desc:'Farm x50',         cost:1e38,  effect:()=>{state.bizMult[2]*=50},                       req:()=>state.owned[2]>=1000 },
+  { id:70, name:'Void Oven',             icon:'🌑', desc:'Bakery x15',       cost:1e33,  effect:()=>{state.bizMult[3]*=15},                       req:()=>state.owned[3]>=250 },
+  { id:71, name:'Cosmic Sourdough',      icon:'🌠', desc:'Bakery x25',       cost:1e36,  effect:()=>{state.bizMult[3]*=25},                       req:()=>state.owned[3]>=500 },
+  { id:72, name:'Omnibake',              icon:'♾️', desc:'Bakery x50',       cost:1e39,  effect:()=>{state.bizMult[3]*=50},                       req:()=>state.owned[3]>=1000 },
+  { id:73, name:'Singularity Press',     icon:'🕳️', desc:'Factory x15',      cost:1e34,  effect:()=>{state.bizMult[4]*=15},                       req:()=>state.owned[4]>=250 },
+  { id:74, name:'Galactic Forge',        icon:'⚙️', desc:'Factory x25',      cost:1e37,  effect:()=>{state.bizMult[4]*=25},                       req:()=>state.owned[4]>=500 },
+  { id:75, name:'Omni Factory',          icon:'🤖', desc:'Factory x50',      cost:1e40,  effect:()=>{state.bizMult[4]*=50},                       req:()=>state.owned[4]>=1000 },
+  { id:76, name:'Reality Splicer',       icon:'🔭', desc:'Lab x15',          cost:1e35,  effect:()=>{state.bizMult[5]*=15},                       req:()=>state.owned[5]>=250 },
+  { id:77, name:'Consciousness Core',    icon:'🧠', desc:'Lab x25',          cost:1e38,  effect:()=>{state.bizMult[5]*=25},                       req:()=>state.owned[5]>=500 },
+  { id:78, name:'Omniscience Lab',       icon:'🔬', desc:'Lab x50',          cost:1e41,  effect:()=>{state.bizMult[5]*=50},                       req:()=>state.owned[5]>=1000 },
+  { id:79, name:'Fate Engine',           icon:'🎰', desc:'Casino x15',       cost:1e36,  effect:()=>{state.bizMult[6]*=15},                       req:()=>state.owned[6]>=250 },
+  { id:80, name:'Probability God',       icon:'🎲', desc:'Casino x25',       cost:1e39,  effect:()=>{state.bizMult[6]*=25},                       req:()=>state.owned[6]>=500 },
+  { id:81, name:'Omniversal House',      icon:'💎', desc:'Casino x50',       cost:1e42,  effect:()=>{state.bizMult[6]*=50},                       req:()=>state.owned[6]>=1000 },
+  { id:82, name:'Infinite Ledger',       icon:'📈', desc:'Bank x15',         cost:1e37,  effect:()=>{state.bizMult[7]*=15},                       req:()=>state.owned[7]>=250 },
+  { id:83, name:'Cosmic Fed',            icon:'🏦', desc:'Bank x25',         cost:1e40,  effect:()=>{state.bizMult[7]*=25},                       req:()=>state.owned[7]>=500 },
+  { id:84, name:'Universal Reserve',     icon:'💰', desc:'Bank x50',         cost:1e43,  effect:()=>{state.bizMult[7]*=50},                       req:()=>state.owned[7]>=1000 },
+  { id:85, name:'Causality Loop',        icon:'⏳', desc:'Time Corp x15',    cost:1e38,  effect:()=>{state.bizMult[8]*=15},                       req:()=>state.owned[8]>=250 },
+  { id:86, name:'Timeline God',          icon:'🌀', desc:'Time Corp x25',    cost:1e41,  effect:()=>{state.bizMult[8]*=25},                       req:()=>state.owned[8]>=500 },
+  { id:87, name:'Omni Epoch',            icon:'♾️', desc:'Time Corp x50',    cost:1e44,  effect:()=>{state.bizMult[8]*=50},                       req:()=>state.owned[8]>=1000 },
+  { id:88, name:'Multiverse CEO',        icon:'🌌', desc:'Universe x15',     cost:1e39,  effect:()=>{state.bizMult[9]*=15},                       req:()=>state.owned[9]>=250 },
+  { id:89, name:'Omniversal Inc',        icon:'🔭', desc:'Universe x25',     cost:1e42,  effect:()=>{state.bizMult[9]*=25},                       req:()=>state.owned[9]>=500 },
+  { id:90, name:'The Everything',        icon:'💥', desc:'Universe x50',     cost:1e45,  effect:()=>{state.bizMult[9]*=50},                       req:()=>state.owned[9]>=1000 },
+  // LATE-GAME CLICK
+  { id:91, name:'Nova Strike',           icon:'🌟', desc:'Click x15',        cost:1e26,  effect:()=>{state.clickMult*=15},                        req:()=>state.totalEarned>=1e25 },
+  { id:92, name:'Pulsar Punch',          icon:'💫', desc:'Click x25',        cost:1e36,  effect:()=>{state.clickMult*=25},                        req:()=>state.totalEarned>=1e35 },
+  { id:93, name:'Quasar Slam',           icon:'⚡', desc:'Click x50',        cost:1e51,  effect:()=>{state.clickMult*=50},                        req:()=>state.totalEarned>=1e50 },
+  { id:94, name:'Big Bang Click',        icon:'💥', desc:'Click x100',       cost:1e71,  effect:()=>{state.clickMult*=100},                       req:()=>state.totalEarned>=1e70 },
+  { id:95, name:'Reality Tap',           icon:'🔮', desc:'Click x500',       cost:1e101, effect:()=>{state.clickMult*=500},                       req:()=>state.totalEarned>=1e100 },
+  { id:96, name:'God Click',             icon:'👑', desc:'Click x9999',      cost:1e151, effect:()=>{state.clickMult*=9999},                      req:()=>state.totalEarned>=1e150 },
+  // LATE-GAME GLOBAL
+  { id:97,  name:'Stellar Dominion',     icon:'🌟', desc:'All income x15',   cost:1e37,  effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=15},  req:()=>state.totalEarned>=1e36 },
+  { id:98,  name:'Universal Hegemony',   icon:'🌌', desc:'All income x25',   cost:1e43,  effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=25},  req:()=>state.totalEarned>=1e42 },
+  { id:99,  name:'Omniversal Apex',      icon:'👑', desc:'All income x50',   cost:1e51,  effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=50},  req:()=>state.totalEarned>=1e50 },
+  { id:100, name:'Centillion Conquest',  icon:'💎', desc:'All income x100',  cost:1e61,  effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=100}, req:()=>state.totalEarned>=1e60 },
+  { id:101, name:'Infinite Dominance',   icon:'♾️', desc:'All income x200',  cost:1e76,  effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=200}, req:()=>state.totalEarned>=1e75 },
+  { id:102, name:'Reality Breach',       icon:'🕳️', desc:'All income x500',  cost:1e91,  effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=500}, req:()=>state.totalEarned>=1e90 },
+  { id:103, name:'The Final Theorem',    icon:'🔮', desc:'All income x1000', cost:1e101, effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=1000},req:()=>state.totalEarned>=1e100 },
+  { id:104, name:'Centillion Crown',     icon:'⭐', desc:'All income x5000', cost:1e151, effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=5000},req:()=>state.totalEarned>=1e150 },
+  { id:105, name:'Beyond Everything',    icon:'🌈', desc:'All income x9999', cost:1e201, effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=9999},req:()=>state.totalEarned>=1e200 },
+  { id:106, name:'The Absolute End',     icon:'💥', desc:'All income x99999',cost:1e251, effect:()=>{for(let i=0;i<10;i++)state.bizMult[i]*=99999},req:()=>state.totalEarned>=1e250 },
 ];
 
 const MILESTONES = [
@@ -1108,7 +1157,7 @@ document.addEventListener('keydown', e=>{
   on('btn-reset-confirm',  'click', confirmReset);
   on('btn-prestige-x',     'click', closePrestige);
   on('btn-prestige-cancel','click', closePrestige);
-  on('btn-prestige-confirm','click', confirmPrestige);
+  on('prestige-confirm-btn','click', confirmPrestige);
   on('btn-cheat-x',        'click', closeCheat);
   on('btn-cheat-submit',   'click', () => submitCheat());
   on('cheat-input',        'keydown', cheatKeydown);
