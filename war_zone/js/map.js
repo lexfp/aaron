@@ -1092,8 +1092,9 @@ function buildFortressMap(obs) {
     addObstacle(obs, stoneMat, 1, 8, 3, 6, -4,  4.5);    // east wall south of E-opening
     addObstacle(obs, stoneMat, 1, 8, 3, -6, -4, -4.5);   // west wall north of W-opening
     addObstacle(obs, stoneMat, 1, 8, 3, -6, -4,  4.5);   // west wall south of W-opening
-    // Ceiling (noCollide, purely visual)
-    addObstacle(obs, stoneMat, 14, 0.4, 14, 0, -3, 0, { noCollide: true });
+    // Floor + Ceiling (noCollide, purely visual)
+    addObstacle(obs, stoneMat, 12, 0.1, 12, 0, -8.05, 0, { noCollide: true }); // floor
+    addObstacle(obs, stoneMat, 14, 0.4, 14, 0, -3, 0, { noCollide: true });    // ceiling
     // Columns (r=1, h=8, standing floor-to-ceiling)
     addCylinder(stoneMat, 1.0, 8, -4, -4, -4);
     addCylinder(stoneMat, 1.0, 8,  4, -4, -4);
