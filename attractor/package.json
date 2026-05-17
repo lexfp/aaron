@@ -1,0 +1,16 @@
+{
+  "name": "attractor",
+  "version": "0.1.0",
+  "description": "DOT-based AI pipeline orchestration with unified LLM client and coding agent loop",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": { "attractor": "attractor.js" },
+  "scripts": {
+    "start": "node attractor.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@google/generative-ai": "^0.24.0",
+    "openai": "^4.87.0"
+  }
+}

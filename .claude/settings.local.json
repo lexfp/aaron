@@ -7,7 +7,13 @@
       "Bash(head:*)",
       "Bash(tree:*)",
       "Bash(node:*)",
-      "Bash(powershell.exe:*)"
+      "Bash(powershell.exe:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(npm install *)",
+      "Bash(bash --version)",
+      "Bash(bash *)",
+      "Bash(claude whoami *)"
     ]
   }
 }

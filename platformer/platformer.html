@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Platformer</title>
+  <link rel="stylesheet" href="platformer.css">
+</head>
+<body>
+
+<!-- MAIN MENU -->
+<div id="main-menu" class="screen" style="display:flex;">
+  <div class="menu-glow"></div>
+  <div class="menu-content">
+    <div class="menu-title">JUMP!<br><span style="font-size:0.55em;letter-spacing:0.02em">Platformer</span></div>
+    <div class="menu-sub">10 Stages · 500 Levels · Double Jump</div>
+    <div class="menu-buttons">
+      <button id="btn-play" class="menu-btn">▶ Play</button>
+      <button id="btn-stage-select" class="menu-btn">🗺 Stage Select</button>
+      <button id="btn-reset" class="menu-btn">↺ New Game</button>
+    </div>
+    <div class="menu-tip">Arrow keys / WASD to move · Space to jump (press twice for double jump!) · ESC to pause</div>
+  </div>
+</div>
+
+<!-- STAGE SELECT -->
+<div id="stage-select" class="screen">
+  <div class="screen-inner">
+    <div class="screen-header">
+      <button id="btn-ss-back" class="back-btn">← Back</button>
+      <div class="ss-title">Select Stage</div>
+    </div>
+    <div id="stage-grid"></div>
+  </div>
+</div>
+
+<!-- LEVEL SELECT -->
+<div id="level-select" class="screen">
+  <div class="screen-inner">
+    <div class="screen-header">
+      <button id="btn-ls-back" class="back-btn"><span id="ls-back-label">← Stage Select</span></button>
+      <div id="ls-title" style="font-size:22px;font-weight:800;">Select Level</div>
+    </div>
+    <div id="level-grid"></div>
+  </div>
+</div>
+
+<!-- GAME WRAP (Canvas + HUD) -->
+<div id="game-wrap" style="display:none;">
+  <canvas id="game" width="800" height="500"></canvas>
+  <div id="hud">
+    <div class="hud-panel">
+      <div id="hud-stage">S1-L1</div>
+    </div>
+    <div class="hud-panel" id="hud-coins-wrap">
+      <span class="coin-icon">🪙</span>
+      <span id="hud-coins-level">0</span>
+      <span style="color:#555;margin:0 4px;">·</span>
+      <span style="color:#a88;font-size:11px;">total</span>
+      <span style="color:#cca;margin-left:4px;" id="hud-coins-total">0</span>
+    </div>
+    <div class="hud-panel" id="hud-lives">♥♥</div>
+  </div>
+</div>
+
+<!-- PAUSE MENU -->
+<div id="pause-menu" class="screen" style="background:rgba(0,0,0,0.82);z-index:30;">
+  <div class="pause-box">
+    <div class="pause-title">PAUSED</div>
+    <button id="btn-resume" class="pause-btn primary">▶ Resume</button>
+    <button id="btn-pause-menu" class="pause-btn">⌂ Main Menu</button>
+  </div>
+</div>
+
+<!-- LEVEL COMPLETE -->
+<div id="level-complete" class="screen" style="background:rgba(0,0,0,0.88);z-index:25;">
+  <div class="lc-box">
+    <div class="lc-star">⭐</div>
+    <div id="lc-heading">Level Complete!</div>
+    <div id="lc-level">Stage 1 — Level 1</div>
+    <div class="lc-coins-earned" id="lc-coins-earned">+0 coins</div>
+    <div class="lc-coins-total" id="lc-coins-total">Total: 0 coins</div>
+    <div class="lc-buttons">
+      <button id="btn-lc-next" class="lc-btn primary">Next Level →</button>
+      <button id="btn-lc-shop" class="lc-btn">🛍 Upgrade Shop</button>
+      <button id="btn-lc-menu" class="lc-btn">⌂ Main Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- SHOP OVERLAY -->
+<div id="shop-overlay" class="screen" style="z-index:28;overflow-y:auto;">
+  <div class="screen-inner">
+    <div class="shop-header">
+      <div class="shop-title">Upgrade Shop</div>
+      <div class="shop-balance">🪙 <span id="shop-coin-count">0</span></div>
+    </div>
+    <div id="shop-grid"></div>
+    <button id="btn-shop-close">✓ Done</button>
+  </div>
+</div>
+
+<!-- STAGE COMPLETE -->
+<div id="stage-complete" class="screen" style="z-index:26;">
+  <div class="sc-box">
+    <div class="sc-trophy">🏆</div>
+    <div id="sc-stage">Stage 1 Complete!</div>
+    <div id="sc-name">Meadow</div>
+    <div id="sc-next">Unlocked: Stage 2</div>
+    <div class="sc-buttons">
+      <button id="btn-sc-next" class="sc-btn primary">Next Stage →</button>
+      <button id="btn-sc-menu" class="sc-btn">⌂ Main Menu</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

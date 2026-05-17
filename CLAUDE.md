@@ -28,6 +28,87 @@ Don't rely on console debug statements. The cursor is locked, so use alerts inst
 
 **Map screen layout:** `#map-screen` uses the same dark military theme (`display:flex; flex-direction:column`). Structure: `.ms-header` (title "SELECT MAP" + `.ms-mode-badge` showing current mode + `.ms-back-btn` styled back button, red `::before` left bar); `.ms-body` (flex row): `.ms-list` (220px wide, `#ms-list` — scrollable list of `.ms-item` rows built by JS, each with `.ms-item-dot` + `.ms-item-info` (`.ms-item-name` + `.ms-item-size`) + `.ms-item-arrow`; `.ms-list-label` id `ms-list-label` shows map count); `.ms-preview` (flex:1 — `.ms-img-wrap` with full-bleed `.ms-img` + `.ms-img-overlay` gradient + `.ms-img-content` holding `#ms-preview-name`, `#ms-preview-desc`, `#ms-preview-tags`; `.ms-footer` with `#ms-deploy-btn` red button). Clicking a list item calls `selectMap()` in `renderMapScreen()` (ui.js) to update the preview; deploy button launches the game. Cave map has no image — `#ms-preview-img` gets `display:none`. Key IDs: `ms-mode-badge`, `ms-list`, `ms-list-label`, `ms-preview-img`, `ms-preview-name`, `ms-preview-desc`, `ms-preview-tags`, `ms-deploy-btn`.
 
+### platformer/ — 2D Platformer (Vanilla JS + Canvas)
+No build step. Open `platformer/platformer.html` directly in a browser. Uses ES modules (no bundler). Canvas renders at 800×500 internally.
+
+**Key features:** Double jump (with particle burst), 10 stages × 50 levels (500 total, procedurally generated from seeded RNG), coin-to-upgrade shop (5 upgrades: Jump Boost, Speed Boots, Coin Magnet, DJ Boost, Extra Lives), 10 animated stage themes.
+
+**File layout:**
+```
+platformer/
+  platformer.html           Entry point; all screen divs + canvas
+  platformer.css            UI styling (dark theme, gold/orange accent)
+  js/
+    main.js                 Game loop (requestAnimationFrame), level lifecycle
+    state.js                playerData (coins, upgrades, progress) — localStorage
+    input.js                Keyboard state, jump buffer, coyote time support
+    player.js               Physics, double-jump, 5-state animation machine, canvas drawing
+    level.js                Seeded procedural generator (mulberry32 RNG), resolveX/resolveY
+    entities.js             Coins (spin anim), exit door, particle system, enemy stub
+    renderer.js             10 stage themes with parallax backgrounds
+    ui.js                   Screen management, HUD, shop, level-complete, stage-complete
+```
+
+**Physics constants:** `GRAVITY=1850`, `JUMP=555`, `DJ=495`, `SPEED=280 px/s`. `COYOTE_TIME=0.1s`, `JUMP_BUFFER=0.085s`.
+**Level gen seed:** `stageIdx * 50 + levelIdx + 1` (0-indexed params). Difficulty scales via `progress = (stageIdx*50+levelIdx)/499`.
+**Collision:** Separate x-then-y passes (`resolveX` → `resolveY`). `resolveY` uses `player.y + player.h >= platTop` (not strict >) so `vy=0` still detects grounded.
+**Enemies:** `enemies[]` array stub in entities.js — populate + implement `updateEnemies`/`drawEnemies` to add enemies later.
+**Stage themes:** index 0–9 in `STAGE_THEMES[]` in renderer.js (Meadow, Cave, Icy Peaks, Desert, Lava, Sky, Forest, Space, Crystal, Dark Fortress).
+
+### attractor/ — DOT-Based AI Pipeline Orchestration (Node.js ESM)
+No build step. Run pipelines with `node attractor/attractor.js <pipeline.dot>`.
+
+**Three spec layers implemented:**
+1. **Unified LLM Client** (`src/llm/`) — provider-agnostic wrapper for Anthropic, OpenAI, and Gemini. Auto-initializes from env vars (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`). Middleware support, exponential-backoff retry, streaming.
+2. **Coding Agent Loop** (`src/agent/`) — `Session` class with agentic loop: tool execution (concurrent), character-first output truncation, event system, steering injection, loop detection, subagent spawning.
+3. **Pipeline Engine** (`src/pipeline/`) — DOT language pipelines with 6 phases (Parse→Transform→Validate→Initialize→Execute→Finalize), 7 node handler types, 5-level edge selection, goal gates, per-node retry with exponential backoff, checkpoint/resume, human-in-the-loop via `CLIInterviewer`.
+
+**File layout:**
+```
+attractor/
+  attractor.js              CLI entry point
+  src/
+    index.js                re-exports everything
+    llm/
+      catalog.js            MODELS map with capabilities + pricing
+      client.js             LLMClient (router + middleware + retry)
+      providers/
+        anthropic.js        Anthropic native API adapter (prompt caching)
+        openai.js           OpenAI native API adapter
+        gemini.js           Gemini native API adapter
+    agent/
+      session.js            Session (the coding agent loop)
+      events.js             Event types + EventEmitter
+      truncation.js         Character-first + line-based truncation
+      execution-env.js      LocalExecutionEnvironment (file/shell/glob/grep)
+      tools/
+        core.js             read_file, write_file, shell, glob, grep, list_dir
+        profiles.js         Provider profiles: anthropic (edit_file), openai (apply_patch), gemini (search_and_replace)
+    pipeline/
+      engine.js             PipelineEngine (6-phase orchestrator)
+      dot-parser.js         Recursive-descent DOT parser
+      validator.js          Pipeline linter (errors + warnings)
+      context.js            PipelineContext (key-value + JS expression eval)
+      checkpoint.js         CheckpointManager (JSON file save/resume)
+      handlers.js           HANDLERS: start, exit, codergen, wait.human, condition, tool, parallel, manager
+      interviewer.js        CLIInterviewer + NoopInterviewer
+  examples/
+    hello.dot               Human-in-the-loop review pattern
+    coding-task.dot         Analyze → propose → approve → implement pipeline
+```
+
+**Node handlers:** `start` / `exit` (no-op), `codergen` (spawns Session with prompt), `wait.human` (CLI approval gate), `condition` (evaluates JS expression against context), `tool` (runs a profile tool directly), `parallel` (fan-out marker), `manager` (supervision loop).
+
+**Edge selection priority:** condition match → preferred label → suggestedNext from handler → highest weight → lexical order.
+
+**Context variables set by handlers:** `{nodeId}_status`, `{nodeId}_output`, `{nodeId}_approved`, `{nodeId}_answer`, `{nodeId}_error`.
+
+```bash
+cd attractor && npm install   # first time only
+node attractor.js examples/hello.dot
+node attractor.js examples/coding-task.dot --var target=src/ --checkpoint --debug
+```
+
 ### tic-tac-toe-bot/ — Bot with Minimax AI (Vanilla JS + Jest)
 ```bash
 npm install --prefix tic-tac-toe-bot   # first time only

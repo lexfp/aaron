@@ -1,0 +1,52 @@
+// Coding task pipeline — analyze, plan, get approval, then implement.
+// Run: node attractor.js examples/coding-task.dot --var target=src/
+
+digraph "coding-task" {
+  start [handler="start"]
+
+  // Step 1: Analyze the target
+  analyze [
+    handler="codergen"
+    prompt="List the files in '{{target}}' using the glob and list_dir tools. Summarize the project structure in 5 bullet points."
+    fidelity="full"
+  ]
+
+  // Step 2: Propose improvements
+  propose [
+    handler="codergen"
+    prompt="Based on the analysis in analyze_output, suggest 3 concrete improvements or new features. Number them 1, 2, 3."
+  ]
+
+  // Step 3: Human approves the plan
+  approve [
+    handler="wait.human"
+    question="Do you want to implement suggestion #1 from the proposal above? (y/n)"
+    timeout="30000"
+    default="n"
+  ]
+
+  // Step 4: Implement (goal gate — must succeed for pipeline to exit cleanly)
+  implement [
+    handler="codergen"
+    prompt="Implement suggestion #1 from propose_output. Use write_file and edit_file tools to make the changes. Show what you changed."
+    fidelity="full"
+    goal_gate="true"
+  ]
+
+  // Step 5: Summary
+  summarize [
+    handler="codergen"
+    prompt="Write a short summary of what was implemented in implement_output. Include file names changed and key decisions made."
+  ]
+
+  finish [handler="exit"]
+
+  // Edges
+  start     -> analyze
+  analyze   -> propose
+  propose   -> approve
+  approve   -> implement [condition="approve_approved == true"  label="implement"]
+  approve   -> finish    [condition="approve_approved == false" label="skip"]
+  implement -> summarize
+  summarize -> finish
+}

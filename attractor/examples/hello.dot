@@ -1,0 +1,21 @@
+// Hello World pipeline — demonstrates the human-in-the-loop review pattern.
+// Run: node attractor.js examples/hello.dot
+
+digraph hello {
+  start  [handler="start"]
+
+  write  [handler="codergen"
+          prompt="Write a short, friendly paragraph (3-5 sentences) explaining what Attractor is: a DOT-based AI pipeline orchestration system with a unified LLM client and coding agent loop."
+          fidelity="compact"]
+
+  review [handler="wait.human"
+          question="Does the paragraph look good? Type 'y' to accept or 'n' to regenerate."
+          default="y"]
+
+  finish [handler="exit"]
+
+  start  -> write
+  write  -> review
+  review -> finish [condition="review_approved == true"  label="accept"]
+  review -> write  [condition="review_approved == false" label="retry"]
+}

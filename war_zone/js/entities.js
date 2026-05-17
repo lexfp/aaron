@@ -12,11 +12,11 @@ import { checkAchievements } from './achievements.js';
 
 // --- Zombies ---
 
-const SQUAD_ADJ  = ['Rotting','Crimson','Plague','Shadow','Feral','Hollow','Dread','Vile','Rotten','Undead'];
-const SQUAD_NOUN = ['Horde','Pack','Tide','Surge','Swarm','Brood','Mob','Siege','Band','Drift'];
+const SQUAD_ADJ = ['Rotting', 'Crimson', 'Plague', 'Shadow', 'Feral', 'Hollow', 'Dread', 'Vile', 'Rotten', 'Undead'];
+const SQUAD_NOUN = ['Horde', 'Pack', 'Tide', 'Surge', 'Swarm', 'Brood', 'Mob', 'Siege', 'Band', 'Drift'];
 function generateSquadName() {
     return SQUAD_ADJ[Math.floor(Math.random() * SQUAD_ADJ.length)]
-         + ' ' + SQUAD_NOUN[Math.floor(Math.random() * SQUAD_NOUN.length)];
+        + ' ' + SQUAD_NOUN[Math.floor(Math.random() * SQUAD_NOUN.length)];
 }
 
 function addSquadNameSprite(zombie, name) {
@@ -914,8 +914,21 @@ export function updateZombies(dt) {
         if (isWandering) {
             z.wanderTimer -= dt;
             if (z.wanderTimer <= 0) {
-                z.wanderAngle += (Math.random() - 0.5) * Math.PI;
-                z.wanderTimer = 1.5 + Math.random() * 2;
+                // 40% chance: pick a completely random destination anywhere on the map
+                // so zombies spread across the whole map instead of drifting near spawn
+                if (Math.random() < 0.4) {
+                    const mapSize = MAPS[gameState.currentMap].size;
+                    const bound = mapSize * 0.88;
+                    const destX = (Math.random() * 2 - 1) * bound;
+                    const destZ = (Math.random() * 2 - 1) * bound;
+                    z.wanderAngle = Math.atan2(
+                        destX - z.mesh.position.x,
+                        destZ - z.mesh.position.z
+                    );
+                } else {
+                    z.wanderAngle += (Math.random() - 0.5) * Math.PI;
+                }
+                z.wanderTimer = 2 + Math.random() * 4;
             }
             const wanderSpeed = z.speed * 0.3;
             const wanderZR = z.zombieRadius || (z.isBoss ? 0.7 : 0.5);
