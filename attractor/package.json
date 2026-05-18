@@ -6,7 +6,9 @@
   "main": "src/index.js",
   "bin": { "attractor": "attractor.js" },
   "scripts": {
-    "start": "node attractor.js"
+    "start": "node attractor.js",
+    "test": "node --test tests/dot-parser.test.js tests/validator.test.js tests/context.test.js tests/checkpoint.test.js tests/interviewer.test.js tests/handlers.test.js tests/engine.test.js",
+    "test:watch": "node --test --watch tests/dot-parser.test.js tests/validator.test.js tests/context.test.js tests/checkpoint.test.js tests/interviewer.test.js tests/handlers.test.js tests/engine.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

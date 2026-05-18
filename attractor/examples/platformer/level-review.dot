@@ -1,0 +1,45 @@
+// Platformer level archetype review pipeline.
+// Analyzes a specific level archetype for balance and physical completability.
+// Run from the attractor/ directory:
+//   node attractor.js examples/platformer/level-review.dot --var archetype=standard
+//
+// Valid archetypes: standard, staircase, zigzag, pit, highrise, longjump, flat, tower, descent, sprint
+
+digraph "platformer-level-review" {
+  start [handler="start"]
+
+  // Step 1: Read the level generator and extract the target archetype's logic
+  read_level [
+    handler  = "codergen"
+    fidelity = "full"
+    prompt   = "Read ../platformer/js/level.js using read_file. Find the generator function for the '${archetype}' archetype. Extract and explain: (1) How platforms are positioned (gap ranges, width ranges, height variation), (2) How difficulty scales with the progress parameter (0=easy, 1=hardest), (3) Coin placement strategy, (4) Any special structures (staircases, towers, pits). Quote the actual numeric ranges from the code."
+  ]
+
+  // Step 2: Physics feasibility check
+  analyze_physics [
+    handler  = "codergen"
+    prompt   = "Given this level analysis:\n\n{{read_level_output}}\n\nThe platformer physics are: JUMP velocity=555, DOUBLE_JUMP velocity=495, SPEED=280 px/s, GRAVITY=1850 px/s², canvas width=800px. A full double-jump from ground level reaches approximately y=430-182=248px height and ~265px horizontal distance at max speed. Analyze: (1) At minimum difficulty (progress=0), are all gaps jumpable? (2) At maximum difficulty (progress=1), are gaps near the double-jump limit? Flag any parameter combination that could create an unjumpable section. Give specific numbers."
+  ]
+
+  // Step 3: Human sign-off before generating recommendations
+  review [
+    handler  = "wait.human"
+    question = "Does the physics analysis for the '${archetype}' archetype look correct? (y for recommendations, n to redo)"
+    default  = "y"
+  ]
+
+  // Step 4: Concrete improvement recommendations
+  recommend [
+    handler = "codergen"
+    prompt  = "Based on this physics analysis:\n\n{{analyze_physics_output}}\n\nWrite 5 concrete, numbered improvement recommendations for the '${archetype}' archetype in ../platformer/js/level.js. Each recommendation must: name the specific variable to change, state the current value range, propose the new value range, and explain why it improves balance or completability. Format as a numbered Markdown list."
+  ]
+
+  finish [handler="exit"]
+
+  start          -> read_level
+  read_level     -> analyze_physics
+  analyze_physics -> review
+  review         -> recommend [condition="review_approved == true"  label="approve"]
+  review         -> finish    [condition="review_approved == false" label="skip"]
+  recommend      -> finish
+}

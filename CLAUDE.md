@@ -95,6 +95,19 @@ attractor/
   examples/
     hello.dot               Human-in-the-loop review pattern
     coding-task.dot         Analyze → propose → approve → implement pipeline
+    platformer/
+      analyze.dot           Read all platformer JS modules → review → write ARCHITECTURE.md
+      level-review.dot      Analyze a specific archetype's balance/physics (--var archetype=standard)
+      add-enemy.dot         Design + implement a new enemy type (--var enemy_type=patrol_slime)
+      balance.dot           Audit upgrade costs and progression curve
+  tests/
+    dot-parser.test.js      29 tests for the DOT tokenizer/parser
+    validator.test.js       18 tests for pipeline linting rules
+    context.test.js         31 tests for PipelineContext (get/set/evaluate/snapshot)
+    checkpoint.test.js      10 tests for CheckpointManager (save/load/clear)
+    interviewer.test.js     9 tests for NoopInterviewer + CLIInterviewer
+    handlers.test.js        22 tests for all HANDLERS (start/exit/condition/wait.human/codergen/manager)
+    engine.test.js          25 tests for PipelineEngine (routing, edge selection, retries, checkpoints)
 ```
 
 **Node handlers:** `start` / `exit` (no-op), `codergen` (spawns Session with prompt), `wait.human` (CLI approval gate), `condition` (evaluates JS expression against context), `tool` (runs a profile tool directly), `parallel` (fan-out marker), `manager` (supervision loop).
@@ -103,9 +116,19 @@ attractor/
 
 **Context variables set by handlers:** `{nodeId}_status`, `{nodeId}_output`, `{nodeId}_approved`, `{nodeId}_answer`, `{nodeId}_error`.
 
+**Testing:** Uses Node.js built-in `node:test` (no extra deps, ESM-native). 144 tests, 0 failures.
+- `codergen` catches session errors internally → returns FAILURE status (engine does NOT retry it)
+- `tool` handler throws on missing tool → engine retry loop fires; use for testing retry logic
+- Multiple `handler="exit"` nodes fail validation — branch tests use codergen nodes sharing one exit
+
 ```bash
 cd attractor && npm install   # first time only
+npm test                      # run all 144 tests
 node attractor.js examples/hello.dot
+node attractor.js examples/platformer/analyze.dot
+node attractor.js examples/platformer/level-review.dot --var archetype=zigzag
+node attractor.js examples/platformer/add-enemy.dot --var enemy_type=bouncer
+node attractor.js examples/platformer/balance.dot
 node attractor.js examples/coding-task.dot --var target=src/ --checkpoint --debug
 ```
 

@@ -1,0 +1,37 @@
+// Platformer codebase analysis pipeline.
+// Run from the attractor/ directory:
+//   node attractor.js examples/platformer/analyze.dot
+
+digraph "platformer-analyze" {
+  start [handler="start"]
+
+  // Step 1: Read every JS module and build a technical summary
+  read_code [
+    handler  = "codergen"
+    fidelity = "full"
+    prompt   = "Use the list_dir and read_file tools to read every file in ../platformer/js/. For each file write a concise technical summary covering: its purpose, key exports/functions, important constants, and how it connects to other modules. Also read ../platformer/platformer.html to understand the screen structure. Format as a Markdown document with one ## section per file."
+  ]
+
+  // Step 2: Human reviews the raw analysis
+  review [
+    handler  = "wait.human"
+    question = "Does the codebase analysis look complete and accurate? (y to accept, n to re-read)"
+    default  = "y"
+  ]
+
+  // Step 3: Write the final ARCHITECTURE.md document
+  write_doc [
+    handler  = "codergen"
+    fidelity = "full"
+    prompt   = "Using the analysis in read_code_output, write a polished ARCHITECTURE.md for the platformer game. Include: (1) Project overview and tech stack, (2) Module reference table (file, purpose, key exports), (3) Physics constants and their meaning, (4) Level generation system (archetypes, seed formula, difficulty scaling), (5) UI screen flow (which screens exist and how they transition), (6) Data persistence (what is saved and how). Write the file to ../platformer/ARCHITECTURE.md using write_file."
+    goal_gate = "true"
+  ]
+
+  finish [handler="exit"]
+
+  start     -> read_code
+  read_code -> review
+  review    -> write_doc [condition="review_approved == true"  label="accepted"]
+  review    -> read_code [condition="review_approved == false" label="retry"]
+  write_doc -> finish
+}

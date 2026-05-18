@@ -13,7 +13,9 @@
       "Bash(npm install *)",
       "Bash(bash --version)",
       "Bash(bash *)",
-      "Bash(claude whoami *)"
+      "Bash(claude whoami *)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\aaron\\\\Documents\\\\code\\\\aaron\\\\attractor\\\\tests\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\aaron\\\\Documents\\\\code\\\\aaron\\\\attractor\\\\examples\\\\platformer\")"
     ]
   }
 }

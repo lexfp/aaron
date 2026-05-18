@@ -1,0 +1,55 @@
+// Platformer enemy implementation pipeline.
+// Designs and implements a new enemy type using the existing stub in entities.js.
+// Run from the attractor/ directory:
+//   node attractor.js examples/platformer/add-enemy.dot --var enemy_type=patrol_slime
+//
+// Suggested enemy types: patrol_slime, bouncer, charger, floater, spiker
+
+digraph "platformer-add-enemy" {
+  start [handler="start"]
+
+  // Step 1: Read the relevant source files to understand the code structure
+  read_code [
+    handler  = "codergen"
+    fidelity = "full"
+    prompt   = "Read these files using read_file: (1) ../platformer/js/entities.js — find the enemies[] array and the stub updateEnemies/drawEnemies functions. (2) ../platformer/js/player.js — note the player object shape (x, y, w, h, vx, vy) and size. (3) ../platformer/js/level.js — note the platform data structure {x, y, w, h, type} and the resolveY collision pattern. (4) ../platformer/js/main.js — see how entities are integrated into the game loop. Summarize what each stub function currently looks like and what the enemy system needs."
+  ]
+
+  // Step 2: Design the enemy
+  design [
+    handler = "codergen"
+    prompt  = "Based on this codebase analysis:\n\n{{read_code_output}}\n\nDesign a '${enemy_type}' enemy for the platformer. Specify in detail:\n1. Object shape: { x, y, w, h, vx, vy, type, hp, speed, direction, state }\n2. Movement pattern (patrol back-and-forth on platforms, or describe unique behavior)\n3. Collision with player: damage amount, knockback direction\n4. Canvas 2D drawing: specific fillRect/arc calls with colors to make it visually distinct\n5. Death: remove from array, spawn 3 coin-colored particles\n6. Interaction with platforms: uses the same resolveY pattern from level.js\n\nKeep it simple — no assets, pure canvas drawing only."
+  ]
+
+  // Step 3: Human approves the design before code is written
+  approve [
+    handler  = "wait.human"
+    question = "Approve this '${enemy_type}' enemy design for implementation? (y/n)"
+    timeout  = "30000"
+    default  = "n"
+  ]
+
+  // Step 4: Implement the enemy in entities.js
+  implement [
+    handler   = "codergen"
+    fidelity  = "full"
+    goal_gate = "true"
+    prompt    = "Implement the '${enemy_type}' enemy from this design:\n\n{{design_output}}\n\nIn ../platformer/js/entities.js:\n1. Add a factory function: export function spawnEnemy(x, y, platforms) { return { x, y, w: ..., h: ..., vx: ..., vy: 0, type: '${enemy_type}', hp: 2, ... }; }\n2. Implement export function updateEnemies(enemies, platforms, player, dt) — use resolveY/resolveX pattern from level.js for platform collision, handle player collision (reduce player lives if touching), handle enemy death.\n3. Implement export function drawEnemies(ctx, enemies, camX) — draw each enemy using canvas 2D. Offset x by -camX for scrolling.\n4. In ../platformer/js/main.js, find where the game loop calls entity updates and add calls to updateEnemies and drawEnemies if they are not already called.\nUse edit_file for all changes. Do not break existing exports."
+  ]
+
+  // Step 5: Summary
+  summary [
+    handler = "codergen"
+    prompt  = "Briefly summarize (3-5 bullet points) what was added to implement the '${enemy_type}' enemy based on implement_output. Include: which functions were added/modified, the enemy's key stats, and how to spawn one in a level."
+  ]
+
+  finish [handler="exit"]
+
+  start     -> read_code
+  read_code -> design
+  design    -> approve
+  approve   -> implement [condition="approve_approved == true"  label="implement"]
+  approve   -> finish    [condition="approve_approved == false" label="skip"]
+  implement -> summary
+  summary   -> finish
+}

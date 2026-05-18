@@ -1,0 +1,43 @@
+// Platformer upgrade balance analysis pipeline.
+// Reads upgrade costs and models progression to surface balance issues.
+// Run from the attractor/ directory:
+//   node attractor.js examples/platformer/balance.dot
+
+digraph "platformer-balance" {
+  start [handler="start"]
+
+  // Step 1: Extract all upgrade data from state.js
+  read_state [
+    handler  = "codergen"
+    fidelity = "full"
+    prompt   = "Read ../platformer/js/state.js using read_file. Extract the complete UPGRADE_DEFS array: for each upgrade record its key, label, max level, costs array, and description. Also note the DEFAULT player data (starting coins=0). Then read ../platformer/js/main.js and find where coins are awarded (collectCoins or similar) to estimate coins earned per level. Present all data in a clear table format."
+  ]
+
+  // Step 2: Run the balance analysis
+  analyze [
+    handler = "codergen"
+    prompt  = "Given this upgrade data:\n\n{{read_state_output}}\n\nPerform a complete balance analysis:\n\n1. **Total cost to max everything**: sum all costs across all upgrades.\n2. **Cost curve per upgrade**: classify each as linear, exponential, or other — show the multiplier between levels.\n3. **Cost-efficiency ranking**: which upgrade gives the most stat gain per coin at level 1? At level 5?\n4. **Progression estimate**: assuming a player earns 15-25 coins per level (average ~20), how many game levels must they complete to afford: first upgrade of each type, full max of each type, everything maxed?\n5. **Bottleneck identification**: which upgrade or upgrade level creates the longest grind? Is the spike jarring?\n\nFormat as a structured Markdown report with tables."
+  ]
+
+  // Step 3: Human review
+  review [
+    handler  = "wait.human"
+    question = "Does this balance analysis look accurate? (y for recommendations, n to redo the analysis)"
+    default  = "y"
+  ]
+
+  // Step 4: Concrete adjustment recommendations
+  recommend [
+    handler = "codergen"
+    prompt  = "Based on this balance report:\n\n{{analyze_output}}\n\nPropose specific cost adjustments to improve the progression curve. Goals: (1) players should be able to afford at least one upgrade level within 10 levels, (2) maxing everything should take 150-250 levels total, (3) no single upgrade should cost 3× the previous tier. Present as a Markdown diff table:\n\n| Upgrade | Level | Current Cost | Proposed Cost | Reason |\n|---------|-------|--------------|---------------|--------|\n\nAlso indicate which upgrade to buy first for maximum early impact."
+  ]
+
+  finish [handler="exit"]
+
+  start      -> read_state
+  read_state -> analyze
+  analyze    -> review
+  review     -> recommend [condition="review_approved == true"  label="approve"]
+  review     -> analyze   [condition="review_approved == false" label="retry"]
+  recommend  -> finish
+}
