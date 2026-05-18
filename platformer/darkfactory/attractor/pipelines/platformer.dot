@@ -1,0 +1,53 @@
+// platformer.dot — Attractor pipeline for the platformer dark factory.
+//
+// Invoked by the orchestrator's evaluator agent (B.5.3) AFTER the test-writer
+// has written tests to platformer/tests/unit/ (and platformer/tests/playwright/
+// if applicable) and AFTER the coding agent has produced its implementation.
+//
+// The spec on disk has already had the holdout scenarios injected into a
+// `## Scenarios` section between <!--ATTRACTOR-SCENARIO-INJECT--> sentinels.
+// Engine reads scenarios from the spec at this point. Orchestrator strips
+// the injection in a try/finally after this engine run.
+//
+// Pipeline phases:
+//   parse           → load spec, extract sections (engine built-in)
+//   validate_spec   → schema check (engine built-in)
+//   quick_test_gate → pnpm exec jest --runInBand --bail in platformer/
+//   scenario_evaluator → LLM reads source files referenced by each
+//                        `Kind: code` scenario's `Verify by:`; PASS/FAIL.
+//                        Skips `Kind: e2e` (handled by orchestrator Phase E).
+//   ci_gate         → second jest run + any lint, simulates a CI invocation
+//   failure_triage  → LLM rewrites failures as plain-English triage_feedback
+//                     and writes outcome-verdict.txt = NEEDS_REWORK
+//   ci_triage       → same but for CI-gate failures
+//   emit_outcome    → tool node, runs scripts/emit-outcome.ps1 against
+//                     checkpoints/, writes last-outcome.json
+
+digraph platformer_pipeline {
+    rankdir=LR;
+
+    parse              [label="parse"                type="builtin/parse"];
+    validate_spec      [label="validate_spec"        type="builtin/validate"];
+    quick_test_gate    [label="quick_test_gate"      type="shell"          cwd="${projectRoot}" cmd="pnpm exec jest --runInBand --bail" timeoutSeconds=180 stdoutLog="checkpoints/quick-test.stdout.log" stderrLog="checkpoints/quick-test.stderr.log"];
+    scenario_evaluator [label="scenario_evaluator"   type="codergen"       model="claude-opus-4-7" promptTemplate="prompts/scenario-evaluator.md" output="checkpoints/scenario-results.json"];
+    failure_triage     [label="failure_triage"       type="codergen"       model="claude-opus-4-7" promptTemplate="prompts/failure-triage.md"     verdictOut="checkpoints/outcome-verdict.txt" feedbackOut="checkpoints/triage-feedback.txt"];
+    ci_gate            [label="ci_gate"              type="shell"          cwd="${projectRoot}" cmd="pnpm exec jest --runInBand"             timeoutSeconds=240 stdoutLog="checkpoints/ci.stdout.log" stderrLog="checkpoints/ci.stderr.log"];
+    ci_triage          [label="ci_triage"            type="codergen"       model="claude-opus-4-7" promptTemplate="prompts/ci-triage.md"          verdictOut="checkpoints/outcome-verdict.txt" feedbackOut="checkpoints/triage-feedback.txt"];
+    emit_outcome       [label="emit_outcome"         type="tool"           cmd="pwsh -File scripts/emit-outcome.ps1 -CheckpointDir checkpoints"];
+
+    parse              -> validate_spec;
+    validate_spec      -> quick_test_gate    [label="ok"];
+    validate_spec      -> emit_outcome       [label="invalid"  verdict="SPEC_INVALID"];
+
+    quick_test_gate    -> scenario_evaluator [label="pass"];
+    quick_test_gate    -> failure_triage     [label="fail"];
+
+    scenario_evaluator -> ci_gate            [label="all_pass"];
+    scenario_evaluator -> failure_triage     [label="any_fail"];
+
+    ci_gate            -> emit_outcome       [label="pass"     verdict="SUCCESS"];
+    ci_gate            -> ci_triage          [label="fail"];
+
+    failure_triage     -> emit_outcome;
+    ci_triage          -> emit_outcome;
+}
