@@ -1,6 +1,9 @@
 const held = new Set();
 let _jumpJustPressed = false;
 let _escJustPressed = false;
+let _mouseDown = false;
+
+const ATTACK_KEYS = new Set(['KeyJ', 'KeyX', 'KeyK', 'KeyF', 'Enter']);
 
 export function initInput() {
   window.addEventListener('keydown', e => {
@@ -16,6 +19,9 @@ export function initInput() {
   window.addEventListener('keyup', e => {
     held.delete(e.code);
   });
+  // Left mouse button also attacks (click on the canvas).
+  window.addEventListener('mousedown', e => { if (e.button === 0) _mouseDown = true; });
+  window.addEventListener('mouseup', e => { if (e.button === 0) _mouseDown = false; });
 }
 
 export function isLeft() {
@@ -38,8 +44,17 @@ export function consumeEsc() {
   return e;
 }
 
+// Attack is held-based (cooldown-gated in the game loop) so holding the key or
+// mouse fires repeatedly at the weapon's rate.
+export function isAttack() {
+  if (_mouseDown) return true;
+  for (const k of ATTACK_KEYS) if (held.has(k)) return true;
+  return false;
+}
+
 export function clearAll() {
   held.clear();
   _jumpJustPressed = false;
   _escJustPressed = false;
+  _mouseDown = false;
 }

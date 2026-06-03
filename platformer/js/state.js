@@ -3,6 +3,8 @@ const SAVE_KEY = 'platformer_save';
 const DEFAULT = {
   coins: 0,
   upgrades: { jump: 0, speed: 0, magnet: 0, djBoost: 0, lives: 0 },
+  weapons: { fists: true },     // owned weapons (fists always owned)
+  equippedWeapon: 'fists',
   stagesUnlocked: 1,
   levelProgress: {},
 };
@@ -16,6 +18,10 @@ export function loadPlayerData() {
     const saved = JSON.parse(raw);
     playerData = { ...DEFAULT, ...saved };
     playerData.upgrades = { ...DEFAULT.upgrades, ...(saved.upgrades || {}) };
+    playerData.weapons = { ...DEFAULT.weapons, ...(saved.weapons || {}) };
+    if (!playerData.equippedWeapon || !playerData.weapons[playerData.equippedWeapon]) {
+      playerData.equippedWeapon = 'fists';
+    }
   } catch {}
 }
 
@@ -25,6 +31,17 @@ export function savePlayerData() {
 
 export function resetAllProgress() {
   playerData = JSON.parse(JSON.stringify(DEFAULT));
+  savePlayerData();
+}
+
+// Secret cheat: mark every level of every stage complete and unlock all stages.
+export function completeAllLevels() {
+  for (let s = 1; s <= 10; s++) {
+    for (let l = 1; l <= 50; l++) {
+      playerData.levelProgress[`${s}-${l}`] = true;
+    }
+  }
+  playerData.stagesUnlocked = 10;
   savePlayerData();
 }
 
@@ -102,4 +119,62 @@ export function getLevelCompletedCount(stage) {
     if (playerData.levelProgress[`${stage}-${l}`]) count++;
   }
   return count;
+}
+
+// ─── WEAPONS ──────────────────────────────────────────────────────────────
+// `damage` = HP removed per hit. `reach` = melee hitbox length in front of the
+// player (px). Ranged weapons use `speed` (projectile px/s) and ignore reach.
+// `cooldown` = seconds between attacks. `splash` = explosion radius (ranged).
+export const WEAPON_DEFS = [
+  {
+    key: 'fists', label: 'Fists', cost: 0, type: 'melee', icon: '👊',
+    damage: 1, reach: 22, cooldown: 0.30, knockback: 220, color: '#f0a070',
+    desc: 'Your bare hands. Free, but short and weak.',
+  },
+  {
+    key: 'sword', label: 'Sword', cost: 120, type: 'melee', icon: '🗡️',
+    damage: 3, reach: 46, cooldown: 0.24, knockback: 320, color: '#dfe7f2',
+    desc: 'Long reach, fast swing. A big upgrade over fists.',
+  },
+  {
+    key: 'hammer', label: 'War Hammer', cost: 320, type: 'melee', icon: '🔨',
+    damage: 8, reach: 36, cooldown: 0.55, knockback: 560, color: '#c08a4a',
+    desc: 'Slow but devastating — flattens brutes in one blow.',
+  },
+  {
+    key: 'blaster', label: 'Blaster', cost: 480, type: 'ranged', icon: '🔫',
+    damage: 2, cooldown: 0.30, speed: 600, knockback: 260, color: '#00d2ff', splash: 0,
+    desc: 'Fires energy bolts — hit enemies across gaps.',
+  },
+  {
+    key: 'launcher', label: 'Boom Bow', cost: 850, type: 'ranged', icon: '🏹',
+    damage: 6, cooldown: 0.70, speed: 480, knockback: 520, color: '#ffd24a', splash: 70,
+    desc: 'Explosive arrows with splash damage. The finisher.',
+  },
+];
+
+export const WEAPON_MAP = Object.fromEntries(WEAPON_DEFS.map(w => [w.key, w]));
+
+export function ownsWeapon(key) {
+  return key === 'fists' || !!playerData.weapons[key];
+}
+
+export function buyWeapon(key) {
+  const w = WEAPON_MAP[key];
+  if (!w || ownsWeapon(key) || playerData.coins < w.cost) return false;
+  playerData.coins -= w.cost;
+  playerData.weapons[key] = true;
+  savePlayerData();
+  return true;
+}
+
+export function equipWeapon(key) {
+  if (!ownsWeapon(key)) return false;
+  playerData.equippedWeapon = key;
+  savePlayerData();
+  return true;
+}
+
+export function getEquippedWeapon() {
+  return WEAPON_MAP[playerData.equippedWeapon] || WEAPON_MAP.fists;
 }

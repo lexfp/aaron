@@ -118,6 +118,18 @@ html, body {
 
 #main-menu {
   background: radial-gradient(ellipse at 50% 30%, #1a1a3a 0%, var(--bg) 70%);
+  overflow: hidden;
+}
+
+/* hue-rotatable wrapper so the palette toy can recolor everything */
+#main-menu { filter: hue-rotate(var(--menu-hue, 0deg)); transition: filter 0.4s ease; }
+
+#menu-fx {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .menu-glow {
@@ -126,7 +138,125 @@ html, body {
   width: 400px; height: 300px;
   background: radial-gradient(ellipse, rgba(243,156,18,0.08) 0%, transparent 70%);
   pointer-events: none;
+  animation: glowPulse 4s ease-in-out infinite;
 }
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+  50%      { opacity: 1;   transform: translateX(-50%) scale(1.15); }
+}
+
+/* ----- Orbiting emoji ring around the title ----- */
+.menu-orbit {
+  position: absolute;
+  top: 26%; left: 50%;
+  width: 0; height: 0;
+  z-index: 0;
+  pointer-events: none;
+  animation: orbitSpin 18s linear infinite;
+}
+.orbit-dot {
+  position: absolute;
+  font-size: 26px;
+  filter: drop-shadow(0 0 8px rgba(243,156,18,0.5));
+  animation: orbitBob 3s ease-in-out infinite;
+}
+.orbit-dot:nth-child(1) { transform: rotate(0deg)   translateX(230px); }
+.orbit-dot:nth-child(2) { transform: rotate(72deg)  translateX(230px); animation-delay: 0.4s; }
+.orbit-dot:nth-child(3) { transform: rotate(144deg) translateX(230px); animation-delay: 0.8s; }
+.orbit-dot:nth-child(4) { transform: rotate(216deg) translateX(230px); animation-delay: 1.2s; }
+.orbit-dot:nth-child(5) { transform: rotate(288deg) translateX(230px); animation-delay: 1.6s; }
+@keyframes orbitSpin { to { transform: rotate(360deg); } }
+@keyframes orbitBob { 0%,100% { margin-top: -4px; } 50% { margin-top: 4px; } }
+
+/* title gets a subtle floaty wobble + animated gradient sheen */
+.menu-title {
+  background-size: 200% auto;
+  animation: titleSheen 5s linear infinite, titleFloat 4s ease-in-out infinite;
+  cursor: default;
+}
+@keyframes titleSheen { to { background-position: 200% center; } }
+@keyframes titleFloat { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-6px) rotate(-0.6deg); } }
+
+/* ----- Toy box ----- */
+.toy-box {
+  display: flex;
+  gap: 12px;
+  margin-top: -6px;
+  z-index: 1;
+}
+.toy {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(26,26,46,0.7);
+  font-size: 24px;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+  display: grid; place-items: center;
+}
+.toy:hover {
+  transform: translateY(-4px) scale(1.12) rotate(-6deg);
+  background: #22223a;
+  box-shadow: 0 8px 22px rgba(243,156,18,0.35);
+}
+.toy:active { transform: scale(0.9); }
+.toy.wiggle { animation: toyWiggle 0.4s ease; }
+@keyframes toyWiggle {
+  0%,100% { transform: rotate(0); }
+  25% { transform: rotate(18deg) scale(1.2); }
+  75% { transform: rotate(-18deg) scale(1.2); }
+}
+
+/* ----- Disco mode ----- */
+#main-menu.disco { animation: discoBg 0.6s steps(1) infinite; }
+@keyframes discoBg {
+  0%   { background: radial-gradient(ellipse at 50% 30%, #3a0a2a, var(--bg) 70%); }
+  25%  { background: radial-gradient(ellipse at 50% 30%, #0a2a3a, var(--bg) 70%); }
+  50%  { background: radial-gradient(ellipse at 50% 30%, #2a3a0a, var(--bg) 70%); }
+  75%  { background: radial-gradient(ellipse at 50% 30%, #3a1a0a, var(--bg) 70%); }
+  100% { background: radial-gradient(ellipse at 50% 30%, #1a0a3a, var(--bg) 70%); }
+}
+#main-menu.disco .menu-title { animation: titleSheen 0.8s linear infinite, discoSpin 0.7s linear infinite; }
+@keyframes discoSpin { 0%,100% { transform: rotate(-3deg) scale(1.02); } 50% { transform: rotate(3deg) scale(1.05); } }
+
+/* ----- screen shake on win ----- */
+#main-menu.quake { animation: quake 0.5s linear; }
+@keyframes quake {
+  0%,100% { transform: translate(0,0); }
+  10% { transform: translate(-8px,4px) rotate(-0.5deg); }
+  30% { transform: translate(7px,-6px) rotate(0.5deg); }
+  50% { transform: translate(-6px,7px); }
+  70% { transform: translate(8px,-4px) rotate(0.4deg); }
+  90% { transform: translate(-4px,3px); }
+}
+
+/* ----- victory banner ----- */
+.win-banner {
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  z-index: 60;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(4px);
+  text-align: center;
+  animation: winFade 0.4s ease;
+}
+.win-banner.show { display: flex; }
+.win-banner h1 {
+  font-size: 56px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #f1c40f, #e74c3c, #9b59b6);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: titleFloat 1.6s ease-in-out infinite;
+}
+.win-banner p { color: var(--text); font-size: 16px; }
+.win-banner small { color: var(--text-dim); font-size: 12px; }
+@keyframes winFade { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
 
 .menu-content {
   display: flex;
@@ -522,6 +652,34 @@ html, body {
 }
 
 .shop-card.maxed { border-color: var(--coin); }
+
+.shop-section-title {
+  grid-column: 1 / -1;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  margin: 6px 0 -4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.shop-card.equipped {
+  border-color: #2ecc71;
+  box-shadow: 0 0 0 1px #2ecc71 inset;
+}
+
+.shop-wstat {
+  font-size: 11px;
+  font-weight: 700;
+  color: #e1b04a;
+  letter-spacing: 0.02em;
+}
+
+.shop-buy.shop-equip {
+  background: linear-gradient(135deg, #16a085, #2ecc71);
+  color: #04150f;
+}
 
 .shop-icon {
   font-size: 28px;

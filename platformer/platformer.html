@@ -10,16 +10,35 @@
 
 <!-- MAIN MENU -->
 <div id="main-menu" class="screen" style="display:flex;">
+  <canvas id="menu-fx"></canvas>
   <div class="menu-glow"></div>
+  <div class="menu-orbit" aria-hidden="true">
+    <span class="orbit-dot">🪙</span>
+    <span class="orbit-dot">⭐</span>
+    <span class="orbit-dot">🍄</span>
+    <span class="orbit-dot">💎</span>
+    <span class="orbit-dot">🔥</span>
+  </div>
   <div class="menu-content">
-    <div class="menu-title">JUMP!<br><span style="font-size:0.55em;letter-spacing:0.02em">Platformer</span></div>
+    <div class="menu-title" id="menu-title">JUMP!<br><span style="font-size:0.55em;letter-spacing:0.02em">Platformer</span></div>
     <div class="menu-sub">10 Stages · 500 Levels · Double Jump</div>
     <div class="menu-buttons">
       <button id="btn-play" class="menu-btn">▶ Play</button>
       <button id="btn-stage-select" class="menu-btn">🗺 Stage Select</button>
+      <button id="btn-shop" class="menu-btn">🛍 Shop</button>
       <button id="btn-reset" class="menu-btn">↺ New Game</button>
     </div>
-    <div class="menu-tip">Arrow keys / WASD to move · Space to jump (press twice for double jump!) · ESC to pause</div>
+
+    <!-- TOY BOX: a row of cool interactive widgets -->
+    <div class="toy-box" id="toy-box">
+      <button class="toy" id="toy-dice" title="Roll the dice">🎲</button>
+      <button class="toy" id="toy-palette" title="Shuffle the colors">🎨</button>
+      <button class="toy" id="toy-spark" title="Make some sparkles">🎆</button>
+      <button class="toy" id="toy-boop" title="Boop!">🐸</button>
+      <button class="toy" id="toy-disco" title="Disco mode">🪩</button>
+    </div>
+
+    <div class="menu-tip">Arrow keys / WASD to move · Space to jump (twice for double jump!) · J / X / click to attack · ESC to pause</div>
   </div>
 </div>
 
@@ -60,6 +79,7 @@
       <span style="color:#cca;margin-left:4px;" id="hud-coins-total">0</span>
     </div>
     <div class="hud-panel" id="hud-lives">♥♥</div>
+    <div class="hud-panel" id="hud-weapon" title="Equipped weapon (J / X / click to attack)">👊 Fists</div>
   </div>
 </div>
 
@@ -82,7 +102,7 @@
     <div class="lc-coins-total" id="lc-coins-total">Total: 0 coins</div>
     <div class="lc-buttons">
       <button id="btn-lc-next" class="lc-btn primary">Next Level →</button>
-      <button id="btn-lc-shop" class="lc-btn">🛍 Upgrade Shop</button>
+      <button id="btn-lc-shop" class="lc-btn">🛍 Shop</button>
       <button id="btn-lc-menu" class="lc-btn">⌂ Main Menu</button>
     </div>
   </div>
@@ -92,7 +112,7 @@
 <div id="shop-overlay" class="screen" style="z-index:28;overflow-y:auto;">
   <div class="screen-inner">
     <div class="shop-header">
-      <div class="shop-title">Upgrade Shop</div>
+      <div class="shop-title">Shop</div>
       <div class="shop-balance">🪙 <span id="shop-coin-count">0</span></div>
     </div>
     <div id="shop-grid"></div>
@@ -112,6 +132,13 @@
       <button id="btn-sc-menu" class="sc-btn">⌂ Main Menu</button>
     </div>
   </div>
+</div>
+
+<!-- SECRET VICTORY BANNER -->
+<div id="win-banner" class="win-banner">
+  <h1>🏆 ALL LEVELS BEATEN! 🏆</h1>
+  <p>You spammed the forbidden button. The universe rewarded you.</p>
+  <small>Every stage unlocked · 500/500 levels complete</small>
 </div>
 
 <script type="module" src="js/main.js"></script>

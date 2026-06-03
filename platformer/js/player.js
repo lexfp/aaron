@@ -1,7 +1,9 @@
 import { isLeft, isRight } from './input.js';
 import { resolveX, resolveY } from './level.js';
 import { addDJParticles, addLandParticles } from './entities.js';
-import { getJumpMult, getDJMult, getSpeedMult } from './state.js';
+import { getJumpMult, getDJMult, getSpeedMult, getEquippedWeapon } from './state.js';
+
+function lerp(a, b, t) { return a + (b - a) * t; }
 
 const BASE_JUMP = 555;
 const BASE_DJ = 495;
@@ -27,6 +29,11 @@ export const player = {
   landSquash: 0,
   djFlash: 0,
   dead: false,
+  // Combat
+  attackCD: 0,        // seconds until the next attack is allowed
+  swingT: 0,          // remaining swing-animation time
+  swingDur: 0.16,
+  weapon: null,       // equipped weapon def (for drawing)
   // Computed from upgrades each level
   jumpForce: BASE_JUMP,
   djForce: BASE_DJ,
@@ -50,6 +57,9 @@ export function initPlayer(spawnX, spawnY) {
   player.landSquash = 0;
   player.djFlash = 0;
   player.dead = false;
+  player.attackCD = 0;
+  player.swingT = 0;
+  player.weapon = getEquippedWeapon();
 
   player.jumpForce = BASE_JUMP * getJumpMult();
   player.djForce = BASE_DJ * getDJMult();
@@ -136,6 +146,8 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
   // Update timers
   player.landSquash = Math.max(0, player.landSquash - dt * 5.5);
   player.djFlash = Math.max(0, player.djFlash - dt);
+  player.attackCD = Math.max(0, player.attackCD - dt);
+  player.swingT = Math.max(0, player.swingT - dt);
 
   // Walk distance for leg swing animation
   if (player.onGround && Math.abs(player.vx) > 15) {
@@ -255,6 +267,11 @@ export function drawPlayer(ctx, t) {
   ctx.arc(hw * 0.1, eyeY + 9, 5, 0.1, Math.PI - 0.1);
   ctx.stroke();
 
+  // Weapon swing / attack
+  if (player.swingT > 0 && player.weapon) {
+    drawWeaponSwing(ctx, hw, hh, player.weapon, 1 - player.swingT / player.swingDur);
+  }
+
   // Double-jump flash outline
   if (djFlash > 0) {
     const flashAlpha = djFlash / 0.28;
@@ -266,6 +283,72 @@ export function drawPlayer(ctx, t) {
     ctx.lineWidth = 1;
   }
 
+  ctx.restore();
+}
+
+// Draws the equipped weapon mid-swing in front of the player. Called inside the
+// player's translated+facing-flipped context, so +x is always "forward".
+function drawWeaponSwing(ctx, hw, hh, weapon, prog) {
+  ctx.save();
+  ctx.translate(hw * 0.55, -hh * 0.05); // shoulder pivot
+
+  if (weapon.type === 'ranged') {
+    // Hold the weapon level and forward, with a muzzle flash early in the swing.
+    ctx.fillStyle = '#2a2a33';
+    ctx.fillRect(0, -3.5, 18, 7);
+    ctx.fillStyle = weapon.color;
+    ctx.fillRect(15, -2.5, 7, 5);
+    if (prog < 0.55) {
+      ctx.globalAlpha = 1 - prog / 0.55;
+      ctx.fillStyle = weapon.color;
+      ctx.beginPath();
+      ctx.arc(26, 0, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+    return;
+  }
+
+  // Melee: arc the arm + weapon from overhead down through forward.
+  const reach = weapon.reach || 26;
+  const ang = lerp(-1.0, 1.05, prog);
+  ctx.rotate(ang);
+
+  // swoosh trail
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, reach * 0.85, -0.55, 0.55);
+  ctx.stroke();
+
+  // arm
+  ctx.strokeStyle = '#f0a070';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(reach * 0.45, 0);
+  ctx.stroke();
+
+  ctx.translate(reach * 0.45, 0);
+  if (weapon.key === 'fists') {
+    ctx.fillStyle = weapon.color;
+    ctx.beginPath();
+    ctx.arc(4, 0, 6.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (weapon.key === 'hammer') {
+    ctx.fillStyle = '#5a4632';
+    ctx.fillRect(0, -2.5, reach * 0.45, 5);
+    ctx.fillStyle = weapon.color;
+    ctx.fillRect(reach * 0.45 - 3, -9, 13, 18);
+  } else {
+    // sword (and any other blade)
+    ctx.fillStyle = '#8a8a96';
+    ctx.fillRect(-3, -5, 5, 10); // guard
+    ctx.fillStyle = weapon.color;
+    ctx.fillRect(2, -2.5, reach * 0.75, 5); // blade
+  }
   ctx.restore();
 }
 

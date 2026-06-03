@@ -1,6 +1,7 @@
 import {
   playerData, savePlayerData, isLevelComplete, isStageComplete,
-  getLevelCompletedCount, UPGRADE_DEFS, resetAllProgress,
+  getLevelCompletedCount, UPGRADE_DEFS, resetAllProgress, completeAllLevels,
+  WEAPON_DEFS, ownsWeapon, buyWeapon, equipWeapon, getEquippedWeapon,
 } from './state.js';
 import { STAGE_THEMES } from './renderer.js';
 
@@ -21,6 +22,8 @@ export function initUI(callbacks) {
     buildStageSelect(callbacks);
     showScreen('stage-select');
   });
+  const shopBtn = document.getElementById('btn-shop');
+  if (shopBtn) shopBtn.addEventListener('click', () => showShop(undefined, undefined, callbacks));
   document.getElementById('btn-reset').addEventListener('click', () => {
     if (confirm('Reset ALL progress? This cannot be undone.')) {
       resetAllProgress();
@@ -45,6 +48,7 @@ export function initUI(callbacks) {
   });
 
   buildMainMenu(callbacks);
+  setupMenuEffects(callbacks);
 }
 
 export function buildMainMenu(callbacks) {
@@ -125,6 +129,10 @@ export function updateHUD(stageIdx, levelIdx, coinsThisLevel, totalCoins, lives)
   if (el('hud-lives')) {
     el('hud-lives').textContent = '♥'.repeat(Math.max(0, lives));
   }
+  if (el('hud-weapon')) {
+    const w = getEquippedWeapon();
+    el('hud-weapon').textContent = `${w.icon} ${w.label}`;
+  }
 }
 
 export function showLevelComplete(stageIdx, levelIdx, coinsThisLevel, totalCoins, callbacks) {
@@ -191,6 +199,54 @@ function renderShop(callbacks) {
   const grid = document.getElementById('shop-grid');
   grid.innerHTML = '';
 
+  // ── Weapons section ──
+  const wTitle = document.createElement('div');
+  wTitle.className = 'shop-section-title';
+  wTitle.textContent = '⚔️ Weapons';
+  grid.appendChild(wTitle);
+
+  const equippedKey = getEquippedWeapon().key;
+  for (const w of WEAPON_DEFS) {
+    const owned = ownsWeapon(w.key);
+    const isEquipped = equippedKey === w.key;
+    const canAfford = !owned && playerData.coins >= w.cost;
+    const stat = w.type === 'ranged'
+      ? `DMG ${w.damage} · ranged${w.splash ? ' · splash' : ''}`
+      : `DMG ${w.damage} · reach ${w.reach}`;
+
+    let btnHTML;
+    if (isEquipped) btnHTML = '<div class="shop-maxed">EQUIPPED</div>';
+    else if (owned) btnHTML = `<button class="shop-buy shop-equip" data-key="${w.key}">Equip</button>`;
+    else btnHTML = `<button class="shop-buy${canAfford ? '' : ' cant-afford'}" data-key="${w.key}">🪙 ${w.cost}</button>`;
+
+    const card = document.createElement('div');
+    card.className = 'shop-card' + (isEquipped ? ' equipped' : '');
+    card.innerHTML = `
+      <div class="shop-icon">${w.icon}</div>
+      <div class="shop-name">${w.label}</div>
+      <div class="shop-desc">${w.desc}</div>
+      <div class="shop-wstat">${stat}</div>
+      ${btnHTML}
+    `;
+    const wbtn = card.querySelector('button');
+    if (wbtn) {
+      if (owned && !isEquipped) {
+        wbtn.addEventListener('click', () => { equipWeapon(w.key); renderShop(callbacks); });
+      } else if (!owned && canAfford) {
+        wbtn.addEventListener('click', () => {
+          if (buyWeapon(w.key)) { equipWeapon(w.key); renderShop(callbacks); }
+        });
+      }
+    }
+    grid.appendChild(card);
+  }
+
+  // ── Upgrades section ──
+  const uTitle = document.createElement('div');
+  uTitle.className = 'shop-section-title';
+  uTitle.textContent = '✨ Upgrades';
+  grid.appendChild(uTitle);
+
   for (const def of UPGRADE_DEFS) {
     const currentLevel = playerData.upgrades[def.key];
     const maxed = currentLevel >= def.max;
@@ -225,4 +281,239 @@ function renderShop(callbacks) {
 
 export function showPauseMenu() {
   showScreen('pause-menu');
+}
+
+/* ============================================================
+ *  MAIN MENU EFFECTS + INTERACTIVE WIDGETS
+ *  A particle canvas behind the menu, a row of "toy" widgets,
+ *  and the forbidden button — spam it to instantly beat the game.
+ * ============================================================ */
+
+const EMOJI_POOL = ['🪙', '⭐', '✨', '🍄', '💎', '🔥', '🎈', '🎉', '🟡', '🟠'];
+let menuFxStarted = false;
+
+function setupMenuEffects(callbacks) {
+  startMenuParticles();
+  wireToyBox(callbacks);
+}
+
+/* ---------- Particle / starfield canvas ---------- */
+const fxParticles = [];   // ambient + burst particles
+let fxRainbow = false;
+
+function startMenuParticles() {
+  const canvas = document.getElementById('menu-fx');
+  if (!canvas || menuFxStarted) return;
+  menuFxStarted = true;
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // Seed drifting ambient motes.
+  for (let i = 0; i < 60; i++) {
+    fxParticles.push(makeMote(canvas, true));
+  }
+
+  // Mouse-trail sparkles (only while the menu is visible).
+  document.getElementById('main-menu').addEventListener('pointermove', (e) => {
+    if (Math.random() < 0.35 && fxParticles.length < MAX_PARTICLES) {
+      fxParticles.push({
+        x: e.clientX, y: e.clientY,
+        vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30 + 20,
+        life: 0.7, maxLife: 0.7, size: 2 + Math.random() * 2,
+        hue: fxRainbow ? Math.random() * 360 : 42, kind: 'spark',
+      });
+    }
+  });
+
+  let prev = performance.now();
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const menu = document.getElementById('main-menu');
+    const visible = menu && menu.style.display !== 'none';
+    const dt = Math.min((now - prev) / 1000, 0.05);
+    prev = now;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!visible) { fxParticles.length = Math.min(fxParticles.length, 60); return; }
+
+    for (let i = fxParticles.length - 1; i >= 0; i--) {
+      const p = fxParticles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      if (p.gravity) p.vy += p.gravity * dt;
+      if (p.kind === 'mote') {
+        // wrap around the screen
+        if (p.y > canvas.height + 10) { p.y = -10; p.x = Math.random() * canvas.width; }
+        const tw = 0.5 + 0.5 * Math.sin(now / 400 + p.phase);
+        ctx.globalAlpha = p.alpha * tw;
+        ctx.fillStyle = `hsl(${p.hue}, 90%, 70%)`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        p.life -= dt;
+        if (p.life <= 0) { fxParticles.splice(i, 1); continue; }
+        const a = p.life / p.maxLife;
+        ctx.globalAlpha = a;
+        if (p.emoji) {
+          ctx.font = `${p.size}px serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(p.emoji, p.x, p.y);
+        } else {
+          ctx.fillStyle = `hsl(${p.hue}, 95%, 60%)`;
+          ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  requestAnimationFrame(frame);
+}
+
+function makeMote(canvas, randomY) {
+  return {
+    kind: 'mote',
+    x: Math.random() * canvas.width,
+    y: randomY ? Math.random() * canvas.height : -10,
+    vx: (Math.random() - 0.5) * 12,
+    vy: 10 + Math.random() * 25,
+    size: 1 + Math.random() * 2.5,
+    alpha: 0.3 + Math.random() * 0.5,
+    hue: 38 + Math.random() * 20,
+    phase: Math.random() * Math.PI * 2,
+  };
+}
+
+/* Burst of confetti/emoji at a screen point. */
+const MAX_PARTICLES = 140;   // hard cap so spamming never lags
+function burst(x, y, count = 24, emojiMode = false) {
+  // drop the burst if we're already saturated (keeps the click cheap)
+  if (fxParticles.length > MAX_PARTICLES) return;
+  count = Math.min(count, MAX_PARTICLES - fxParticles.length);
+  for (let i = 0; i < count; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const spd = 80 + Math.random() * 260;
+    fxParticles.push({
+      kind: 'burst',
+      x, y,
+      vx: Math.cos(ang) * spd,
+      vy: Math.sin(ang) * spd - 80,
+      gravity: 420,
+      life: 0.9 + Math.random() * 0.7,
+      maxLife: 1.5,
+      size: emojiMode ? 18 + Math.random() * 14 : 4 + Math.random() * 5,
+      hue: Math.random() * 360,
+      emoji: emojiMode ? EMOJI_POOL[(Math.random() * EMOJI_POOL.length) | 0] : null,
+    });
+  }
+}
+
+function centerOf(el) {
+  const r = el.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+/* ---------- Toy box widgets ---------- */
+function wireToyBox(callbacks) {
+  const wiggle = (el) => { el.classList.remove('wiggle'); void el.offsetWidth; el.classList.add('wiggle'); };
+
+  // The dice looks like an ordinary "roll the dice" toy, but secretly counts
+  // rapid clicks — spam it 500× (each within 600ms of the last) to win.
+  // Counting is cheap on every click; the (expensive) visual feedback is
+  // throttled so fast spamming can never lag.
+  const dice = document.getElementById('toy-dice');
+  if (dice) {
+    const faces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+    const SECRET_TARGET = 500;
+    const SECRET_WINDOW = 600;   // ms between clicks to keep the streak alive
+    const FX_THROTTLE = 70;      // ms; min gap between visual flourishes
+    let combo = 0, last = 0, lastFx = 0, won = false;
+    let cx = 0, cy = 0;          // cached dice center (avoids layout thrash)
+    const recache = () => { const r = dice.getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2; };
+    window.addEventListener('resize', recache);
+
+    dice.addEventListener('click', () => {
+      // --- cheap: always count ---
+      if (!won) {
+        const now = performance.now();
+        combo = (now - last < SECRET_WINDOW) ? combo + 1 : 1;
+        last = now;
+        if (combo >= SECRET_TARGET) { won = true; triggerSecretWin(callbacks); return; }
+
+        // --- throttled visual feedback (skipped during rapid spam) ---
+        if (now - lastFx >= FX_THROTTLE) {
+          lastFx = now;
+          dice.textContent = faces[(Math.random() * 6) | 0];
+          wiggle(dice);
+          if (!cx) recache();
+          burst(cx, cy, 4, false);   // small, cheap (no emoji)
+        }
+      }
+    });
+  }
+
+  const palette = document.getElementById('toy-palette');
+  if (palette) palette.addEventListener('click', () => {
+    const hue = (Math.random() * 360) | 0;
+    document.getElementById('main-menu').style.setProperty('--menu-hue', hue + 'deg');
+    fxRainbow = !fxRainbow;
+    wiggle(palette);
+  });
+
+  const spark = document.getElementById('toy-spark');
+  if (spark) spark.addEventListener('click', () => {
+    const c = centerOf(spark);
+    burst(c.x, c.y - 20, 36, false);
+    wiggle(spark);
+  });
+
+  const boop = document.getElementById('toy-boop');
+  if (boop) {
+    const faces = ['🐸', '😆', '🤪', '😜', '🥳', '😎'];
+    let n = 0;
+    boop.addEventListener('click', () => {
+      boop.textContent = faces[++n % faces.length];
+      wiggle(boop);
+      const c = centerOf(boop);
+      fxParticles.push({
+        kind: 'burst', x: c.x, y: c.y, vx: 0, vy: -120, gravity: 0,
+        life: 0.6, maxLife: 0.6, size: 22, hue: 0, emoji: '💬',
+      });
+    });
+  }
+
+  const disco = document.getElementById('toy-disco');
+  if (disco) disco.addEventListener('click', () => {
+    const menu = document.getElementById('main-menu');
+    menu.classList.toggle('disco');
+    fxRainbow = menu.classList.contains('disco');
+    wiggle(disco);
+  });
+}
+
+function triggerSecretWin(callbacks) {
+  completeAllLevels();
+
+  const menu = document.getElementById('main-menu');
+  // confetti storm
+  const w = window.innerWidth, h = window.innerHeight;
+  for (let i = 0; i < 12; i++) {
+    burst(Math.random() * w, h * (0.2 + Math.random() * 0.3), 30, Math.random() < 0.5);
+  }
+  menu.classList.remove('quake'); void menu.offsetWidth; menu.classList.add('quake');
+
+  const banner = document.getElementById('win-banner');
+  if (banner) {
+    banner.classList.add('show');
+    setTimeout(() => banner.classList.remove('show'), 4200);
+  }
+
+  // refresh menu UI to reflect the new 100% progress
+  buildMainMenu(callbacks);
 }

@@ -1,11 +1,15 @@
 import { loadPlayerData, playerData, markLevelComplete, getMagnetRadius, getStartLives, isStageComplete } from './state.js';
-import { initInput, consumeJump, consumeEsc, clearAll } from './input.js';
+import { initInput, consumeJump, consumeEsc, isAttack, clearAll } from './input.js';
 import { player, initPlayer, updatePlayer, drawPlayer } from './player.js';
 import {
   generateLevel, drawPlatforms, drawHazards, getPlayerSpawn,
   resetDynamics, updateDynamics, hazardHit, GW, GH,
 } from './level.js';
-import { initEntities, updateEntities, drawEntities, exitDoor } from './entities.js';
+import {
+  initEntities, updateEntities, drawEntities, exitDoor,
+  updateEnemies, updateProjectiles, drawEnemies, drawProjectiles,
+  playerMeleeAttack, spawnProjectile,
+} from './entities.js';
 import { drawBackground, getTheme } from './renderer.js';
 import {
   initUI, showScreen, updateHUD, showLevelComplete,
@@ -159,6 +163,17 @@ function gameLoop(timestamp) {
   updatePlayer(dt, levelData.platforms, jumpPressed);
   updateCamera(dt);
 
+  // Combat: attack first so a kill removes the enemy before contact is checked.
+  if (isAttack() && player.attackCD <= 0 && !player.dead) {
+    const weapon = player.weapon;
+    if (weapon.type === 'ranged') spawnProjectile(player, weapon);
+    else playerMeleeAttack(player, weapon);
+    player.attackCD = weapon.cooldown;
+    player.swingT = player.swingDur;
+  }
+  updateProjectiles(dt, levelData.platforms);
+  const enemyRes = updateEnemies(dt, levelData.platforms, player);
+
   const collected = updateEntities(dt, player, getMagnetRadius());
   if (collected > 0) {
     coinsThisLevel += collected;
@@ -167,8 +182,8 @@ function gameLoop(timestamp) {
     updateHUD(currentStage, currentLevel, coinsThisLevel, playerData.coins, lives);
   }
 
-  // Check death (fell off bottom, or touched a hazard)
-  if (player.y > GH + 100 || hazardHit(player, levelData.hazards)) {
+  // Check death (fell off bottom, touched a hazard, or hit by an enemy)
+  if (player.y > GH + 100 || hazardHit(player, levelData.hazards) || enemyRes.playerHit) {
     deathTimer = 0.35;
   }
 
@@ -194,7 +209,9 @@ function renderFrame() {
   drawPlatforms(ctx, levelData.platforms, currentStage, gameTime);
   drawHazards(ctx, levelData.hazards, currentStage);
   drawEntities(ctx, camX, currentStage, gameTime);
+  drawEnemies(ctx, camX, GW, gameTime);
   drawPlayer(ctx, gameTime);
+  drawProjectiles(ctx, camX, GW);
 
   ctx.restore();
 

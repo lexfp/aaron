@@ -344,6 +344,81 @@ function buildLevel(rng, p) {
   return b;
 }
 
+// ─── ENEMY PLACEMENT ─────────────────────────────────────────────────────
+// Scatters enemies across the finished geometry. Ground-bound foes patrol the
+// platform they spawn on; flyers hover in wide gaps. Count, HP and type variety
+// all scale with global progress `p`, and the start pad + exit platform stay
+// clear so spawns and finishes are safe.
+function makeGroundEnemy(pl, rng, p) {
+  const top = pl.y; // player-stand height of this platform
+  const roll = rng();
+  let type, w, h, hp, speed, color, jumpForce, jumpEvery;
+  if (p > 0.40 && roll < 0.18) {
+    type = 'brute'; w = 40; h = 38; hp = 5 + Math.floor(p * 7);
+    speed = lerp(28, 66, p); color = '#6c5ce7';
+  } else if (p > 0.25 && roll < 0.42) {
+    type = 'jumper'; w = 24; h = 24; hp = 2 + Math.floor(p * 3);
+    speed = lerp(30, 70, p); color = '#16a085';
+    jumpForce = lerp(360, 480, p); jumpEvery = lerp(1.8, 1.0, p);
+  } else {
+    type = 'walker'; w = 26; h = 24; hp = 1 + Math.floor(p * 3);
+    speed = lerp(45, 108, p); color = '#c0392b';
+  }
+  if (pl.w < w + 24) return null; // platform too small to patrol
+  const min = pl.x + 4;
+  const max = pl.x + pl.w - 4 - w;
+  const e = {
+    type, x: Math.round(lerp(min, max, rng())), y: Math.round(top - h),
+    w, h, hp, dir: rng() < 0.5 ? -1 : 1, speed, color,
+    patrolMin: Math.round(min), patrolMax: Math.round(max),
+  };
+  if (type === 'jumper') { e.baseY = e.y; e.jumpForce = jumpForce; e.jumpEvery = jumpEvery; e.phase = rng() * jumpEvery; }
+  return e;
+}
+
+function placeEnemies(platforms, rng, p, exitPlat) {
+  const enemies = [];
+  if (p < 0.012) return enemies; // very first level stays enemy-free
+  const density = lerp(0.12, 0.6, p);
+  const CAP = 46;
+
+  // Ground-bound enemies on solid platforms / ground runs.
+  for (const pl of platforms) {
+    if (enemies.length >= CAP) break;
+    if (pl === exitPlat) continue;
+    if (pl.x < 320) continue;            // keep the opening safe
+    if (pl.type === 'move' || pl.type === 'crumble') continue; // unstable footing
+    if (pl.type !== 'ground' && pl.type !== 'normal') continue;
+    if (pl.w < 50) continue;
+    if (rng() >= density) continue;
+    const e = makeGroundEnemy(pl, rng, p);
+    if (e) enemies.push(e);
+  }
+
+  // Flyers hovering in wide gaps.
+  if (p >= 0.12) {
+    const sorted = platforms.filter(pl => pl.type !== 'move').slice().sort((a, b) => a.x - b.x);
+    for (let i = 1; i < sorted.length && enemies.length < CAP; i++) {
+      const a = sorted[i - 1], b = sorted[i];
+      const gap = b.x - (a.x + a.w);
+      if (gap < 200) continue;
+      if (rng() >= lerp(0.1, 0.5, p)) continue;
+      const midX = a.x + a.w + gap / 2;
+      const baseY = clamp(Math.min(a.y, b.y) - lerp(45, 95, p), TOP + 30, FLOOR - 40);
+      enemies.push({
+        type: 'flyer', x: Math.round(midX), y: Math.round(baseY), w: 34, h: 26,
+        hp: 1 + Math.floor(p * 2), dir: 1, color: '#8e44ad',
+        baseX: Math.round(midX), baseY: Math.round(baseY),
+        ampX: Math.min(gap * 0.3, 120), ampY: lerp(15, 42, p),
+        sx: 0.8 + rng() * 0.9, sy: 1.4 + rng() * 1.1, phase: rng() * 6.28,
+        patrolMin: 0, patrolMax: 0,
+      });
+    }
+  }
+
+  return enemies;
+}
+
 export function generateLevel(stageIdx, levelIdx) {
   const seed = stageIdx * 50 + levelIdx + 1;
   const rng = mulberry32(seed);
@@ -369,7 +444,9 @@ export function generateLevel(stageIdx, levelIdx) {
     w: 40, h: 60,
   };
 
-  return { width, height: GH, platforms, coins, hazards, enemies: [], exit, stageIdx, levelIdx };
+  const enemies = placeEnemies(platforms, rng, p, lastPlat);
+
+  return { width, height: GH, platforms, coins, hazards, enemies, exit, stageIdx, levelIdx };
 }
 
 export function getPlayerSpawn(levelData) {
