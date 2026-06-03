@@ -11,7 +11,7 @@ const STOMP_DAMAGE = 2;   // a head-stomp deals this much (kills 1-2 HP foes)
 const STOMP_BOUNCE = 430; // upward velocity given to the player after a stomp
 const INVULN_TIME = 0.9;  // player i-frames after taking a contact hit
 // HP a side-contact hit drains from the player (out of 100), per enemy type.
-const CONTACT_DAMAGE = { walker: 12, jumper: 14, brute: 25, flyer: 10 };
+const CONTACT_DAMAGE = { walker: 6, jumper: 8, brute: 15, flyer: 5 };
 
 export let exitDoor = null;
 

@@ -23,6 +23,26 @@ html, body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   color: var(--text);
   user-select: none;
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+}
+
+/* Dark, theme-matched scrollbars for the scrollable overlays (shop, grids). */
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); background-clip: content-box; }
+
+/* Clear keyboard-focus ring (mouse clicks stay clean via :focus-visible). */
+button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ===== CANVAS / GAME WRAP ===== */
@@ -112,6 +132,20 @@ html, body {
   max-width: 700px;
   padding: 24px 20px;
 }
+
+/* Content screens can grow taller than the viewport (full shop, 50-level grid).
+   A vertically-centered flex child gets its top clipped and is unreachable by
+   scroll, so these scroll from the top instead — nothing is cut off. */
+#shop-overlay, #stage-select, #level-select {
+  justify-content: flex-start;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+/* Keep the inner column padded away from the very top/bottom edges while scrolled. */
+#shop-overlay .screen-inner,
+#stage-select .screen-inner,
+#level-select .screen-inner { padding-block: 32px; margin: auto 0; }
 
 .screen-header {
   display: flex;
