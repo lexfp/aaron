@@ -1,0 +1,21 @@
+node_modules/
+
+# Dark factory throwaway artifacts (regenerated per run)
+tests/playwright/dark-factory-*.spec.ts
+tests/playwright/.results/
+
+# Per-run holdout settings — created by B.4, deleted by B.6 teardown.
+# If a run crashes this may be left behind; resume protocol cleans it.
+.claude/settings.json
+
+# Engine checkpoint outputs (regenerated each engine pass)
+darkfactory/attractor/checkpoints/last-outcome.json
+darkfactory/attractor/checkpoints/outcome-verdict.txt
+darkfactory/attractor/checkpoints/triage-feedback.txt
+darkfactory/attractor/checkpoints/validation-errors.json
+darkfactory/attractor/checkpoints/quick-test.stdout.log
+darkfactory/attractor/checkpoints/quick-test.stderr.log
+darkfactory/attractor/checkpoints/ci.stdout.log
+darkfactory/attractor/checkpoints/ci.stderr.log
+darkfactory/attractor/checkpoints/scenario-results.json
+darkfactory/attractor/checkpoints/scenario-failures.txt

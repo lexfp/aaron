@@ -1,0 +1,5 @@
+{
+  "_comment": "Auto-resolve allow-list for B.1 rebase and C.2 merge. Add CI-bot-regenerated paths as they emerge; never add product source files.",
+  "take_specs": ["platformer/docs/TEST-REPORT.md"],
+  "take_theirs_on_rebase": ["platformer/docs/TEST-REPORT.md"]
+}
