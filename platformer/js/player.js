@@ -59,6 +59,13 @@ export function initPlayer(spawnX, spawnY) {
 export function updatePlayer(dt, platforms, jumpJustPressed) {
   if (player.dead) return;
 
+  // Ride moving platforms: if grounded on one last frame, inherit its motion
+  // this frame so the player stays attached instead of sliding off.
+  if (player.onGround && player._groundPlat && player._groundPlat.type === 'move') {
+    player.x += player._groundPlat._dx || 0;
+    player.y += player._groundPlat._dy || 0;
+  }
+
   // Jump buffer
   if (jumpJustPressed) player.jumpBufferTimer = 0.085;
   else if (player.jumpBufferTimer > 0) player.jumpBufferTimer = Math.max(0, player.jumpBufferTimer - dt);

@@ -1,7 +1,10 @@
 import { loadPlayerData, playerData, markLevelComplete, getMagnetRadius, getStartLives, isStageComplete } from './state.js';
 import { initInput, consumeJump, consumeEsc, clearAll } from './input.js';
 import { player, initPlayer, updatePlayer, drawPlayer } from './player.js';
-import { generateLevel, drawPlatforms, getPlayerSpawn, GW, GH } from './level.js';
+import {
+  generateLevel, drawPlatforms, drawHazards, getPlayerSpawn,
+  resetDynamics, updateDynamics, hazardHit, GW, GH,
+} from './level.js';
 import { initEntities, updateEntities, drawEntities, exitDoor } from './entities.js';
 import { drawBackground, getTheme } from './renderer.js';
 import {
@@ -53,6 +56,7 @@ function startLevel(stage, level) {
   const spawn = getPlayerSpawn(levelData);
   initPlayer(spawn.x, spawn.y);
   initEntities(levelData);
+  resetDynamics(levelData);
 
   camX = 0;
   coinsThisLevel = 0;
@@ -73,6 +77,7 @@ function respawnPlayer() {
   const spawn = getPlayerSpawn(levelData);
   initPlayer(spawn.x, spawn.y);
   initEntities(levelData); // reset coins for this attempt
+  resetDynamics(levelData); // reset moving/crumbling platforms
   camX = 0;
   coinsThisLevel = 0;
 }
@@ -149,6 +154,7 @@ function gameLoop(timestamp) {
   }
 
   // Update game logic
+  updateDynamics(dt, levelData);
   const jumpPressed = consumeJump();
   updatePlayer(dt, levelData.platforms, jumpPressed);
   updateCamera(dt);
@@ -161,8 +167,8 @@ function gameLoop(timestamp) {
     updateHUD(currentStage, currentLevel, coinsThisLevel, playerData.coins, lives);
   }
 
-  // Check death (fell off bottom)
-  if (player.y > GH + 100) {
+  // Check death (fell off bottom, or touched a hazard)
+  if (player.y > GH + 100 || hazardHit(player, levelData.hazards)) {
     deathTimer = 0.35;
   }
 
@@ -185,7 +191,8 @@ function renderFrame() {
   ctx.save();
   ctx.translate(-Math.round(camX), 0);
 
-  drawPlatforms(ctx, levelData.platforms, currentStage);
+  drawPlatforms(ctx, levelData.platforms, currentStage, gameTime);
+  drawHazards(ctx, levelData.hazards, currentStage);
   drawEntities(ctx, camX, currentStage, gameTime);
   drawPlayer(ctx, gameTime);
 

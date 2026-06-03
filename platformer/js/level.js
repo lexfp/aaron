@@ -14,27 +14,28 @@ export const GW = 800;
 export const GH = 500;
 export const GROUND_Y = 430;
 
+// Vertical bounds for placing standable surfaces.
+const TOP = 80;            // ceiling clearance
+const FLOOR = GROUND_Y - 20; // 410 — comfortable baseline platform top
+// Most you can climb in a single jump (keeps every required leap reachable).
+const MAX_RISE = 95;
+
+// Crumble timing (seconds): how long after you land before it drops, and
+// how long until it regenerates so retries stay possible.
+const CRUMBLE_DELAY = 0.42;
+const CRUMBLE_REGEN = 2.8;
+
 function lerp(a, b, t) { return a + (b - a) * t; }
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-function ri(rng, lo, hi) { return Math.round(lerp(lo, hi, rng())); }
 
-function mkPlat(x, y, w) {
-  return { x: Math.round(x), y: Math.round(y), w: Math.max(28, Math.round(w)), h: 20, type: 'normal' };
+function mkP(x, y, w, type = 'normal') {
+  return { x: Math.round(x), y: Math.round(y), w: Math.max(40, Math.round(w)), h: 20, type };
 }
 function mkGround(x, w) {
   return { x: Math.round(x), y: GROUND_Y, w: Math.max(1, Math.round(w)), h: GH - GROUND_Y, type: 'ground' };
 }
 function mkCoin(x, y, spin) {
   return { x: Math.round(x), y: Math.round(y), collected: false, spinAngle: spin };
-}
-
-function platCoins(coins, plat, rng, chance) {
-  if (rng() >= chance) return;
-  const n = 1 + Math.floor(rng() * 4);
-  const sp = plat.w / (n + 1);
-  for (let c = 0; c < n; c++) {
-    coins.push(mkCoin(plat.x + sp * (c + 1) - 8, plat.y - 36, rng() * Math.PI * 2));
-  }
 }
 
 function nCoins(coins, plat, n, rng) {
@@ -44,7 +45,8 @@ function nCoins(coins, plat, n, rng) {
   }
 }
 
-// Parabolic arc of coins from (x1,y1) to (x2,y2), peaking upward by arcH px
+// Parabolic arc of coins from (x1,y1) to (x2,y2), peaking upward by arcH px.
+// Doubles as a readable "this is the path" hint over every jump.
 function arcCoins(coins, x1, y1, x2, y2, n, rng, arcH = 55) {
   for (let i = 0; i < n; i++) {
     const t = (i + 1) / (n + 1);
@@ -54,335 +56,311 @@ function arcCoins(coins, x1, y1, x2, y2, n, rng, arcH = 55) {
   }
 }
 
-// ─── ARCHETYPE GENERATORS ────────────────────────────────────────────────────
-// Each returns { platforms, coins, needsGround, forcedWidth? }
-// Caller adds ground and starting platform separately.
-// Generators begin placing platforms after x=220 (right edge of starting pad).
+// ─── BUILDER ───────────────────────────────────────────────────────────────
+// A cursor that walks left→right. `x` is the right edge of the last placed
+// surface, `y` is the top of that surface (where the player would stand).
+// Segments append to it and leave the cursor on their final landing spot, so
+// any two segments connect cleanly — that's what gives levels a deliberate,
+// hand-built flow instead of one long random walk.
 
-// 1. STANDARD — random walk, varied heights
-function genStandard(rng, p, lw) {
-  const minW = lerp(170, 60, p), maxW = lerp(250, 95, p);
-  const minG = lerp(70, 90, p), maxG = lerp(140, 210, p);
-  const dy = lerp(50, 140, p);
-  const ceil = GROUND_Y - lerp(130, 280, p);
-  const platforms = [], coins = [];
-  let cx = 220, cy = GROUND_Y - 20;
-
-  while (cx < lw - 380) {
-    const gap = lerp(minG, maxG, rng()), w = lerp(minW, maxW, rng());
-    const ny = clamp(cy + (rng() - 0.5) * dy * 2, ceil, GROUND_Y - 20);
-    const pl = mkPlat(cx + gap, ny, w);
-    platforms.push(pl);
-    platCoins(coins, pl, rng, 0.65);
-    cx = pl.x + pl.w; cy = ny;
-  }
-  return { platforms, coins, needsGround: true };
+// Place a single platform `gap` px past the cursor, at height `y`, with a coin
+// arc tracing the jump. Returns the platform.
+function connect(b, gap, y, w, type, arcH, coinN) {
+  y = clamp(y, TOP, FLOOR);
+  y = Math.max(y, b.y - MAX_RISE); // never demand more than one jump's worth of climb
+  const fromX = b.x, fromY = b.y;
+  const pl = mkP(b.x + gap, y, w, type || 'normal');
+  b.plats.push(pl);
+  if (coinN > 0) arcCoins(b.coins, fromX, fromY, pl.x + pl.w / 2, y, coinN, b.rng, arcH == null ? 50 : arcH);
+  b.x = pl.x + pl.w; b.y = y;
+  return pl;
 }
 
-// 2. STAIRCASE — rhythmic ascending/descending steps, coin arcs show the path
-function genStaircase(rng, p, lw) {
-  const stepW = lerp(100, 55, p), gap = lerp(70, 100, p), rise = lerp(35, 55, p);
-  const ceil = GROUND_Y - lerp(160, 310, p);
-  const platforms = [], coins = [];
-  let cx = 220, cy = GROUND_Y - 20, ascending = true;
-
-  while (cx < lw - 380) {
-    const g = gap + rng() * 22, w = stepW + rng() * 38;
-    const ny = ascending
-      ? Math.max(ceil, cy - rise - rng() * 18)
-      : Math.min(GROUND_Y - 20, cy + rise + rng() * 18);
-    const pl = mkPlat(cx + g, ny, w);
-    platforms.push(pl);
-
-    // Coin arc from previous platform right edge to new platform centre
-    arcCoins(coins, cx, cy, pl.x + w / 2, ny, 3, rng, 38);
-
-    cx = pl.x + pl.w; cy = ny;
-    if (ascending && cy <= ceil + 45) ascending = false;
-    else if (!ascending && cy >= GROUND_Y - 35) ascending = true;
+// Add a row of spikes. dir 'up' sits on a surface (jump over it); dir 'down'
+// hangs from a ceiling (don't jump into it).
+function addSpikes(b, x, topY, count, dir, size) {
+  size = size || 20;
+  for (let i = 0; i < count; i++) {
+    const y = dir === 'down' ? topY : topY - size;
+    b.hazards.push({ x: Math.round(x + i * size), y: Math.round(y), w: size, h: size, dir });
   }
-  return { platforms, coins, needsGround: true };
 }
 
-// 3. ZIGZAG — strict high/low alternation, coins at each jump peak
-function genZigzag(rng, p, lw) {
-  const hiY = GROUND_Y - lerp(155, 305, p);
-  const loY = GROUND_Y - lerp(42, 88, p);
-  const w = lerp(115, 62, p), gap = lerp(95, 148, p);
-  const platforms = [], coins = [];
-  let cx = 220, high = false, prevCX = 220, prevCY = GROUND_Y - 20;
+// ─── SEGMENTS ────────────────────────────────────────────────────────────────
+// Each segment is one recognizable, intentional challenge. They are tuned by an
+// effective difficulty `e` (0..1) so the same segment reads as gentle early and
+// brutal late. Signature: (b, e).
 
-  while (cx < lw - 380) {
-    const g = gap + rng() * 38, pw = w + rng() * 45;
-    const ny = high ? hiY + rng() * 28 : loY + rng() * 22;
-    const pl = mkPlat(cx + g, ny, pw);
-    platforms.push(pl);
-
-    // Coins forming the jump arc
-    arcCoins(coins, prevCX, prevCY, pl.x + pw / 2, ny, 4, rng, high ? 75 : 38);
-
-    prevCX = pl.x + pw / 2; prevCY = ny;
-    cx = pl.x + pl.w;
-    high = !high;
-  }
-  return { platforms, coins, needsGround: true };
+// Safe breather — used to pace the level so it has rhythm, not a wall of hazards.
+function segRest(b, e) {
+  const gap = lerp(70, 95, e);
+  const w = lerp(195, 150, e);
+  const y = clamp(b.y + (b.rng() - 0.5) * 36, TOP + 130, FLOOR);
+  const pl = connect(b, gap, y, w, 'normal', 38, 0);
+  nCoins(b.coins, pl, 3, b.rng);
 }
 
-// 4. PIT — ground runs with lethal gaps, coins arc over each chasm
-function genPit(rng, p, lw) {
-  const numPits = 3 + Math.floor(p * 5 + rng() * 2);
-  const groundLen = lerp(175, 105, p);
-  const pitW = lerp(125, 230, p);
-  const midPlatChance = lerp(0.7, 0.2, p); // fewer mid-pit platforms as it gets harder
-
-  const platforms = [], coins = [];
-  let cx = 0;
-
-  // Starting ground
-  platforms.push(mkGround(0, 240));
-
-  for (let i = 0; i < numPits; i++) {
-    cx = 240 + i * (groundLen + pitW + rng() * 60);
-
-    // Ground run
-    const gl = groundLen + rng() * 70;
-    platforms.push(mkGround(cx, gl));
-    // Coins on the ground run
-    const nc = 2 + Math.floor(rng() * 3);
-    for (let c = 0; c < nc; c++) {
-      coins.push(mkCoin(cx + gl * (c + 1) / (nc + 1) - 8, GROUND_Y - 36, rng() * Math.PI * 2));
-    }
-
-    // Pit
-    const pw = pitW + rng() * 65;
-    const pitX = cx + gl;
-    if (rng() < midPlatChance) {
-      // Small floating platform mid-pit
-      const py = GROUND_Y - lerp(85, 165, p) - rng() * 45;
-      const mpw = 48 + rng() * 38;
-      const mpl = mkPlat(pitX + (pw - mpw) / 2, py, mpw);
-      platforms.push(mpl);
-      nCoins(coins, mpl, 2 + Math.floor(rng() * 2), rng);
-    } else {
-      // Just coins in arc over the void
-      arcCoins(coins, pitX, GROUND_Y - 20, pitX + pw, GROUND_Y - 20, 5, rng, 90);
-    }
+// Rhythm jumps — evenly spaced equal platforms. Clean, metronomic.
+function segGapRun(b, e) {
+  const n = 3 + Math.floor(b.rng() * 3);
+  const gap = lerp(115, 200, e);
+  const w = lerp(135, 80, e);
+  const baseY = clamp(b.y - lerp(0, 45, e), TOP + 90, FLOOR);
+  for (let i = 0; i < n; i++) {
+    connect(b, gap + b.rng() * 18, baseY + (b.rng() - 0.5) * 32, w, 'normal', 52, 2);
   }
-
-  // Final ground + end pad
-  const endX = 240 + numPits * (groundLen + pitW + 60) + 60;
-  platforms.push(mkGround(endX, 240));
-  const endPl = mkPlat(endX + 50, GROUND_Y - 20, 120);
-  platforms.push(endPl);
-  nCoins(coins, endPl, 3, rng);
-
-  const fw = endX + 260;
-  return { platforms, coins, needsGround: false, forcedWidth: fw };
 }
 
-// 5. HIGHRISE — all platforms packed near the ceiling, deadly fall below
-function genHighrise(rng, p, lw) {
-  const zTop = GROUND_Y - lerp(185, 340, p);
-  const zH = lerp(85, 50, p);
-  const w = lerp(112, 55, p), gap = lerp(82, 152, p);
-  const platforms = [], coins = [];
-  let cx = 220, cy = zTop + zH * 0.5;
-
-  while (cx < lw - 380) {
-    const g = gap + rng() * 55, pw = w + rng() * 42;
-    const ny = clamp(cy + (rng() - 0.5) * zH * 2, zTop, zTop + zH);
-    const pl = mkPlat(cx + g, ny, pw);
-    platforms.push(pl);
-
-    // Coin above (normal)
-    if (rng() < 0.8) coins.push(mkCoin(pl.x + pw / 2 - 8, pl.y - 36, rng() * Math.PI * 2));
-    // Coin below platform (risky — must hop off and land on platform below or die)
-    if (rng() < 0.28) coins.push(mkCoin(pl.x + pw / 2 - 8, pl.y + 65, rng() * Math.PI * 2));
-
-    cx = pl.x + pl.w; cy = ny;
-  }
-  return { platforms, coins, needsGround: true };
+// Ascending staircase — uniform steps, one coin per step.
+function segStairsUp(b, e) {
+  const n = 4 + Math.floor(b.rng() * 3);
+  const rise = lerp(48, 78, e);
+  const gap = lerp(78, 116, e);
+  const w = lerp(120, 74, e);
+  for (let i = 0; i < n; i++) connect(b, gap, b.y - rise, w, 'normal', 28, 1);
 }
 
-// 6. LONG JUMP — very few platforms, each needs near-maximum jump distance
-function genLongJump(rng, p, lw) {
-  const gap = lerp(168, 245, p); // near max double-jump range
-  const w = lerp(148, 80, p);
-  const ceil = GROUND_Y - lerp(135, 265, p);
-  const platforms = [], coins = [];
-  let cx = 220, cy = GROUND_Y - 20;
-
-  while (cx < lw - 380) {
-    const g = gap + rng() * 32, pw = w + rng() * 55;
-    const ny = clamp(cy + (rng() - 0.5) * 115, ceil, GROUND_Y - 20);
-    const pl = mkPlat(cx + g, ny, pw);
-    platforms.push(pl);
-
-    // Generous coin reward on the platform
-    nCoins(coins, pl, 3 + Math.floor(rng() * 4), rng);
-    // Coin trail showing the jump trajectory
-    arcCoins(coins, cx, cy, pl.x + pw / 2, ny, 4, rng, 65);
-
-    cx = pl.x + pl.w; cy = ny;
-  }
-  return { platforms, coins, needsGround: true };
+// Descending staircase — quick drops are free, so this is a tempo break.
+function segStairsDown(b, e) {
+  const n = 4 + Math.floor(b.rng() * 3);
+  const drop = lerp(42, 92, e);
+  const gap = lerp(82, 124, e);
+  const w = lerp(122, 76, e);
+  for (let i = 0; i < n; i++) connect(b, gap, b.y + drop, w, 'normal', 24, 1);
 }
 
-// 7. FLAT BURST — densely packed small platforms at similar heights, fast-paced
-function genFlat(rng, p, lw) {
-  const baseY = GROUND_Y - lerp(85, 205, p);
-  const w = lerp(68, 38, p), gap = lerp(38, 68, p);
-  const wobble = lerp(22, 55, p);
-  const ceil = GROUND_Y - lerp(250, 360, p);
-  const platforms = [], coins = [];
-  let cx = 220;
-
-  while (cx < lw - 380) {
-    const g = gap + rng() * 28, pw = w + rng() * 42;
-    const ny = clamp(baseY + (rng() - 0.5) * wobble * 2, ceil, GROUND_Y - 22);
-    const pl = mkPlat(cx + g, ny, pw);
-    platforms.push(pl);
-    if (rng() < 0.55) coins.push(mkCoin(pl.x + pw / 2 - 8, pl.y - 36, rng() * Math.PI * 2));
-    cx = pl.x + pl.w;
+// Precision pillars — narrow posts alternating around a center line.
+function segPillars(b, e) {
+  const n = 4 + Math.floor(b.rng() * 4);
+  const w = lerp(74, 44, e);
+  const gap = lerp(96, 150, e);
+  const amp = lerp(28, 70, e);
+  const center = clamp(b.y - 18, TOP + 130, FLOOR - 40);
+  for (let i = 0; i < n; i++) {
+    connect(b, gap, center + (i % 2 ? amp : -amp), w, 'normal', 58, 1);
   }
-  return { platforms, coins, needsGround: true };
 }
 
-// 8. TOWER — approach run, then zigzag vertical climb, coin jackpot at top
-function genTower(rng, p, lw) {
-  const tW = lerp(95, 58, p); // horizontal spread
-  const stepH = lerp(55, 33, p);
-  const pw = lerp(80, 46, p);
-  const platforms = [], coins = [];
-  let cx = 220;
-
-  while (cx < lw - 420) {
-    // Approach gap
-    cx += lerp(120, 75, p) + rng() * 60;
-
-    const tTop = GROUND_Y - lerp(200, 368, p) - rng() * 40;
-    let ty = GROUND_Y - 20, side = rng() > 0.5 ? 1 : -1;
-    const txC = cx;
-
-    while (ty > tTop) {
-      const sx = txC + side * (tW / 2) - pw / 2 + (rng() - 0.5) * 12;
-      const pl = mkPlat(sx, ty, pw + rng() * 22);
-      platforms.push(pl);
-      coins.push(mkCoin(pl.x + pl.w / 2 - 8, pl.y - 36, rng() * Math.PI * 2));
-      ty -= stepH + rng() * 14;
-      side = -side;
-    }
-
-    // Top landing with bonus coins
-    const topPl = mkPlat(txC - pw, tTop, pw * 2.5);
-    platforms.push(topPl);
-    nCoins(coins, topPl, 4 + Math.floor(rng() * 3), rng);
-
-    cx = txC + tW + lerp(88, 55, p);
+// Zigzag climb — alternating up/down while gaining altitude.
+function segZigzag(b, e) {
+  const n = 4 + Math.floor(b.rng() * 3);
+  const w = lerp(96, 60, e);
+  const gap = lerp(90, 140, e);
+  let up = true;
+  for (let i = 0; i < n; i++) {
+    const dy = up ? -lerp(40, 72, e) : lerp(20, 42, e);
+    connect(b, gap, b.y + dy, w, 'normal', 54, 1);
+    up = !up;
   }
-  return { platforms, coins, needsGround: true };
 }
 
-// 9. DESCENT — start high via a launch pad, descend, then climb back
-function genDescent(rng, p, lw) {
-  const startY = GROUND_Y - lerp(185, 315, p);
-  const sw = lerp(110, 60, p), gap = lerp(75, 112, p), step = lerp(35, 62, p);
-  const platforms = [], coins = [];
-
-  // High launch pad
-  const launchPl = mkPlat(300, startY, lerp(165, 90, p));
-  platforms.push(launchPl);
-  nCoins(coins, launchPl, 3, rng);
-
-  let cx = launchPl.x + launchPl.w, cy = startY;
-  let phase = 'down';
-  const bot = GROUND_Y - 28;
-
-  while (cx < lw - 380) {
-    const g = gap + rng() * 30, w = sw + rng() * 38;
-    let ny;
-    if (phase === 'down') {
-      ny = Math.min(bot, cy + step + rng() * 22);
-      if (ny >= bot - 20) phase = 'bottom';
-    } else if (phase === 'bottom') {
-      ny = clamp(cy + (rng() - 0.5) * 30, bot - 28, bot);
-      if (rng() > 0.55) phase = 'up';
-    } else {
-      ny = Math.max(startY, cy - step - rng() * 22);
-      if (ny <= startY + 22) phase = 'down';
-    }
-
-    const pl = mkPlat(cx + g, ny, w);
-    platforms.push(pl);
-    coins.push(mkCoin(pl.x + pl.w / 2 - 8, pl.y - 36, rng() * Math.PI * 2));
-    cx = pl.x + pl.w; cy = ny;
+// Long leaps — a couple of near-max double-jump gaps with a fat coin trail.
+function segLongLeap(b, e) {
+  const n = 2 + Math.floor(b.rng() * 2);
+  const gap = lerp(185, 248, e);
+  const w = lerp(140, 92, e);
+  for (let i = 0; i < n; i++) {
+    connect(b, gap + b.rng() * 8, b.y + (b.rng() - 0.5) * 56, w, 'normal', 82, 4);
   }
-  return { platforms, coins, needsGround: true };
 }
 
-// 10. SPRINT — shorter level, tiny rapid-fire platforms, punishing gaps
-function genSprint(rng, p, lw) {
-  const sw = lerp(58, 35, p), gap = lerp(52, 82, p);
-  const ceil = GROUND_Y - lerp(105, 225, p);
-  const bw = lerp(45, 95, p); // vertical band
-  const sprintW = Math.round(lerp(750, 1700, p)); // always shorter than lw
-  const platforms = [], coins = [];
-  let cx = 220, cy = GROUND_Y - 20;
-
-  while (cx < sprintW - 280) {
-    const g = gap + rng() * 32, pw = sw + rng() * 38;
-    const ny = clamp(cy + (rng() - 0.5) * bw * 2, ceil, GROUND_Y - 20);
-    const pl = mkPlat(cx + g, ny, pw);
-    platforms.push(pl);
-    if (rng() < 0.62) coins.push(mkCoin(pl.x + pw / 2 - 8, pl.y - 36, rng() * Math.PI * 2));
-    cx = pl.x + pl.w; cy = ny;
+// Descent shaft — controlled drop down a stack of ledges.
+function segDescentDrop(b, e) {
+  const n = 2 + Math.floor(b.rng() * 2);
+  const w = lerp(112, 72, e);
+  for (let i = 0; i < n; i++) {
+    connect(b, lerp(58, 92, e), b.y + lerp(70, 120, e), w, 'normal', 22, 1);
   }
-  return { platforms, coins, needsGround: true, forcedWidth: sprintW + 100 };
 }
 
-// ─── ARCHETYPE SELECTION ──────────────────────────────────────────────────────
-const ARCHETYPE_NAMES = [
-  'standard', 'staircase', 'zigzag', 'pit',
-  'highrise', 'longjump', 'flat', 'tower',
-  'descent', 'sprint',
+// Ground run studded with spike clusters you must hop over.
+function segSpikePath(b, e) {
+  connect(b, lerp(42, 72, e), FLOOR, 92, 'normal', 30, 1); // step down to ground level
+  const runLen = lerp(520, 820, e);
+  const gx = b.x + 8;
+  b.plats.push(mkGround(gx, runLen));
+  const clusters = 2 + Math.floor(e * 3 + b.rng() * 2);
+  for (let k = 0; k < clusters; k++) {
+    const cxk = gx + runLen * (k + 1) / (clusters + 1) - 20;
+    const cnt = 1 + Math.floor(e * 2 + b.rng() * 2);
+    addSpikes(b, cxk, GROUND_Y, cnt, 'up', 20);
+    arcCoins(b.coins, cxk - 22, GROUND_Y - 20, cxk + cnt * 20 + 22, GROUND_Y - 20, 3, b.rng, 62);
+  }
+  b.x = gx + runLen; b.y = GROUND_Y;
+}
+
+// Horizontal moving platform ferrying you across a void. Timing puzzle.
+function segMovingBridge(b, e) {
+  connect(b, lerp(80, 110, e), b.y + (b.rng() - 0.5) * 28, lerp(120, 90, e), 'normal', 40, 1);
+  const range = lerp(140, 240, e);
+  const mw = lerp(96, 64, e);
+  const my = clamp(b.y + (b.rng() - 0.5) * 18, TOP + 80, FLOOR);
+  const baseX = b.x + lerp(40, 70, e);
+  const mp = mkP(baseX, my, mw, 'move');
+  mp.move = { axis: 'x', baseX, baseY: my, max: baseX + range, speed: lerp(1.4, 2.4, e), phase: b.rng() * 6.28 };
+  b.plats.push(mp);
+  const landX = baseX + range + lerp(150, 230, e);
+  const ly = clamp(my + (b.rng() - 0.5) * 28, TOP + 80, FLOOR);
+  const lp = mkP(landX, ly, lerp(130, 92, e), 'normal');
+  b.plats.push(lp);
+  arcCoins(b.coins, baseX, my, landX, ly, 4, b.rng, 50);
+  nCoins(b.coins, lp, 2, b.rng);
+  b.x = lp.x + lp.w; b.y = ly;
+}
+
+// Vertical elevator lifting you up a shaft to a higher ledge.
+function segElevator(b, e) {
+  connect(b, lerp(80, 110, e), Math.min(FLOOR, b.y + lerp(0, 40, e)), lerp(120, 90, e), 'normal', 40, 1);
+  const bottom = b.y;
+  const rise = lerp(120, 205, e);
+  const top = clamp(bottom - rise, TOP + 40, FLOOR);
+  const mw = lerp(102, 70, e);
+  const baseX = b.x + lerp(50, 80, e);
+  const mp = mkP(baseX, bottom, mw, 'move');
+  mp.move = { axis: 'y', baseX, baseY: bottom, max: top, speed: lerp(1.0, 1.7, e), phase: 0 };
+  b.plats.push(mp);
+  const lp = mkP(baseX + mw + lerp(40, 70, e), top, lerp(122, 86, e), 'normal');
+  b.plats.push(lp);
+  for (let i = 0; i < 4; i++) {
+    b.coins.push(mkCoin(baseX + mw / 2 - 8, bottom - (i + 1) * (rise / 5), b.rng() * 6.28));
+  }
+  nCoins(b.coins, lp, 2, b.rng);
+  b.x = lp.x + lp.w; b.y = top;
+}
+
+// Low corridor with ceiling spikes — a single jump clears each gap, but a
+// double jump skewers you. Punishes panic-jumping.
+function segGauntlet(b, e) {
+  const n = 3 + Math.floor(b.rng() * 2);
+  const w = lerp(112, 78, e);
+  const gap = lerp(80, 120, e);
+  for (let i = 0; i < n; i++) {
+    const pl = connect(b, gap, clamp(b.y + (b.rng() - 0.5) * 18, FLOOR - 70, FLOOR), w, 'normal', 26, 1);
+    const ceilY = pl.y - lerp(178, 150, e); // high enough that a single jump clears, a double doesn't
+    addSpikes(b, pl.x + 6, ceilY, Math.max(2, Math.floor(pl.w / 20) - 1), 'down', 18);
+  }
+}
+
+// Crumbling platforms that fall away seconds after you touch them — keep moving.
+function segCrumbleRun(b, e) {
+  const n = 3 + Math.floor(b.rng() * 3);
+  const w = lerp(98, 66, e);
+  const gap = lerp(95, 148, e);
+  for (let i = 0; i < n; i++) {
+    connect(b, gap, b.y + (b.rng() - 0.5) * 28, w, 'crumble', 50, 1);
+  }
+  connect(b, gap, b.y, lerp(122, 92, e), 'normal', 40, 2); // solid landing to recover
+}
+
+// One big leap over an open spike pit — miss and you're impaled.
+function segSpikeLeap(b, e) {
+  connect(b, lerp(80, 110, e), b.y, lerp(110, 82, e), 'normal', 28, 1);
+  const gap = lerp(190, 250, e);
+  const pitX = b.x + 30;
+  const pitW = gap - 30;
+  const sCount = Math.max(2, Math.floor(pitW / 22));
+  addSpikes(b, pitX, GROUND_Y, sCount, 'up', 22);
+  connect(b, gap, b.y + (b.rng() - 0.5) * 28, lerp(122, 92, e), 'normal', 86, 4);
+}
+
+// Reward vault — a wide safe platform with a patterned coin payout. Adds
+// authored "set piece" flavor and a moment to breathe.
+function segCoinVault(b, e) {
+  const pl = connect(b, lerp(70, 100, e), clamp(b.y + (b.rng() - 0.5) * 28, TOP + 130, FLOOR), lerp(210, 160, e), 'normal', 40, 0);
+  arcCoins(b.coins, pl.x + 12, pl.y - 8, pl.x + pl.w - 12, pl.y - 8, 6, b.rng, 72);
+  nCoins(b.coins, pl, 4, b.rng);
+}
+
+// Final approach — a generous platform that hosts the exit door.
+function segFinish(b) {
+  const pl = connect(b, 105, clamp(b.y, TOP + 130, FLOOR), 210, 'normal', 45, 0);
+  nCoins(b.coins, pl, 5, b.rng);
+}
+
+// ─── SEGMENT TABLE & SELECTION ───────────────────────────────────────────────
+// tier: 0 easy, 1 medium, 2 hard. gate: minimum global progress before a
+// mechanic is allowed to appear (so stage 1 doesn't open with crumble + spikes).
+const SEGMENTS = [
+  { fn: segGapRun, tier: 0, gate: 0 },
+  { fn: segStairsUp, tier: 0, gate: 0 },
+  { fn: segStairsDown, tier: 0, gate: 0 },
+  { fn: segCoinVault, tier: 0, gate: 0 },
+  { fn: segPillars, tier: 1, gate: 0 },
+  { fn: segZigzag, tier: 1, gate: 0 },
+  { fn: segLongLeap, tier: 1, gate: 0 },
+  { fn: segDescentDrop, tier: 1, gate: 0 },
+  { fn: segSpikePath, tier: 1, gate: 0.03 },
+  { fn: segMovingBridge, tier: 2, gate: 0.06 },
+  { fn: segElevator, tier: 2, gate: 0.06 },
+  { fn: segGauntlet, tier: 2, gate: 0.10 },
+  { fn: segCrumbleRun, tier: 2, gate: 0.16 },
+  { fn: segSpikeLeap, tier: 2, gate: 0.20 },
 ];
-const GENERATORS = {
-  standard: genStandard, staircase: genStaircase, zigzag: genZigzag, pit: genPit,
-  highrise: genHighrise, longjump: genLongJump, flat: genFlat, tower: genTower,
-  descent: genDescent, sprint: genSprint,
-};
 
-function selectArchetype(stageIdx, levelIdx) {
-  // Each stage has a phase-shifted rotation so consecutive levels differ
-  // AND same levelIdx in different stages gets a different archetype
-  const idx = (levelIdx + stageIdx * 3) % ARCHETYPE_NAMES.length;
-  return ARCHETYPE_NAMES[idx];
+function pickSegment(b, e, last) {
+  const desired = e < 0.34 ? 0 : e < 0.66 ? 1 : 2;
+  let pool = SEGMENTS.filter(s => b.p >= s.gate && s.tier <= desired && s.tier >= desired - 1 && s.fn !== last);
+  if (!pool.length) pool = SEGMENTS.filter(s => b.p >= s.gate && s.tier <= desired && s.fn !== last);
+  if (!pool.length) pool = SEGMENTS.filter(s => b.p >= s.gate);
+  if (!pool.length) pool = [SEGMENTS[0]];
+  return pool[Math.floor(b.rng() * pool.length)];
 }
 
-// ─── MAIN GENERATOR ──────────────────────────────────────────────────────────
+// ─── LEVEL ASSEMBLY ──────────────────────────────────────────────────────────
+// Builds the level as an intentional arc: warm-up → escalating challenges
+// (paced with breathers) → a hard climax → the exit approach. Difficulty ramps
+// both across the 500 levels (global `p`) and within each level (local `e`).
+function buildLevel(rng, p) {
+  const b = { rng, p, x: 220, y: FLOOR, plats: [], coins: [], hazards: [] };
+  const targetW = lerp(5500, 24000, p); // 5× the old 1100→4800 range
+
+  segRest(b, 0.08); // gentle landing right after the start pad
+
+  let last = null;
+  let sinceRest = 0;
+  let guard = 0;
+  while (b.x < targetW - 900 && guard++ < 600) {
+    const f = clamp(b.x / targetW, 0, 1);
+    const localE = lerp(0.12, 1.0, f);
+    const e = clamp(p * 0.45 + localE * 0.55, 0, 1);
+
+    // Insert a breather every few segments so the level has rhythm.
+    if (sinceRest >= 2 + Math.floor(rng() * 2)) {
+      segRest(b, e); sinceRest = 0; continue;
+    }
+
+    const seg = pickSegment(b, e, last);
+    seg.fn(b, e);
+    last = seg.fn;
+    sinceRest++;
+  }
+
+  // Climax: a deliberately hard set piece right before the finish.
+  const climaxE = clamp(p * 0.5 + 0.88, 0, 1);
+  const climax = pickSegment(b, climaxE, last);
+  climax.fn(b, climaxE);
+
+  segFinish(b);
+  return b;
+}
 
 export function generateLevel(stageIdx, levelIdx) {
   const seed = stageIdx * 50 + levelIdx + 1;
   const rng = mulberry32(seed);
-  const progress = (stageIdx * 50 + levelIdx) / 499;
-  const archetype = selectArchetype(stageIdx, levelIdx);
+  const p = (stageIdx * 50 + levelIdx) / 499;
 
-  const lw = Math.round(lerp(1100, 4800, progress));
-  const { platforms: genPlats, coins, needsGround, forcedWidth } = GENERATORS[archetype](rng, progress, lw);
+  const { plats, coins, hazards } = buildLevel(rng, p);
 
-  const actualWidth = forcedWidth || lw;
+  // Starting safe platform (always present; player spawns here).
+  const startPlat = { x: 40, y: FLOOR, w: 180, h: 20, type: 'normal' };
+  const platforms = [startPlat, ...plats];
 
-  // Starting safe platform (always present)
-  const startPlat = { x: 40, y: GROUND_Y - 20, w: 180, h: 20, type: 'normal' };
+  let maxRight = 0;
+  for (const pl of platforms) maxRight = Math.max(maxRight, pl.x + pl.w);
+  const width = Math.round(maxRight + 240);
 
-  // Assemble all platforms
-  const allPlatforms = [];
-  if (needsGround) allPlatforms.push({ x: 0, y: GROUND_Y, w: actualWidth, h: GH - GROUND_Y, type: 'ground' });
-  allPlatforms.push(startPlat);
-  allPlatforms.push(...genPlats);
-
-  // Exit door on the rightmost normal platform
-  const normals = allPlatforms.filter(p => p.type === 'normal' && p.x > 200);
+  // Exit on the rightmost solid (normal) platform — segFinish guarantees one.
+  const normals = platforms.filter(pl => pl.type === 'normal' && pl.x > 200);
   normals.sort((a, b) => (b.x + b.w) - (a.x + a.w));
   const lastPlat = normals[0] || startPlat;
   const exit = {
@@ -391,7 +369,7 @@ export function generateLevel(stageIdx, levelIdx) {
     w: 40, h: 60,
   };
 
-  return { width: actualWidth, height: GH, platforms: allPlatforms, coins, enemies: [], exit, stageIdx, levelIdx, archetype };
+  return { width, height: GH, platforms, coins, hazards, enemies: [], exit, stageIdx, levelIdx };
 }
 
 export function getPlayerSpawn(levelData) {
@@ -400,23 +378,142 @@ export function getPlayerSpawn(levelData) {
   return { x: 80, y: GROUND_Y - 42 };
 }
 
+// ─── DYNAMIC PLATFORMS (moving + crumbling) ──────────────────────────────────
+
+function movingPos(m, t) {
+  const osc = Math.sin(t * m.speed) * 0.5 + 0.5; // 0..1, eases at the ends
+  if (m.axis === 'x') return { x: m.baseX + osc * (m.max - m.baseX), y: m.baseY };
+  return { x: m.baseX, y: m.baseY + osc * (m.max - m.baseY) };
+}
+
+// Reset every moving/crumbling platform to its starting state. Call on level
+// start and on every respawn so a death gives a clean slate.
+export function resetDynamics(levelData) {
+  for (const p of levelData.platforms) {
+    if (p.type === 'move' && p.move) {
+      const t0 = p.move.phase || 0;
+      const pos = movingPos(p.move, t0);
+      p.x = Math.round(pos.x); p.y = Math.round(pos.y);
+      p._t = t0; p._dx = 0; p._dy = 0;
+    } else if (p.type === 'crumble') {
+      p._crumbleState = 0; p._crumbleT = 0;
+    }
+  }
+}
+
+// Advance moving platforms (storing per-frame delta for player carry) and tick
+// crumble timers. Must run before updatePlayer each frame.
+export function updateDynamics(dt, levelData) {
+  for (const p of levelData.platforms) {
+    if (p.type === 'move' && p.move) {
+      p._t = (p._t || 0) + dt;
+      const prevX = p.x, prevY = p.y;
+      const pos = movingPos(p.move, p._t);
+      p.x = pos.x; p.y = pos.y;
+      p._dx = p.x - prevX; p._dy = p.y - prevY;
+    } else if (p.type === 'crumble') {
+      if (p._crumbleState === 1) {
+        p._crumbleT -= dt;
+        if (p._crumbleT <= 0) { p._crumbleState = 2; p._crumbleT = CRUMBLE_REGEN; }
+      } else if (p._crumbleState === 2) {
+        p._crumbleT -= dt;
+        if (p._crumbleT <= 0) { p._crumbleState = 0; }
+      }
+    }
+  }
+}
+
+// ─── HAZARDS ─────────────────────────────────────────────────────────────────
+
+// Slightly forgiving spike collision (inset hitbox) so near-misses survive.
+export function hazardHit(player, hazards) {
+  if (!hazards) return false;
+  const px = player.x + 4, pw = player.w - 8;
+  const py = player.y + 3, ph = player.h - 5;
+  for (const h of hazards) {
+    const hx = h.x + 4, hw = h.w - 8;
+    const hy = h.dir === 'down' ? h.y : h.y + 5;
+    const hh = h.h - 6;
+    if (px < hx + hw && px + pw > hx && py < hy + hh && py + ph > hy) return true;
+  }
+  return false;
+}
+
 // ─── RENDERING ───────────────────────────────────────────────────────────────
 
-export function drawPlatforms(ctx, platforms, stage) {
+export function drawPlatforms(ctx, platforms, stage, t = 0) {
   const theme = getTheme(stage);
   for (const p of platforms) {
     if (p.type === 'ground') {
       ctx.fillStyle = theme.groundColor;
       ctx.fillRect(p.x, p.y, p.w, p.h);
-    } else {
-      ctx.fillStyle = theme.platColor;
-      ctx.fillRect(p.x, p.y + 5, p.w, p.h - 5);
-      ctx.fillStyle = theme.platTopColor;
-      ctx.fillRect(p.x, p.y, p.w, 6);
-      ctx.fillStyle = theme.platSide;
-      ctx.fillRect(p.x, p.y, 4, p.h);
-      ctx.fillRect(p.x + p.w - 4, p.y, 4, p.h);
+      continue;
     }
+    if (p.type === 'crumble') {
+      if (p._crumbleState === 2) continue; // gone
+      const shake = p._crumbleState === 1 ? (Math.sin(t * 60) * 1.5) : 0;
+      const x = p.x + shake;
+      ctx.fillStyle = p._crumbleState === 1 ? '#8a5a3a' : '#7a6a52';
+      ctx.fillRect(x, p.y + 5, p.w, p.h - 5);
+      ctx.fillStyle = p._crumbleState === 1 ? '#b07a4a' : '#9a8a6a';
+      ctx.fillRect(x, p.y, p.w, 6);
+      // crack lines
+      ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x + p.w * 0.3, p.y); ctx.lineTo(x + p.w * 0.4, p.y + p.h);
+      ctx.moveTo(x + p.w * 0.7, p.y); ctx.lineTo(x + p.w * 0.62, p.y + p.h);
+      ctx.stroke();
+      continue;
+    }
+    if (p.type === 'move') {
+      // metallic platform with bolt studs + a directional tint
+      ctx.fillStyle = '#4a5568';
+      ctx.fillRect(p.x, p.y + 5, p.w, p.h - 5);
+      ctx.fillStyle = '#7a8aa0';
+      ctx.fillRect(p.x, p.y, p.w, 6);
+      ctx.fillStyle = theme.accentColor;
+      ctx.fillRect(p.x, p.y + p.h - 3, p.w, 3);
+      ctx.fillStyle = '#2e3744';
+      for (let bx = p.x + 6; bx < p.x + p.w - 4; bx += 16) {
+        ctx.fillRect(bx, p.y + 9, 3, 3);
+      }
+      continue;
+    }
+    // normal
+    ctx.fillStyle = theme.platColor;
+    ctx.fillRect(p.x, p.y + 5, p.w, p.h - 5);
+    ctx.fillStyle = theme.platTopColor;
+    ctx.fillRect(p.x, p.y, p.w, 6);
+    ctx.fillStyle = theme.platSide;
+    ctx.fillRect(p.x, p.y, 4, p.h);
+    ctx.fillRect(p.x + p.w - 4, p.y, 4, p.h);
+  }
+}
+
+export function drawHazards(ctx, hazards, stage) {
+  if (!hazards || !hazards.length) return;
+  for (const h of hazards) {
+    const x = h.x, y = h.y, w = h.w, hh = h.h;
+    ctx.fillStyle = '#c0392b';
+    ctx.beginPath();
+    if (h.dir === 'down') {
+      ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w / 2, y + hh);
+    } else {
+      ctx.moveTo(x, y + hh); ctx.lineTo(x + w, y + hh); ctx.lineTo(x + w / 2, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    // metallic highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.beginPath();
+    if (h.dir === 'down') {
+      ctx.moveTo(x + w * 0.5, y); ctx.lineTo(x + w * 0.62, y); ctx.lineTo(x + w / 2, y + hh);
+    } else {
+      ctx.moveTo(x + w * 0.5, y + hh); ctx.lineTo(x + w * 0.5, y); ctx.lineTo(x + w * 0.62, y + hh);
+    }
+    ctx.closePath();
+    ctx.fill();
   }
 }
 
@@ -430,6 +527,7 @@ function aabbOverlap(a, b) {
 export function resolveX(player, platforms) {
   for (const p of platforms) {
     if (p.type === 'ground') continue;
+    if (p._crumbleState === 2) continue; // crumbled away
     if (!aabbOverlap(player, p)) continue;
     const mid = player.x + player.w / 2;
     if (mid < p.x + p.w / 2) player.x = p.x - player.w;
@@ -440,9 +538,11 @@ export function resolveX(player, platforms) {
 
 export function resolveY(player, platforms) {
   let onGround = false;
+  player._groundPlat = null;
   const prevBottom = player._prevY + player.h;
 
   for (const p of platforms) {
+    if (p._crumbleState === 2) continue; // crumbled away
     if (player.x + player.w <= p.x || player.x >= p.x + p.w) continue;
     const platTop = p.y, platBottom = p.y + p.h;
 
@@ -451,6 +551,10 @@ export function resolveY(player, platforms) {
         player.y = platTop - player.h;
         player.vy = 0;
         onGround = true;
+        player._groundPlat = p;
+        if (p.type === 'crumble' && p._crumbleState === 0) {
+          p._crumbleState = 1; p._crumbleT = CRUMBLE_DELAY;
+        }
       }
     } else {
       if (player.y < platBottom && player.y + player.h > platBottom) {

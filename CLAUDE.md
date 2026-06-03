@@ -31,7 +31,7 @@ Don't rely on console debug statements. The cursor is locked, so use alerts inst
 ### platformer/ — 2D Platformer (Vanilla JS + Canvas)
 No build step. Open `platformer/platformer.html` directly in a browser. Uses ES modules (no bundler). Canvas renders at 800×500 internally.
 
-**Key features:** Double jump (with particle burst), 10 stages × 50 levels (500 total, procedurally generated from seeded RNG), coin-to-upgrade shop (5 upgrades: Jump Boost, Speed Boots, Coin Magnet, DJ Boost, Extra Lives), 10 animated stage themes.
+**Key features:** Double jump (with particle burst), 10 stages × 50 levels (500 total, **segment-composed** from seeded RNG — see Level generation below), coin-to-upgrade shop (5 upgrades: Jump Boost, Speed Boots, Coin Magnet, DJ Boost, Extra Lives), 10 animated stage themes, **hazards** (spikes), **dynamic platforms** (moving + crumbling).
 
 **File layout:**
 ```
@@ -43,15 +43,19 @@ platformer/
     state.js                playerData (coins, upgrades, progress) — localStorage
     input.js                Keyboard state, jump buffer, coyote time support
     player.js               Physics, double-jump, 5-state animation machine, canvas drawing
-    level.js                Seeded procedural generator (mulberry32 RNG), resolveX/resolveY
+    level.js                Seeded segment-composition generator (mulberry32 RNG), hazards, dynamic platforms, resolveX/resolveY
     entities.js             Coins (spin anim), exit door, particle system, enemy stub
     renderer.js             10 stage themes with parallax backgrounds
     ui.js                   Screen management, HUD, shop, level-complete, stage-complete
 ```
 
-**Physics constants:** `GRAVITY=1850`, `JUMP=555`, `DJ=495`, `SPEED=280 px/s`. `COYOTE_TIME=0.1s`, `JUMP_BUFFER=0.085s`.
+**Physics constants:** `GRAVITY=1850`, `JUMP=555`, `DJ=495`, `SPEED=280 px/s`. `COYOTE_TIME=0.1s`, `JUMP_BUFFER=0.085s`. Max double-jump reach (base stats) ≈ 271px horizontal / 149px vertical — `level.js` keeps every required leap inside this envelope (validated: 0 unreachable jumps across all 500 levels).
+
+**Level generation (`level.js`):** Levels are NOT a single random walk — they are **composed from curated segments** (set pieces), giving a deliberate, hand-built feel. `buildLevel()` walks a cursor `{x, y}` left→right and appends segments via `connect()` (which auto-arcs guide-coins over each jump and clamps required rise to `MAX_RISE=95`). Arc: warm-up `segRest` → escalating segments paced with periodic breathers → a forced hard climax → `segFinish` (hosts the exit). Segment table `SEGMENTS[]` has `{fn, tier (0/1/2), gate}`; `pickSegment()` chooses by effective difficulty `e` (blends global `progress` + local position in the level) and `gate` (mechanic unlock thresholds: spikes ≥0.03, moving ≥0.06, ceiling-spike gauntlet ≥0.10, crumble ≥0.16, spike-leap ≥0.20). **Levels are 5× longer:** `targetW = lerp(5500, 24000, progress)` (old was 1100→4800). Segment generators: `segRest, segGapRun, segStairsUp/Down, segPillars, segZigzag, segLongLeap, segDescentDrop, segSpikePath` (ground run w/ spike clusters), `segMovingBridge` (horizontal mover over void), `segElevator` (vertical lift), `segGauntlet` (ceiling spikes — single jump clears, double jump skewers), `segCrumbleRun, segSpikeLeap, segCoinVault` (reward set piece), `segFinish`.
 **Level gen seed:** `stageIdx * 50 + levelIdx + 1` (0-indexed params). Difficulty scales via `progress = (stageIdx*50+levelIdx)/499`.
-**Collision:** Separate x-then-y passes (`resolveX` → `resolveY`). `resolveY` uses `player.y + player.h >= platTop` (not strict >) so `vy=0` still detects grounded.
+**Platform types:** `normal`, `ground` (continuous walkway), `move` (oscillates; `p.move = {axis:'x'|'y', baseX, baseY, max, speed, phase}`), `crumble` (falls `CRUMBLE_DELAY=0.42s` after landing, regenerates after `CRUMBLE_REGEN=2.8s`). `resetDynamics(levelData)` resets all dynamic platforms (called on level start AND respawn); `updateDynamics(dt, levelData)` runs each frame **before** `updatePlayer` (stores per-frame `_dx/_dy` for player carry, ticks crumble timers).
+**Hazards:** `levelData.hazards[]` of `{x, y, w, h, dir:'up'|'down'}` spike triangles. `hazardHit(player, hazards)` (inset hitbox, forgiving) → instant death (same path as falling off). `drawHazards()` renders them. `'up'` sits on a surface (jump over), `'down'` hangs from a ceiling (don't jump into).
+**Collision:** Separate x-then-y passes (`resolveX` → `resolveY`). `resolveY` uses `player.y + player.h >= platTop` (not strict >) so `vy=0` still detects grounded; it sets `player._groundPlat` (the landed platform) and triggers crumble. Both passes skip platforms with `_crumbleState===2` (crumbled away). Moving-platform carry: `updatePlayer` applies `_groundPlat._dx/_dy` to the player when grounded on a `move` platform.
 **Enemies:** `enemies[]` array stub in entities.js — populate + implement `updateEnemies`/`drawEnemies` to add enemies later.
 **Stage themes:** index 0–9 in `STAGE_THEMES[]` in renderer.js (Meadow, Cave, Icy Peaks, Desert, Lava, Sky, Forest, Space, Crystal, Dark Fortress).
 
