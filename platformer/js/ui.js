@@ -4,6 +4,7 @@ import {
   WEAPON_DEFS, ownsWeapon, buyWeapon, equipWeapon, getEquippedWeapon,
 } from './state.js';
 import { STAGE_THEMES } from './renderer.js';
+import { STAGE_MODIFIERS } from './player.js';
 
 const SCREENS = ['main-menu', 'stage-select', 'level-select', 'game-wrap',
   'level-complete', 'shop-overlay', 'stage-complete', 'pause-menu'];
@@ -121,14 +122,23 @@ export function buildLevelSelect(stageIdx, callbacks) {
   }
 }
 
-export function updateHUD(stageIdx, levelIdx, coinsThisLevel, totalCoins, lives) {
+export function updateHUD(stageIdx, levelIdx, coinsThisLevel, totalCoins, lives, hp = 100, maxHp = 100) {
   const el = id => document.getElementById(id);
-  if (el('hud-stage')) el('hud-stage').textContent = `S${stageIdx}-L${levelIdx}`;
+  const mod = STAGE_MODIFIERS[(stageIdx - 1) % 10];
+  if (el('hud-stage')) {
+    el('hud-stage').textContent = `S${stageIdx}-L${levelIdx}`;
+    if (el('hud-modifier')) el('hud-modifier').textContent = mod ? mod.label : '';
+  }
   if (el('hud-coins-level')) el('hud-coins-level').textContent = coinsThisLevel;
   if (el('hud-coins-total')) el('hud-coins-total').textContent = totalCoins;
-  if (el('hud-lives')) {
-    el('hud-lives').textContent = '♥'.repeat(Math.max(0, lives));
+  const pct = Math.max(0, Math.min(1, hp / maxHp));
+  if (el('hud-hp-fill')) {
+    el('hud-hp-fill').style.width = `${pct * 100}%`;
+    // green → amber → red as HP drops
+    el('hud-hp-fill').style.background =
+      pct > 0.5 ? '#3fbf5f' : pct > 0.25 ? '#e8a33d' : '#e74c3c';
   }
+  if (el('hud-hp-text')) el('hud-hp-text').textContent = `${Math.ceil(hp)}/${maxHp}`;
   if (el('hud-weapon')) {
     const w = getEquippedWeapon();
     el('hud-weapon').textContent = `${w.icon} ${w.label}`;

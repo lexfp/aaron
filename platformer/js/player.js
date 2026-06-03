@@ -11,7 +11,41 @@ const BASE_SPEED = 280;
 const GRAVITY = 1850;
 const TERMINAL_VEL = 950;
 const COYOTE_TIME = 0.1;
-const FRICTION = 0.72;
+// Idle horizontal damping is per-stage now (see STAGE_MODIFIERS `.fric`); base is 0.72.
+
+// Per-stage gameplay twist (index 0-9, matches STAGE_THEMES order in renderer.js).
+//   gMul  — gravity multiplier
+//   jMul  — jump/double-jump force multiplier (scaled WITH gravity on "heavy"
+//           stages so required jumps stay reachable — see physics note below)
+//   fric  — idle horizontal damping per frame (base 0.72; ↑ = slippery, ↓ = grippy)
+//   wind  — sideways gust acceleration amplitude (px/s², 0 = none)
+//   dark  — 1 = limited-visibility vignette around the player (rendered in main.js)
+// NOTE on reachability: scaling gMul and jMul together leaves horizontal jump
+// distance unchanged and only INCREASES vertical reach, and lowering gMul alone
+// only increases reach — so every twist keeps all 500 validated levels solvable.
+export const STAGE_MODIFIERS = [
+  { label: '🌱 Springy Grass', gMul: 1.0,  jMul: 1.12, fric: 0.72, wind: 0,    dark: 0 }, // Meadow
+  { label: '🕯️ Pitch Dark',    gMul: 1.0,  jMul: 1.0,  fric: 0.72, wind: 0,    dark: 1 }, // Cave
+  { label: '❄️ Slippery Ice',  gMul: 1.0,  jMul: 1.0,  fric: 0.965, wind: 0,   dark: 0 }, // Icy Peaks
+  { label: '🌬️ Desert Gusts',  gMul: 1.0,  jMul: 1.0,  fric: 0.72, wind: 1300, dark: 0 }, // Desert
+  { label: '🔥 Scorching Heat', gMul: 1.25, jMul: 1.25, fric: 0.72, wind: 0,    dark: 0 }, // Lava
+  { label: '☁️ Sky Updrafts',  gMul: 0.6,  jMul: 1.0,  fric: 0.78, wind: 0,    dark: 0 }, // Sky
+  { label: '🍄 Mossy Grip',    gMul: 1.0,  jMul: 1.0,  fric: 0.42, wind: 0,    dark: 0 }, // Forest
+  { label: '🚀 Zero Gravity',  gMul: 0.32, jMul: 1.0,  fric: 0.86, wind: 0,    dark: 0 }, // Space
+  { label: '💎 Bouncy Crystal', gMul: 1.0,  jMul: 1.24, fric: 0.72, wind: 0,    dark: 0 }, // Crystal
+  { label: '🏰 Heavy Gravity',  gMul: 1.45, jMul: 1.45, fric: 0.72, wind: 0,    dark: 0 }, // Dark Fortress
+];
+
+let _mod = STAGE_MODIFIERS[0];
+let _modT = 0; // time accumulator for oscillating effects (wind gusts)
+
+// Select the active stage twist (call before initPlayer on level start/respawn).
+export function setStageModifier(stageIdx) {
+  _mod = STAGE_MODIFIERS[((stageIdx % 10) + 10) % 10] || STAGE_MODIFIERS[0];
+  _modT = 0;
+}
+
+export function getStageModifier() { return _mod; }
 
 export const player = {
   x: 80, y: 380,
@@ -29,6 +63,11 @@ export const player = {
   landSquash: 0,
   djFlash: 0,
   dead: false,
+  // Health
+  maxHp: 100,
+  hp: 100,
+  invuln: 0,          // i-frame timer after taking a hit (no further contact damage)
+  hurtFlash: 0,       // red flash timer when damaged
   // Combat
   attackCD: 0,        // seconds until the next attack is allowed
   swingT: 0,          // remaining swing-animation time
@@ -57,12 +96,16 @@ export function initPlayer(spawnX, spawnY) {
   player.landSquash = 0;
   player.djFlash = 0;
   player.dead = false;
+  player.maxHp = 100;
+  player.hp = 100;
+  player.invuln = 0;
+  player.hurtFlash = 0;
   player.attackCD = 0;
   player.swingT = 0;
   player.weapon = getEquippedWeapon();
 
-  player.jumpForce = BASE_JUMP * getJumpMult();
-  player.djForce = BASE_DJ * getDJMult();
+  player.jumpForce = BASE_JUMP * getJumpMult() * _mod.jMul;
+  player.djForce = BASE_DJ * getDJMult() * _mod.jMul;
   player.speed = BASE_SPEED * getSpeedMult();
 }
 
@@ -105,18 +148,25 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
     }
   }
 
-  // Horizontal movement
+  _modT += dt;
+
+  // Horizontal movement (idle damping varies by stage: slippery ice vs. mossy grip)
   const targetVx = isLeft() ? -player.speed : isRight() ? player.speed : 0;
   if (targetVx !== 0) {
     player.vx = targetVx;
     player.facing = targetVx > 0 ? 1 : -1;
   } else {
-    player.vx *= FRICTION;
+    player.vx *= _mod.fric;
     if (Math.abs(player.vx) < 8) player.vx = 0;
   }
 
-  // Gravity
-  player.vy = Math.min(player.vy + GRAVITY * dt, TERMINAL_VEL);
+  // Desert gusts: oscillating sideways push you must lean against.
+  if (_mod.wind) player.vx += _mod.wind * Math.sin(_modT * 0.6) * dt;
+
+  // Gravity (per-stage multiplier; terminal velocity tracks it so low-g feels floaty)
+  const grav = GRAVITY * _mod.gMul;
+  const term = TERMINAL_VEL * Math.max(0.45, _mod.gMul);
+  player.vy = Math.min(player.vy + grav * dt, term);
 
   // Store prevY for collision resolution
   player._prevY = player.y;
@@ -148,6 +198,8 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
   player.djFlash = Math.max(0, player.djFlash - dt);
   player.attackCD = Math.max(0, player.attackCD - dt);
   player.swingT = Math.max(0, player.swingT - dt);
+  player.invuln = Math.max(0, player.invuln - dt);
+  player.hurtFlash = Math.max(0, player.hurtFlash - dt);
 
   // Walk distance for leg swing animation
   if (player.onGround && Math.abs(player.vx) > 15) {
@@ -175,6 +227,9 @@ export function drawPlayer(ctx, t) {
   ctx.save();
   ctx.translate(centerX, centerY);
   if (facing < 0) ctx.scale(-1, 1);
+
+  // Blink while invulnerable (i-frames) so the player can read that hits won't land.
+  if (player.invuln > 0) ctx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(player.invuln * 30));
 
   // Squash/stretch transform
   let sx = 1, sy = 1;
@@ -270,6 +325,15 @@ export function drawPlayer(ctx, t) {
   // Weapon swing / attack
   if (player.swingT > 0 && player.weapon) {
     drawWeaponSwing(ctx, hw, hh, player.weapon, 1 - player.swingT / player.swingDur);
+  }
+
+  // Hurt flash — red tint over the body when damaged
+  if (player.hurtFlash > 0) {
+    ctx.globalAlpha = (player.hurtFlash / 0.3) * 0.6;
+    ctx.fillStyle = '#ff2b2b';
+    roundRect(ctx, -hw, -hh, w, h, 6);
+    ctx.fill();
+    ctx.globalAlpha = 1;
   }
 
   // Double-jump flash outline

@@ -312,7 +312,14 @@ function pickSegment(b, e, last) {
 // both across the 500 levels (global `p`) and within each level (local `e`).
 function buildLevel(rng, p) {
   const b = { rng, p, x: 220, y: FLOOR, plats: [], coins: [], hazards: [] };
-  const targetW = lerp(5500, 24000, p); // 5× the old 1100→4800 range
+
+  // Gentle on-ramp for the opening levels: the first ~15 levels (the start of
+  // Meadow) begin short and easy, then ramp up to the full length/difficulty
+  // curve. `introT` is 0 on level 1 and reaches 1 by ~level 16.
+  const idx = Math.round(p * 499);            // global level index 0..499
+  const introT = clamp(idx / 15, 0, 1);
+  const baseW = lerp(5500, 24000, p);         // full-curve length for this progress
+  const targetW = lerp(1800, baseW, introT);  // much shorter while easing in
 
   segRest(b, 0.08); // gentle landing right after the start pad
 
@@ -322,7 +329,8 @@ function buildLevel(rng, p) {
   while (b.x < targetW - 900 && guard++ < 600) {
     const f = clamp(b.x / targetW, 0, 1);
     const localE = lerp(0.12, 1.0, f);
-    const e = clamp(p * 0.45 + localE * 0.55, 0, 1);
+    let e = clamp(p * 0.45 + localE * 0.55, 0, 1);
+    e *= 0.5 + 0.5 * introT; // hold the opening levels down in the easy tier
 
     // Insert a breather every few segments so the level has rhythm.
     if (sinceRest >= 2 + Math.floor(rng() * 2)) {
@@ -335,10 +343,14 @@ function buildLevel(rng, p) {
     sinceRest++;
   }
 
-  // Climax: a deliberately hard set piece right before the finish.
-  const climaxE = clamp(p * 0.5 + 0.88, 0, 1);
-  const climax = pickSegment(b, climaxE, last);
-  climax.fn(b, climaxE);
+  // Climax: a deliberately hard set piece right before the finish — but eased
+  // way down during the on-ramp, and skipped entirely on the first few levels
+  // so they stay short and end gently instead of on a wall.
+  if (introT >= 0.2) {
+    const climaxE = clamp((p * 0.5 + 0.88) * (0.35 + 0.65 * introT), 0, 1);
+    const climax = pickSegment(b, climaxE, last);
+    climax.fn(b, climaxE);
+  }
 
   segFinish(b);
   return b;

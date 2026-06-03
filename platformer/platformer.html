@@ -21,7 +21,7 @@
   </div>
   <div class="menu-content">
     <div class="menu-title" id="menu-title">JUMP!<br><span style="font-size:0.55em;letter-spacing:0.02em">Platformer</span></div>
-    <div class="menu-sub">10 Stages · 500 Levels · Double Jump</div>
+    <div class="menu-sub">10 Stages · 500 Levels</div>
     <div class="menu-buttons">
       <button id="btn-play" class="menu-btn">▶ Play</button>
       <button id="btn-stage-select" class="menu-btn">🗺 Stage Select</button>
@@ -70,6 +70,7 @@
   <div id="hud">
     <div class="hud-panel">
       <div id="hud-stage">S1-L1</div>
+      <div id="hud-modifier" title="This stage's special twist"></div>
     </div>
     <div class="hud-panel" id="hud-coins-wrap">
       <span class="coin-icon">🪙</span>
@@ -78,7 +79,11 @@
       <span style="color:#a88;font-size:11px;">total</span>
       <span style="color:#cca;margin-left:4px;" id="hud-coins-total">0</span>
     </div>
-    <div class="hud-panel" id="hud-lives">♥♥</div>
+    <div class="hud-panel" id="hud-hp-wrap" title="Health">
+      <span id="hud-hp-icon">❤️</span>
+      <div id="hud-hp-bar"><div id="hud-hp-fill"></div></div>
+      <span id="hud-hp-text">100/100</span>
+    </div>
     <div class="hud-panel" id="hud-weapon" title="Equipped weapon (J / X / click to attack)">👊 Fists</div>
   </div>
 </div>

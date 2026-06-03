@@ -9,6 +9,9 @@ export const projectiles = [];
 const E_GRAVITY = 1600;
 const STOMP_DAMAGE = 2;   // a head-stomp deals this much (kills 1-2 HP foes)
 const STOMP_BOUNCE = 430; // upward velocity given to the player after a stomp
+const INVULN_TIME = 0.9;  // player i-frames after taking a contact hit
+// HP a side-contact hit drains from the player (out of 100), per enemy type.
+const CONTACT_DAMAGE = { walker: 12, jumper: 14, brute: 25, flyer: 10 };
 
 export let exitDoor = null;
 
@@ -414,7 +417,22 @@ export function updateEnemies(dt, platforms, player) {
         player._prevY = player.y;
         player.jumpsLeft = Math.max(player.jumpsLeft, 1); // regain a hop after a stomp
       } else {
-        playerHit = true;
+        // If the player is mid-attack and facing this enemy, the weapon connects
+        // and the contact deals no damage — so you can fight foes up close.
+        const eCx = e.x + e.w / 2;
+        const facingEnemy = player.facing > 0 ? eCx >= player.x : eCx <= player.x + player.w;
+        const guarding = (player.attackCD > 0 || player.swingT > 0) && facingEnemy;
+        // Otherwise the enemy chips the player's HP (with i-frames between hits).
+        if (!guarding && player.invuln <= 0) {
+          player.hp -= CONTACT_DAMAGE[e.type] || 12;
+          player.invuln = INVULN_TIME;
+          player.hurtFlash = 0.3;
+          // knock the player back and up, away from the enemy
+          const kdir = eCx >= player.x + player.w / 2 ? -1 : 1;
+          player.vx = kdir * 260;
+          player.vy = -250;
+          if (player.hp <= 0) { player.hp = 0; playerHit = true; } // out of HP → death
+        }
       }
     }
   }

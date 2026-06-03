@@ -1,6 +1,6 @@
 import { loadPlayerData, playerData, markLevelComplete, getMagnetRadius, getStartLives, isStageComplete } from './state.js';
 import { initInput, consumeJump, consumeEsc, isAttack, clearAll } from './input.js';
-import { player, initPlayer, updatePlayer, drawPlayer } from './player.js';
+import { player, initPlayer, updatePlayer, drawPlayer, setStageModifier, getStageModifier } from './player.js';
 import {
   generateLevel, drawPlatforms, drawHazards, getPlayerSpawn,
   resetDynamics, updateDynamics, hazardHit, GW, GH,
@@ -23,6 +23,7 @@ let currentStage = 1;
 let currentLevel = 1;
 let levelData = null;
 let camX = 0;
+let camY = 0;
 let lives = 2;
 let coinsThisLevel = 0;
 let gameTime = 0;
@@ -30,6 +31,7 @@ let gameActive = false;
 let paused = false;
 let prevTimestamp = null;
 let deathTimer = 0;
+let _lastHp = 100;
 
 // UI callbacks object
 const callbacks = {
@@ -57,12 +59,14 @@ function startLevel(stage, level) {
   currentLevel = level;
   levelData = generateLevel(stage - 1, level - 1);
 
+  setStageModifier(stage - 1);
   const spawn = getPlayerSpawn(levelData);
   initPlayer(spawn.x, spawn.y);
   initEntities(levelData);
   resetDynamics(levelData);
 
   camX = 0;
+  camY = 0;
   coinsThisLevel = 0;
   lives = getStartLives();
   gameTime = 0;
@@ -72,17 +76,20 @@ function startLevel(stage, level) {
   prevTimestamp = null;
 
   callbacks._lastCoins = 0;
+  _lastHp = player.hp;
 
-  updateHUD(stage, level, 0, playerData.coins, lives);
+  updateHUD(stage, level, 0, playerData.coins, lives, player.hp, player.maxHp);
   showScreen('game-wrap');
 }
 
 function respawnPlayer() {
+  setStageModifier(currentStage - 1);
   const spawn = getPlayerSpawn(levelData);
   initPlayer(spawn.x, spawn.y);
   initEntities(levelData); // reset coins for this attempt
   resetDynamics(levelData); // reset moving/crumbling platforms
   camX = 0;
+  camY = 0;
   coinsThisLevel = 0;
 }
 
@@ -95,7 +102,8 @@ function onPlayerDeath() {
   } else {
     respawnPlayer();
   }
-  updateHUD(currentStage, currentLevel, coinsThisLevel, playerData.coins, lives);
+  _lastHp = player.hp;
+  updateHUD(currentStage, currentLevel, coinsThisLevel, playerData.coins, lives, player.hp, player.maxHp);
 }
 
 function onLevelComplete() {
@@ -112,11 +120,23 @@ function onLevelComplete() {
   }
 }
 
+// How far below the screen top the player is allowed to rise before the camera
+// starts scrolling up to keep them in view.
+const TOP_DEADZONE = 150;
+
 function updateCamera(dt) {
   const targetX = player.x + player.w / 2 - GW / 2;
   const maxCam = Math.max(0, levelData.width - GW);
   const clampedTarget = Math.max(0, Math.min(targetX, maxCam));
   camX += (clampedTarget - camX) * Math.min(dt * 9, 1);
+
+  // Vertical follow: camY stays at 0 (floor anchored to the bottom) during normal
+  // play, and only goes negative — scrolling up to reveal sky — when the player
+  // rises above the top dead-zone (e.g. low-gravity Space, springy jumps).
+  const targetY = Math.min(0, player.y - TOP_DEADZONE);
+  camY += (targetY - camY) * Math.min(dt * 12, 1);
+  // Hard guarantee the player can never cross the top edge, even on a fast rise.
+  camY = Math.min(camY, player.y - 8);
 }
 
 function checkExit() {
@@ -179,7 +199,13 @@ function gameLoop(timestamp) {
     coinsThisLevel += collected;
     playerData.coins += collected;
     callbacks._lastCoins = coinsThisLevel;
-    updateHUD(currentStage, currentLevel, coinsThisLevel, playerData.coins, lives);
+    updateHUD(currentStage, currentLevel, coinsThisLevel, playerData.coins, lives, player.hp, player.maxHp);
+  }
+
+  // Refresh the HP bar whenever it changes (e.g. took an enemy hit).
+  if (player.hp !== _lastHp) {
+    _lastHp = player.hp;
+    updateHUD(currentStage, currentLevel, coinsThisLevel, playerData.coins, lives, player.hp, player.maxHp);
   }
 
   // Check death (fell off bottom, touched a hazard, or hit by an enemy)
@@ -204,7 +230,7 @@ function renderFrame() {
 
   // World space
   ctx.save();
-  ctx.translate(-Math.round(camX), 0);
+  ctx.translate(-Math.round(camX), -Math.round(camY));
 
   drawPlatforms(ctx, levelData.platforms, currentStage, gameTime);
   drawHazards(ctx, levelData.hazards, currentStage);
@@ -214,6 +240,18 @@ function renderFrame() {
   drawProjectiles(ctx, camX, GW);
 
   ctx.restore();
+
+  // Cave twist: limited visibility — darken everything except a glow around the player.
+  if (getStageModifier().dark) {
+    const sx = player.x - camX + player.w / 2;
+    const sy = player.y - camY + player.h / 2;
+    const vg = ctx.createRadialGradient(sx, sy, 45, sx, sy, 240);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(0.7, 'rgba(0,0,0,0.55)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.93)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, GW, GH);
+  }
 
   // Death flash overlay
   if (deathTimer > 0) {
