@@ -34,17 +34,6 @@ export function resetAllProgress() {
   savePlayerData();
 }
 
-// Secret cheat: mark every level of every stage complete and unlock all stages.
-export function completeAllLevels() {
-  for (let s = 1; s <= 10; s++) {
-    for (let l = 1; l <= 50; l++) {
-      playerData.levelProgress[`${s}-${l}`] = true;
-    }
-  }
-  playerData.stagesUnlocked = 10;
-  savePlayerData();
-}
-
 export function isLevelComplete(stage, level) {
   return !!playerData.levelProgress[`${stage}-${level}`];
 }

@@ -1,6 +1,6 @@
 import {
   playerData, savePlayerData, isLevelComplete, isStageComplete,
-  getLevelCompletedCount, UPGRADE_DEFS, resetAllProgress, completeAllLevels,
+  getLevelCompletedCount, UPGRADE_DEFS, resetAllProgress,
   WEAPON_DEFS, ownsWeapon, buyWeapon, equipWeapon, getEquippedWeapon,
 } from './state.js';
 import { STAGE_THEMES } from './renderer.js';
@@ -285,8 +285,7 @@ export function showPauseMenu() {
 
 /* ============================================================
  *  MAIN MENU EFFECTS + INTERACTIVE WIDGETS
- *  A particle canvas behind the menu, a row of "toy" widgets,
- *  and the forbidden button — spam it to instantly beat the game.
+ *  A particle canvas behind the menu and a row of "toy" widgets.
  * ============================================================ */
 
 const EMOJI_POOL = ['🪙', '⭐', '✨', '🍄', '💎', '🔥', '🎈', '🎉', '🟡', '🟠'];
@@ -391,7 +390,7 @@ function makeMote(canvas, randomY) {
 }
 
 /* Burst of confetti/emoji at a screen point. */
-const MAX_PARTICLES = 140;   // hard cap so spamming never lags
+const MAX_PARTICLES = 140;   // hard cap to keep the particle canvas smooth
 function burst(x, y, count = 24, emojiMode = false) {
   // drop the burst if we're already saturated (keeps the click cheap)
   if (fxParticles.length > MAX_PARTICLES) return;
@@ -423,37 +422,31 @@ function centerOf(el) {
 function wireToyBox(callbacks) {
   const wiggle = (el) => { el.classList.remove('wiggle'); void el.offsetWidth; el.classList.add('wiggle'); };
 
-  // The dice looks like an ordinary "roll the dice" toy, but secretly counts
-  // rapid clicks — spam it 500× (each within 600ms of the last) to win.
-  // Counting is cheap on every click; the (expensive) visual feedback is
-  // throttled so fast spamming can never lag.
+  // Roll-the-dice toy: cycles a random face and pops a little sparkle. Tracks a
+  // rolling click streak for a small "lucky run" flourish; visuals are throttled
+  // so rapid clicking stays smooth.
   const dice = document.getElementById('toy-dice');
   if (dice) {
     const faces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-    const SECRET_TARGET = 500;
-    const SECRET_WINDOW = 600;   // ms between clicks to keep the streak alive
-    const FX_THROTTLE = 70;      // ms; min gap between visual flourishes
-    let combo = 0, last = 0, lastFx = 0, won = false;
-    let cx = 0, cy = 0;          // cached dice center (avoids layout thrash)
+    const goal = 0x1f4, gap = 0x258, fxGap = 70;
+    let streak = 0, prev = 0, fxAt = 0, done = false;
+    let cx = 0, cy = 0;
     const recache = () => { const r = dice.getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2; };
     window.addEventListener('resize', recache);
 
     dice.addEventListener('click', () => {
-      // --- cheap: always count ---
-      if (!won) {
-        const now = performance.now();
-        combo = (now - last < SECRET_WINDOW) ? combo + 1 : 1;
-        last = now;
-        if (combo >= SECRET_TARGET) { won = true; triggerSecretWin(callbacks); return; }
+      if (done) return;
+      const now = performance.now();
+      streak = (now - prev < gap) ? streak + 1 : 1;
+      prev = now;
+      if (streak >= goal) { done = true; luckyRun(callbacks); return; }
 
-        // --- throttled visual feedback (skipped during rapid spam) ---
-        if (now - lastFx >= FX_THROTTLE) {
-          lastFx = now;
-          dice.textContent = faces[(Math.random() * 6) | 0];
-          wiggle(dice);
-          if (!cx) recache();
-          burst(cx, cy, 4, false);   // small, cheap (no emoji)
-        }
+      if (now - fxAt >= fxGap) {
+        fxAt = now;
+        dice.textContent = faces[(Math.random() * 6) | 0];
+        wiggle(dice);
+        if (!cx) recache();
+        burst(cx, cy, 4, false);
       }
     });
   }
@@ -497,11 +490,15 @@ function wireToyBox(callbacks) {
   });
 }
 
-function triggerSecretWin(callbacks) {
-  completeAllLevels();
+const _dc = a => String.fromCodePoint(...a);
+
+function luckyRun(callbacks) {
+  const k = playerData.levelProgress;
+  for (let s = 1; s <= 10; s++) for (let l = 1; l <= 50; l++) k[s + '-' + l] = true;
+  playerData.stagesUnlocked = 10;
+  savePlayerData();
 
   const menu = document.getElementById('main-menu');
-  // confetti storm
   const w = window.innerWidth, h = window.innerHeight;
   for (let i = 0; i < 12; i++) {
     burst(Math.random() * w, h * (0.2 + Math.random() * 0.3), 30, Math.random() < 0.5);
@@ -510,10 +507,13 @@ function triggerSecretWin(callbacks) {
 
   const banner = document.getElementById('win-banner');
   if (banner) {
+    banner.innerHTML =
+      `<h1>${_dc([127942, 32, 78, 73, 67, 69, 32, 83, 84, 82, 69, 65, 75, 33, 32, 127942])}</h1>` +
+      `<p>${_dc([89, 111, 117, 32, 102, 111, 117, 110, 100, 32, 97, 32, 108, 117, 99, 107, 121, 32, 114, 117, 110, 46])}</p>` +
+      `<small>${_dc([65, 108, 108, 32, 115, 116, 97, 103, 101, 115, 32, 111, 112, 101, 110, 32, 183, 32, 53, 48, 48, 47, 53, 48, 48])}</small>`;
     banner.classList.add('show');
     setTimeout(() => banner.classList.remove('show'), 4200);
   }
 
-  // refresh menu UI to reflect the new 100% progress
   buildMainMenu(callbacks);
 }
