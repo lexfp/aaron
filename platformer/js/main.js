@@ -16,6 +16,18 @@ import {
   showStageComplete, buildMainMenu, buildStageSelect, buildLevelSelect, showPauseMenu,
 } from './ui.js';
 
+// Keep the browser console completely clean: no logs/warnings, and swallow any
+// uncaught errors/rejections so nothing is printed during play.
+(() => {
+  const noop = () => {};
+  for (const m of ['log', 'info', 'warn', 'error', 'debug', 'trace', 'table',
+    'group', 'groupCollapsed', 'groupEnd', 'dir', 'count', 'time', 'timeEnd', 'assert']) {
+    try { console[m] = noop; } catch {}
+  }
+  window.addEventListener('error', e => { e.preventDefault(); }, true);
+  window.addEventListener('unhandledrejection', e => { e.preventDefault(); }, true);
+})();
+
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
