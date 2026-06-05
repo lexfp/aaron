@@ -8,7 +8,7 @@ import {
 import {
   initEntities, updateEntities, drawEntities, exitDoor,
   updateEnemies, updateProjectiles, drawEnemies, drawProjectiles,
-  playerMeleeAttack, spawnProjectile,
+  playerMeleeAttack, spawnProjectile, isBossAlive,
 } from './entities.js';
 import { drawBackground, getTheme } from './renderer.js';
 import {
@@ -213,8 +213,8 @@ function gameLoop(timestamp) {
     deathTimer = 0.35;
   }
 
-  // Check exit
-  if (checkExit()) {
+  // Check exit (locked while a stage boss is alive)
+  if (checkExit() && !isBossAlive()) {
     onLevelComplete();
     return;
   }

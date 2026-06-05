@@ -3,6 +3,7 @@ export const STAGE_THEMES = [
   // 1: Meadow
   {
     name: 'Meadow',
+    spikeColor: '#8a5a2b',
     accentColor: '#2ecc71',
     platColor: '#4a9c3f',
     platTopColor: '#6dce5e',
@@ -29,6 +30,7 @@ export const STAGE_THEMES = [
   // 2: Cave
   {
     name: 'Cave',
+    spikeColor: '#8d8d99',
     accentColor: '#e67e22',
     platColor: '#5a5a5a',
     platTopColor: '#7a7a7a',
@@ -61,6 +63,7 @@ export const STAGE_THEMES = [
   // 3: Icy Peaks
   {
     name: 'Icy Peaks',
+    spikeColor: '#aee3ff',
     accentColor: '#74b9ff',
     platColor: '#8ec8e8',
     platTopColor: '#b8e0f8',
@@ -91,6 +94,7 @@ export const STAGE_THEMES = [
   // 4: Desert Ruins
   {
     name: 'Desert Ruins',
+    spikeColor: '#4e9a3e',
     accentColor: '#f39c12',
     platColor: '#c8a05a',
     platTopColor: '#dbb870',
@@ -114,6 +118,7 @@ export const STAGE_THEMES = [
   // 5: Lava Realm
   {
     name: 'Lava Realm',
+    spikeColor: '#ff7b29',
     accentColor: '#e74c3c',
     platColor: '#3d1a1a',
     platTopColor: '#5a2828',
@@ -143,6 +148,7 @@ export const STAGE_THEMES = [
   // 6: Sky Kingdom
   {
     name: 'Sky Kingdom',
+    spikeColor: '#e8ecff',
     accentColor: '#f0e0ff',
     platColor: '#d8d8e8',
     platTopColor: '#f0f0ff',
@@ -164,6 +170,7 @@ export const STAGE_THEMES = [
   // 7: Deep Forest
   {
     name: 'Deep Forest',
+    spikeColor: '#5a8f3c',
     accentColor: '#27ae60',
     platColor: '#4a2e10',
     platTopColor: '#2e7d32',
@@ -198,6 +205,7 @@ export const STAGE_THEMES = [
   // 8: Space Station
   {
     name: 'Space Station',
+    spikeColor: '#46d5ff',
     accentColor: '#00d2ff',
     platColor: '#1e2a40',
     platTopColor: '#2e3e5a',
@@ -228,6 +236,7 @@ export const STAGE_THEMES = [
   // 9: Crystal Cavern
   {
     name: 'Crystal Cavern',
+    spikeColor: '#00ffe5',
     accentColor: '#00ffe5',
     platColor: '#152040',
     platTopColor: '#204060',
@@ -258,6 +267,7 @@ export const STAGE_THEMES = [
   // 10: Dark Fortress
   {
     name: 'Dark Fortress',
+    spikeColor: '#b0392b',
     accentColor: '#9b59b6',
     platColor: '#2a1838',
     platTopColor: '#3c2250',

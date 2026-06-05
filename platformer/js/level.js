@@ -28,6 +28,118 @@ const CRUMBLE_REGEN = 2.8;
 function lerp(a, b, t) { return a + (b - a) * t; }
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
+// ─── PER-STAGE CHARACTER ─────────────────────────────────────────────────────
+// Each biome plays differently, not just recolored:
+//   grounded — lay a continuous floor so a missed jump lands on terrain instead
+//              of an endless death-void (fields, cave floor, desert, forest).
+//   low      — keep platforms near that floor as rolling terrain (paired w/ grounded).
+//   pool     — which segments may appear (by id). Terrain stages get hills/spikes;
+//              floating stages also get the moving/crumbling "vehicle" segments.
+//   flyerFreq — how common the stage's air species are (cave bats, sky birds…).
+//   (Enemy species themselves live in SPECIES / STAGE_ROSTER below.)
+const TERRAIN_POOL = ['gap', 'stairsUp', 'stairsDown', 'coinVault', 'pillars',
+  'zigzag', 'longLeap', 'descent', 'spikePath', 'spikeLeap', 'gauntlet'];
+
+const STAGE_PROFILES = [
+  { grounded: true,  low: true,  pool: TERRAIN_POOL, flyerFreq: 1.0 }, // 0 Meadow — grassy field
+  { grounded: true,  low: true,  pool: TERRAIN_POOL, flyerFreq: 1.7 }, // 1 Cave — stalagmites + bats
+  { grounded: false, low: false, pool: null,         flyerFreq: 0.5 }, // 2 Icy Peaks — floating & slippery
+  { grounded: true,  low: true,  pool: TERRAIN_POOL, flyerFreq: 1.0 }, // 3 Desert — dunes & cacti
+  { grounded: false, low: false, pool: null,         flyerFreq: 0.9 }, // 4 Lava — islands over magma
+  { grounded: false, low: false, pool: null,         flyerFreq: 1.9 }, // 5 Sky — birds everywhere
+  { grounded: true,  low: true,  pool: TERRAIN_POOL, flyerFreq: 0.9 }, // 6 Forest — woodland floor
+  { grounded: false, low: false, pool: null,         flyerFreq: 1.7 }, // 7 Space — drones & turrets
+  { grounded: false, low: false, pool: null,         flyerFreq: 1.0 }, // 8 Crystal — shards over abyss
+  { grounded: false, low: false, pool: null,         flyerFreq: 1.2 }, // 9 Dark Fortress — ramparts
+];
+function getProfile(stageIdx) { return STAGE_PROFILES[((stageIdx % 10) + 10) % 10] || STAGE_PROFILES[0]; }
+
+// ─── ENEMY SPECIES ───────────────────────────────────────────────────────────
+// Every stage fields its own bespoke species with DIFFERENT BEHAVIOR, not a
+// reskin. behavior ∈ walk / hop / charge / fly / swoop / float / orbit / drop /
+// spider / shoot — implemented in entities.js `updateEnemies`, drawn per-species
+// in `drawEnemies`. `air` foes skip knockback clamping; `color` tints particles.
+const SPECIES = {
+  slime:    p => ({ species: 'slime',    behavior: 'hop',    w: 26, h: 20, hp: 1 + Math.floor(p * 2), dmg: 5,  color: '#58b94a', speed: lerp(28, 55, p), jumpForce: lerp(230, 300, p), jumpEvery: lerp(1.2, 0.8, p) }),
+  bee:      p => ({ species: 'bee',      behavior: 'fly',    air: true, w: 24, h: 20, hp: 1, dmg: 4, color: '#f9ca24', chase: 80 }),
+  crawler:  p => ({ species: 'crawler',  behavior: 'walk',   w: 30, h: 20, hp: 2 + Math.floor(p * 2), dmg: 6,  color: '#7f8c8d', speed: lerp(35, 70, p) }),
+  bat:      p => ({ species: 'bat',      behavior: 'swoop',  air: true, w: 30, h: 22, hp: 1 + Math.floor(p * 2), dmg: 6, color: '#786fa6', swoopRange: 170, swoopSpeed: lerp(230, 310, p) }),
+  slider:   p => ({ species: 'slider',   behavior: 'walk',   w: 30, h: 24, hp: 2 + Math.floor(p * 2), dmg: 7,  color: '#82ccdd', speed: lerp(100, 160, p) }),
+  icicle:   p => ({ species: 'icicle',   behavior: 'drop',   air: true, w: 18, h: 30, hp: 1, dmg: 12, color: '#aee3ff' }),
+  scorpion: p => ({ species: 'scorpion', behavior: 'charge', w: 34, h: 20, hp: 2 + Math.floor(p * 3), dmg: 8,  color: '#cc8e35', speed: lerp(30, 55, p), chargeRange: 180, chargeSpeed: lerp(260, 340, p) }),
+  vulture:  p => ({ species: 'vulture',  behavior: 'orbit',  air: true, w: 34, h: 24, hp: 1 + Math.floor(p * 2), dmg: 6, color: '#935116', orbitR: lerp(50, 85, p), orbitSpd: lerp(1.5, 2.2, p) }),
+  lavablob: p => ({ species: 'lavablob', behavior: 'hop',    w: 30, h: 24, hp: 2 + Math.floor(p * 3), dmg: 9,  color: '#ff793f', speed: lerp(38, 66, p), jumpForce: lerp(420, 520, p), jumpEvery: 0.15 }),
+  ember:    p => ({ species: 'ember',    behavior: 'fly',    air: true, w: 20, h: 24, hp: 1, dmg: 5, color: '#ffb142', chase: 95 }),
+  bird:     p => ({ species: 'bird',     behavior: 'swoop',  air: true, w: 34, h: 24, hp: 1 + Math.floor(p * 2), dmg: 6, color: '#f5f6fa', swoopRange: 210, swoopSpeed: lerp(270, 350, p) }),
+  puff:     p => ({ species: 'puff',     behavior: 'float',  air: true, w: 30, h: 24, hp: 1 + Math.floor(p * 2), dmg: 5, color: '#dfe6e9', floatSpeed: lerp(42, 70, p) }),
+  spider:   p => ({ species: 'spider',   behavior: 'spider', air: true, w: 26, h: 20, hp: 1 + Math.floor(p * 2), dmg: 7, color: '#8d6e4a', dropSpeed: 330 }),
+  shroom:   p => ({ species: 'shroom',   behavior: 'hop',    w: 26, h: 24, hp: 2 + Math.floor(p * 2), dmg: 6, color: '#e17055', speed: lerp(24, 48, p), jumpForce: lerp(380, 460, p), jumpEvery: lerp(1.7, 1.1, p) }),
+  drone:    p => ({ species: 'drone',    behavior: 'orbit',  air: true, w: 28, h: 18, hp: 2 + Math.floor(p * 2), dmg: 6, color: '#00d2d3', orbitR: lerp(45, 75, p), orbitSpd: lerp(2.1, 2.9, p) }),
+  turret:   p => ({ species: 'turret',   behavior: 'shoot',  w: 30, h: 22, hp: 3 + Math.floor(p * 3), dmg: 8, color: '#4834d4', shotDmg: 8, range: 430, fireEvery: lerp(2.6, 1.9, p) }),
+  golem:    p => ({ species: 'golem',    behavior: 'walk',   w: 42, h: 38, hp: 6 + Math.floor(p * 6), dmg: 12, color: '#48dbfb', speed: lerp(20, 42, p) }),
+  shard:    p => ({ species: 'shard',    behavior: 'orbit',  air: true, w: 22, h: 26, hp: 1 + Math.floor(p * 2), dmg: 7, color: '#00ffe5', orbitR: lerp(55, 90, p), orbitSpd: lerp(1.8, 2.6, p) }),
+  knight:   p => ({ species: 'knight',   behavior: 'charge', w: 32, h: 34, hp: 5 + Math.floor(p * 6), dmg: 12, color: '#8854d0', speed: lerp(24, 44, p), chargeRange: 210, chargeSpeed: lerp(300, 380, p) }),
+  wraith:   p => ({ species: 'wraith',   behavior: 'float',  air: true, w: 30, h: 32, hp: 2 + Math.floor(p * 3), dmg: 8, color: '#9b59b6', floatSpeed: lerp(50, 85, p) }),
+};
+
+// What each stage fields: ground patrollers, air dwellers (placed over gaps),
+// and hang species (anchored above walkways — falling icicles, web spiders).
+const STAGE_ROSTER = [
+  { ground: [['slime', 1]],    air: [['bee', 1]],                 hang: [] },              // 0 Meadow
+  { ground: [['crawler', 1]],  air: [['bat', 1]],                 hang: [] },              // 1 Cave
+  { ground: [['slider', 1]],   air: [],                           hang: [['icicle', 1]] }, // 2 Icy Peaks
+  { ground: [['scorpion', 1]], air: [['vulture', 1]],             hang: [] },              // 3 Desert
+  { ground: [['lavablob', 1]], air: [['ember', 1]],               hang: [] },              // 4 Lava
+  { ground: [],                air: [['bird', 1], ['puff', 0.7]], hang: [] },              // 5 Sky
+  { ground: [['shroom', 1]],   air: [],                           hang: [['spider', 1]] }, // 6 Forest
+  { ground: [['turret', 1]],   air: [['drone', 1]],               hang: [] },              // 7 Space
+  { ground: [['golem', 1]],    air: [['shard', 1]],               hang: [] },              // 8 Crystal
+  { ground: [['knight', 1]],   air: [['wraith', 1]],              hang: [] },              // 9 Dark Fortress
+];
+
+function pickSpecies(list, rng) {
+  let total = 0;
+  for (const s of list) total += s[1];
+  let r = rng() * total;
+  for (const s of list) { r -= s[1]; if (r <= 0) return s[0]; }
+  return list[0][0];
+}
+
+// ─── BOSSES ──────────────────────────────────────────────────────────────────
+// Every 10th level fields the stage's signature species scaled up ×3 on a huge
+// arena. Ground bosses use the 'boss' leap-chase behavior; sky/space bosses are
+// giant swoopers. The exit is locked until the boss dies.
+const BOSS_SPECIES = ['slime', 'crawler', 'slider', 'scorpion', 'lavablob',
+  'bird', 'shroom', 'drone', 'golem', 'knight'];
+
+function makeBoss(stageIdx, p, arena) {
+  const sp = BOSS_SPECIES[((stageIdx % 10) + 10) % 10];
+  const base = SPECIES[sp](p);
+  const scale = 3;
+  const w = base.w * scale, h = base.h * scale;
+  const flying = sp === 'bird' || sp === 'drone';
+  const e = {
+    ...base, boss: true, bossScale: scale, w, h,
+    hp: 24 + Math.round(p * 36), dmg: Math.max(14, (base.dmg || 8) + 8),
+    x: Math.round(arena.x + arena.w * 0.6), dir: -1, phase: 0,
+    patrolMin: arena.x + 6, patrolMax: arena.x + arena.w - 6 - w,
+  };
+  if (flying) {
+    e.behavior = 'swoop'; e.air = true;
+    e.baseX = Math.round(arena.x + arena.w / 2);
+    e.baseY = Math.max(TOP + 50, arena.y - 215);
+    e.y = e.baseY;
+    e.swoopRange = 560; e.swoopSpeed = 300 + p * 90;
+  } else {
+    e.behavior = 'boss'; e.air = false;
+    e.y = arena.y - h;
+    e.baseY = arena.y - h;
+    e.speed = 60 + p * 60;
+    e.leapForce = 660; e.leapEvery = Math.max(1.3, 2.3 - p);
+  }
+  return e;
+}
+
 function mkP(x, y, w, type = 'normal') {
   return { x: Math.round(x), y: Math.round(y), w: Math.max(40, Math.round(w)), h: 20, type };
 }
@@ -68,6 +180,7 @@ function arcCoins(coins, x1, y1, x2, y2, n, rng, arcH = 55) {
 function connect(b, gap, y, w, type, arcH, coinN) {
   y = clamp(y, TOP, FLOOR);
   y = Math.max(y, b.y - MAX_RISE); // never demand more than one jump's worth of climb
+  if (b.low) y = Math.max(y, FLOOR - 175); // terrain stages: keep platforms near the ground
   const fromX = b.x, fromY = b.y;
   const pl = mkP(b.x + gap, y, w, type || 'normal');
   b.plats.push(pl);
@@ -281,26 +394,29 @@ function segFinish(b) {
 // tier: 0 easy, 1 medium, 2 hard. gate: minimum global progress before a
 // mechanic is allowed to appear (so stage 1 doesn't open with crumble + spikes).
 const SEGMENTS = [
-  { fn: segGapRun, tier: 0, gate: 0 },
-  { fn: segStairsUp, tier: 0, gate: 0 },
-  { fn: segStairsDown, tier: 0, gate: 0 },
-  { fn: segCoinVault, tier: 0, gate: 0 },
-  { fn: segPillars, tier: 1, gate: 0 },
-  { fn: segZigzag, tier: 1, gate: 0 },
-  { fn: segLongLeap, tier: 1, gate: 0 },
-  { fn: segDescentDrop, tier: 1, gate: 0 },
-  { fn: segSpikePath, tier: 1, gate: 0.03 },
-  { fn: segMovingBridge, tier: 2, gate: 0.06 },
-  { fn: segElevator, tier: 2, gate: 0.06 },
-  { fn: segGauntlet, tier: 2, gate: 0.10 },
-  { fn: segCrumbleRun, tier: 2, gate: 0.16 },
-  { fn: segSpikeLeap, tier: 2, gate: 0.20 },
+  { id: 'gap', fn: segGapRun, tier: 0, gate: 0 },
+  { id: 'stairsUp', fn: segStairsUp, tier: 0, gate: 0 },
+  { id: 'stairsDown', fn: segStairsDown, tier: 0, gate: 0 },
+  { id: 'coinVault', fn: segCoinVault, tier: 0, gate: 0 },
+  { id: 'pillars', fn: segPillars, tier: 1, gate: 0 },
+  { id: 'zigzag', fn: segZigzag, tier: 1, gate: 0 },
+  { id: 'longLeap', fn: segLongLeap, tier: 1, gate: 0 },
+  { id: 'descent', fn: segDescentDrop, tier: 1, gate: 0 },
+  { id: 'spikePath', fn: segSpikePath, tier: 1, gate: 0.03 },
+  { id: 'movingBridge', fn: segMovingBridge, tier: 2, gate: 0.06 },
+  { id: 'elevator', fn: segElevator, tier: 2, gate: 0.06 },
+  { id: 'gauntlet', fn: segGauntlet, tier: 2, gate: 0.10 },
+  { id: 'crumble', fn: segCrumbleRun, tier: 2, gate: 0.16 },
+  { id: 'spikeLeap', fn: segSpikeLeap, tier: 2, gate: 0.20 },
 ];
 
-function pickSegment(b, e, last) {
+function pickSegment(b, e, last, prof) {
+  const allow = prof && prof.pool;
+  const ok = s => b.p >= s.gate && s.fn !== last && (!allow || allow.includes(s.id));
   const desired = e < 0.34 ? 0 : e < 0.66 ? 1 : 2;
-  let pool = SEGMENTS.filter(s => b.p >= s.gate && s.tier <= desired && s.tier >= desired - 1 && s.fn !== last);
-  if (!pool.length) pool = SEGMENTS.filter(s => b.p >= s.gate && s.tier <= desired && s.fn !== last);
+  let pool = SEGMENTS.filter(s => ok(s) && s.tier <= desired && s.tier >= desired - 1);
+  if (!pool.length) pool = SEGMENTS.filter(s => ok(s) && s.tier <= desired);
+  if (!pool.length) pool = SEGMENTS.filter(s => b.p >= s.gate && (!allow || allow.includes(s.id)));
   if (!pool.length) pool = SEGMENTS.filter(s => b.p >= s.gate);
   if (!pool.length) pool = [SEGMENTS[0]];
   return pool[Math.floor(b.rng() * pool.length)];
@@ -310,8 +426,9 @@ function pickSegment(b, e, last) {
 // Builds the level as an intentional arc: warm-up → escalating challenges
 // (paced with breathers) → a hard climax → the exit approach. Difficulty ramps
 // both across the 500 levels (global `p`) and within each level (local `e`).
-function buildLevel(rng, p) {
-  const b = { rng, p, x: 220, y: FLOOR, plats: [], coins: [], hazards: [] };
+function buildLevel(rng, p, stageIdx) {
+  const prof = getProfile(stageIdx);
+  const b = { rng, p, x: 220, y: FLOOR, plats: [], coins: [], hazards: [], low: !!prof.low };
 
   // Gentle on-ramp for the opening levels: the first ~15 levels (the start of
   // Meadow) begin short and easy, then ramp up to the full length/difficulty
@@ -320,6 +437,23 @@ function buildLevel(rng, p) {
   const introT = clamp(idx / 15, 0, 1);
   const baseW = lerp(5500, 24000, p);         // full-curve length for this progress
   const targetW = lerp(1800, baseW, introT);  // much shorter while easing in
+
+  // Boss levels: every 10th level (10/20/30/40/50 of each stage) is a short
+  // approach into a very large arena platform holding the stage boss. The exit
+  // stays locked until the boss is defeated (gated in entities.js/main.js).
+  if (idx % 10 === 9) {
+    segRest(b, 0.15);
+    const seg = pickSegment(b, 0.3, null, prof);
+    seg.fn(b, 0.3);
+    segRest(b, 0.2);
+    const arena = mkP(b.x + 100, clamp(b.y + 40, TOP + 150, FLOOR), 1150, 'normal');
+    b.plats.push(arena);
+    arcCoins(b.coins, b.x, b.y, arena.x + 90, arena.y, 3, rng, 55);
+    b.x = arena.x + arena.w; b.y = arena.y;
+    b.arena = arena;
+    segFinish(b);
+    return b;
+  }
 
   segRest(b, 0.08); // gentle landing right after the start pad
 
@@ -337,7 +471,7 @@ function buildLevel(rng, p) {
       segRest(b, e); sinceRest = 0; continue;
     }
 
-    const seg = pickSegment(b, e, last);
+    const seg = pickSegment(b, e, last, prof);
     seg.fn(b, e);
     last = seg.fn;
     sinceRest++;
@@ -348,7 +482,7 @@ function buildLevel(rng, p) {
   // so they stay short and end gently instead of on a wall.
   if (introT >= 0.2) {
     const climaxE = clamp((p * 0.5 + 0.88) * (0.35 + 0.65 * introT), 0, 1);
-    const climax = pickSegment(b, climaxE, last);
+    const climax = pickSegment(b, climaxE, last, prof);
     climax.fn(b, climaxE);
   }
 
@@ -361,70 +495,122 @@ function buildLevel(rng, p) {
 // platform they spawn on; flyers hover in wide gaps. Count, HP and type variety
 // all scale with global progress `p`, and the start pad + exit platform stay
 // clear so spawns and finishes are safe.
-function makeGroundEnemy(pl, rng, p) {
-  const top = pl.y; // player-stand height of this platform
-  const roll = rng();
-  let type, w, h, hp, speed, color, jumpForce, jumpEvery;
-  if (p > 0.40 && roll < 0.18) {
-    type = 'brute'; w = 40; h = 38; hp = 5 + Math.floor(p * 7);
-    speed = lerp(28, 66, p); color = '#6c5ce7';
-  } else if (p > 0.25 && roll < 0.42) {
-    type = 'jumper'; w = 24; h = 24; hp = 2 + Math.floor(p * 3);
-    speed = lerp(30, 70, p); color = '#16a085';
-    jumpForce = lerp(360, 480, p); jumpEvery = lerp(1.8, 1.0, p);
-  } else {
-    type = 'walker'; w = 26; h = 24; hp = 1 + Math.floor(p * 3);
-    speed = lerp(45, 108, p); color = '#c0392b';
-  }
-  if (pl.w < w + 24) return null; // platform too small to patrol
+function makeGroundFoe(pl, rng, p, roster) {
+  if (!roster.ground.length) return null;
+  const base = SPECIES[pickSpecies(roster.ground, rng)](p);
+  if (pl.w < base.w + 24) return null; // platform too small to patrol
   const min = pl.x + 4;
-  const max = pl.x + pl.w - 4 - w;
+  const max = pl.x + pl.w - 4 - base.w;
   const e = {
-    type, x: Math.round(lerp(min, max, rng())), y: Math.round(top - h),
-    w, h, hp, dir: rng() < 0.5 ? -1 : 1, speed, color,
+    ...base, x: Math.round(lerp(min, max, rng())), y: Math.round(pl.y - base.h),
+    dir: rng() < 0.5 ? -1 : 1, phase: rng() * 6.28,
     patrolMin: Math.round(min), patrolMax: Math.round(max),
   };
-  if (type === 'jumper') { e.baseY = e.y; e.jumpForce = jumpForce; e.jumpEvery = jumpEvery; e.phase = rng() * jumpEvery; }
+  if (base.behavior === 'hop') e.baseY = e.y;
+  if (base.behavior === 'shoot') { e.patrolMin = e.patrolMax = e.x; } // emplaced gun
   return e;
 }
 
-function placeEnemies(platforms, rng, p, exitPlat) {
+function placeEnemies(platforms, rng, p, exitPlat, stageIdx) {
+  const prof = getProfile(stageIdx);
+  const roster = STAGE_ROSTER[((stageIdx % 10) + 10) % 10];
   const enemies = [];
   if (p < 0.012) return enemies; // very first level stays enemy-free
   const density = lerp(0.12, 0.6, p);
   const CAP = 46;
+  const exitCx = exitPlat.x + exitPlat.w / 2;
 
-  // Ground-bound enemies on solid platforms / ground runs.
+  // Builders for air dwellers (hover over gaps) and hang species (anchored
+  // above a walkway: falling icicles, thread spiders).
+  const mkAir = (sp, midX, baseY, gap) => {
+    const base = SPECIES[sp](p);
+    const e = {
+      ...base, x: Math.round(midX), y: Math.round(baseY),
+      dir: 1, phase: rng() * 6.28, patrolMin: 0, patrolMax: 0,
+      baseX: Math.round(midX), baseY: Math.round(baseY),
+    };
+    if (base.behavior === 'fly') {
+      e.ampX = Math.min(gap * 0.3, 120); e.ampY = lerp(15, 42, p);
+      e.sx = 0.8 + rng() * 0.9; e.sy = 1.4 + rng() * 1.1;
+    }
+    return e;
+  };
+  const mkHang = (sp, cx, platTop) => {
+    const base = SPECIES[sp](p);
+    const anchorY = Math.round(clamp(platTop - lerp(160, 215, rng()), TOP + 8, platTop - 120));
+    return {
+      ...base, x: Math.round(cx - base.w / 2), y: anchorY,
+      dir: 1, phase: rng() * 6.28, patrolMin: 0, patrolMax: 0,
+      baseX: Math.round(cx), baseY: anchorY, anchorY,
+      dropY: Math.round(platTop - base.h - 6),
+    };
+  };
+
+  // Ground patrollers on solid platforms / ground runs.
   for (const pl of platforms) {
-    if (enemies.length >= CAP) break;
+    if (enemies.length >= CAP || !roster.ground.length) break;
     if (pl === exitPlat) continue;
-    if (pl.x < 320) continue;            // keep the opening safe
     if (pl.type === 'move' || pl.type === 'crumble') continue; // unstable footing
     if (pl.type !== 'ground' && pl.type !== 'normal') continue;
+
+    // A wide continuous floor (grounded stages) gets several foes spaced along it
+    // rather than a single one, so terrain levels feel populated.
+    if (pl.type === 'ground' && pl.w > 360) {
+      const slots = Math.min(8, Math.floor(pl.w / 360));
+      for (let s = 0; s < slots && enemies.length < CAP; s++) {
+        const cx = pl.x + pl.w * (s + 0.5) / slots;
+        if (cx < 340) continue;                          // keep the opening safe
+        if (Math.abs(cx - exitCx) < 200) continue;        // keep the finish safe
+        if (rng() >= density) continue;
+        const e = makeGroundFoe({ x: Math.round(cx - 60), y: pl.y, w: 120 }, rng, p, roster);
+        if (e) enemies.push(e);
+      }
+      continue;
+    }
+
+    if (pl.x < 320) continue;            // keep the opening safe
     if (pl.w < 50) continue;
     if (rng() >= density) continue;
-    const e = makeGroundEnemy(pl, rng, p);
+    const e = makeGroundFoe(pl, rng, p, roster);
     if (e) enemies.push(e);
   }
 
-  // Flyers hovering in wide gaps.
-  if (p >= 0.12) {
-    const sorted = platforms.filter(pl => pl.type !== 'move').slice().sort((a, b) => a.x - b.x);
+  // Hang species anchored above walkways (drop on / descend at the player).
+  if (roster.hang.length) {
+    for (const pl of platforms) {
+      if (enemies.length >= CAP) break;
+      if (pl === exitPlat) continue;
+      if (pl.type === 'ground' && pl.w > 480) {
+        const slots = Math.min(6, Math.floor(pl.w / 480));
+        for (let s = 0; s < slots && enemies.length < CAP; s++) {
+          const cx = pl.x + pl.w * (s + 0.5) / slots;
+          if (cx < 380 || Math.abs(cx - exitCx) < 220) continue;
+          if (rng() >= density * 0.55) continue;
+          enemies.push(mkHang(pickSpecies(roster.hang, rng), cx, pl.y));
+        }
+      } else if (pl.type === 'normal' && pl.w >= 70 && pl.x > 360) {
+        if (rng() >= density * 0.5) continue;
+        const cx = pl.x + pl.w * (0.25 + rng() * 0.5);
+        if (Math.abs(cx - exitCx) < 220) continue;
+        enemies.push(mkHang(pickSpecies(roster.hang, rng), cx, pl.y));
+      }
+    }
+  }
+
+  // Air dwellers over gaps — frequency and gap tolerance scale with the stage's
+  // flyerFreq (cave bats and sky birds are common; desert vultures rare).
+  const flyFreq = prof.flyerFreq || 1;
+  if (roster.air.length && p >= 0.04 && flyFreq > 0) {
+    const minGap = 200 / Math.max(0.6, flyFreq);
+    const sorted = platforms.filter(pl => pl.type !== 'move' && pl.type !== 'ground').slice().sort((a, b) => a.x - b.x);
     for (let i = 1; i < sorted.length && enemies.length < CAP; i++) {
       const a = sorted[i - 1], b = sorted[i];
       const gap = b.x - (a.x + a.w);
-      if (gap < 200) continue;
-      if (rng() >= lerp(0.1, 0.5, p)) continue;
+      if (gap < minGap) continue;
+      if (rng() >= clamp(lerp(0.1, 0.5, p) * flyFreq, 0, 0.85)) continue;
       const midX = a.x + a.w + gap / 2;
       const baseY = clamp(Math.min(a.y, b.y) - lerp(45, 95, p), TOP + 30, FLOOR - 40);
-      enemies.push({
-        type: 'flyer', x: Math.round(midX), y: Math.round(baseY), w: 34, h: 26,
-        hp: 1 + Math.floor(p * 2), dir: 1, color: '#8e44ad',
-        baseX: Math.round(midX), baseY: Math.round(baseY),
-        ampX: Math.min(gap * 0.3, 120), ampY: lerp(15, 42, p),
-        sx: 0.8 + rng() * 0.9, sy: 1.4 + rng() * 1.1, phase: rng() * 6.28,
-        patrolMin: 0, patrolMax: 0,
-      });
+      enemies.push(mkAir(pickSpecies(roster.air, rng), midX, baseY, gap));
     }
   }
 
@@ -436,7 +622,8 @@ export function generateLevel(stageIdx, levelIdx) {
   const rng = mulberry32(seed);
   const p = (stageIdx * 50 + levelIdx) / 499;
 
-  const { plats, coins, hazards } = buildLevel(rng, p);
+  const { plats, coins, hazards, arena } = buildLevel(rng, p, stageIdx);
+  const prof = getProfile(stageIdx);
 
   // Starting safe platform (always present; player spawns here).
   const startPlat = { x: 40, y: FLOOR, w: 180, h: 20, type: 'normal' };
@@ -456,7 +643,20 @@ export function generateLevel(stageIdx, levelIdx) {
     w: 40, h: 60,
   };
 
-  const enemies = placeEnemies(platforms, rng, p, lastPlat);
+  // Grounded biomes get a continuous floor so a missed jump lands on terrain
+  // instead of falling into a death-void (added after exit/width are fixed so it
+  // doesn't affect either; it only catches falls and hosts ground-patrol foes).
+  if (prof.grounded) platforms.push(mkGround(0, width));
+
+  const enemies = placeEnemies(platforms, rng, p, lastPlat, stageIdx);
+
+  // Boss levels: clear the arena of regular foes and field the stage boss.
+  if (arena) {
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      if (enemies[i].x > arena.x - 60 && enemies[i].x < arena.x + arena.w + 60) enemies.splice(i, 1);
+    }
+    enemies.push(makeBoss(stageIdx, p, arena));
+  }
 
   return { width, height: GH, platforms, coins, hazards, enemies, exit, stageIdx, levelIdx };
 }
@@ -582,9 +782,10 @@ export function drawPlatforms(ctx, platforms, stage, t = 0) {
 
 export function drawHazards(ctx, hazards, stage) {
   if (!hazards || !hazards.length) return;
+  const spikeCol = getTheme(stage).spikeColor || '#c0392b';
   for (const h of hazards) {
     const x = h.x, y = h.y, w = h.w, hh = h.h;
-    ctx.fillStyle = '#c0392b';
+    ctx.fillStyle = spikeCol;
     ctx.beginPath();
     if (h.dir === 'down') {
       ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w / 2, y + hh);
