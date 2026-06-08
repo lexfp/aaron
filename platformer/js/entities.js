@@ -286,6 +286,20 @@ function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
   return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
 }
 
+function dropCoins(cx, cy, n) {
+  for (let i = 0; i < n; i++) {
+    const angle = (i / Math.max(1, n)) * Math.PI * 2;
+    const r = 10 + (i % 3) * 12;
+    coins.push({
+      x: Math.round(cx + Math.cos(angle) * r) - 8,
+      y: Math.round(cy + Math.sin(angle) * r) - 8,
+      collected: false,
+      spinAngle: angle,
+    });
+  }
+  addCoinParticles(cx, cy); // gold burst at the kill spot
+}
+
 function damageEnemy(e, dmg, knockDir, knock) {
   if (!e.alive) return;
   e.hp -= dmg;
@@ -300,9 +314,12 @@ function damageEnemy(e, dmg, knockDir, knock) {
   if (e.hp <= 0) {
     e.alive = false;
     addHitParticles(cx, cy, e.color, 12);
-    if (e.boss) { // boss defeat: big celebratory blast (also unlocks the exit)
+    if (e.boss) {
       addExplosion(cx, cy, e.color);
       addExplosion(cx, cy - 20, '#ffd700');
+      dropCoins(cx, cy, Math.round(e.maxHp * 1.5)); // big coin pile for bosses
+    } else {
+      dropCoins(cx, cy, Math.max(1, e.maxHp));      // coins scale with enemy toughness
     }
   } else {
     addHitParticles(cx, cy, '#ffffff', 4);
