@@ -398,6 +398,85 @@ export function updateProjectiles(dt, platforms) {
   }
 }
 
+// ─── BOSS SPECIAL ATTACKS ────────────────────────────────────────────────────
+// Each of the 10 boss species has a unique special: projectile patterns,
+// movement overrides, or area blasts. `_specialCD` counts down every frame;
+// on zero it fires and resets. Rage at 50% HP cuts the cooldown by 35%.
+
+function bossFireShot(e, vx, vy, color, dmg, grav, life, r) {
+  const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+  enemyShots.push({ x: ecx, y: ecy, vx, vy: vy || 0, dmg, grav: grav || 0,
+                    life: life || 2.2, r: r || 7, color, boss: true });
+}
+
+function triggerBossSpecial(e, pcx, pcy) {
+  const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+  const dir = pcx >= ecx ? 1 : -1;
+  e._atkFlash = 0.45;
+  switch (e.species) {
+    case 'slime':  // triple arcing green blob
+      bossFireShot(e, -100, -550, '#58b94a', e.dmg, 1100, 2.0, 9);
+      bossFireShot(e,    0, -620, '#58b94a', e.dmg, 1100, 2.0, 9);
+      bossFireShot(e,  100, -550, '#58b94a', e.dmg, 1100, 2.0, 9);
+      break;
+    case 'crawler':  // shockwave: side shots + lobbed rock toward player
+      bossFireShot(e, -360, 0, '#7f8c8d', e.dmg, 0, 2.0, 8);
+      bossFireShot(e,  360, 0, '#7f8c8d', e.dmg, 0, 2.0, 8);
+      bossFireShot(e, dir * 270, -85, '#9b9ba8', e.dmg, 230, 2.0, 9);
+      addHitParticles(ecx, ecy + e.h * 0.5, '#aaa', 10);
+      break;
+    case 'slider':  // ice dash — movement handled in boss behavior block
+      e._sliding = true; e._slideDir = dir; e._slideT = 0.6; e._slideV = 600;
+      break;
+    case 'scorpion': {  // 5-way venom fan aimed at the player
+      const ang = Math.atan2(pcy - ecy, pcx - ecx);
+      for (let i = -2; i <= 2; i++) {
+        const a = ang + i * 0.3;
+        bossFireShot(e, Math.cos(a) * 390, Math.sin(a) * 390, '#cc8e35', e.dmg, 0, 2.2, 8);
+      }
+      break;
+    }
+    case 'lavablob':  // 6-way radial magma slam + explosion ring
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        bossFireShot(e, Math.cos(a) * 320, Math.sin(a) * 320 - 50, '#ff793f', e.dmg, 290, 1.8, 10);
+      }
+      addExplosion(ecx, ecy + e.h * 0.45, '#ff793f');
+      break;
+    case 'bird': {  // 3 feather darts aimed at the player
+      const ang = Math.atan2(pcy - ecy, pcx - ecx);
+      for (let i = -1; i <= 1; i++) {
+        const a = ang + i * 0.24;
+        bossFireShot(e, Math.cos(a) * 370, Math.sin(a) * 370, '#f0e6d3', Math.round(e.dmg * 0.85), 0, 2.0, 7);
+      }
+      break;
+    }
+    case 'shroom': {  // large arcing spore bomb lobbed at player
+      const dx = pcx - ecx, dy = pcy - ecy;
+      const dist = Math.max(80, Math.hypot(dx, dy));
+      bossFireShot(e, (dx / dist) * 200, -430, '#e17055', e.dmg, 720, 3.2, 14);
+      break;
+    }
+    case 'drone':  // 5-beam laser spread fired straight down
+      for (let i = -2; i <= 2; i++) bossFireShot(e, i * 72, 440, '#00d2d3', e.dmg, 0, 1.6, 7);
+      break;
+    case 'golem':  // 8-way crystal burst (radial in all directions)
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        bossFireShot(e, Math.cos(a) * 300, Math.sin(a) * 300, '#48dbfb', e.dmg, 0, 1.8, 9);
+      }
+      addExplosion(ecx, ecy, '#48dbfb');
+      break;
+    case 'knight': {  // blade flurry: 3 slashes + lunging leap
+      bossFireShot(e, dir * 490, -20, '#8854d0', e.dmg, 0, 1.4, 8);
+      bossFireShot(e, dir * 430, -55, '#8854d0', e.dmg, 60, 1.4, 8);
+      bossFireShot(e, dir * 460,  15, '#8854d0', e.dmg, 0, 1.4, 8);
+      if (e.vy === 0) { e.vy = -480; e._vx = dir * 260; }
+      break;
+    }
+  }
+}
+
 // Per-species behavior AI + player contact/stomp. Returns { playerHit }.
 // Behaviors: walk (patrol), hop (bouncing patrol), fly (sine hover), swoop
 // (hover→dive at player→return), float (slow homing drift), orbit (circles an
@@ -471,8 +550,15 @@ export function updateEnemies(dt, platforms, player) {
         e.x += e.dir * e.speed * dt; // carry momentum through the air
       }
     } else if (bhv === 'boss') {
-      // Arena boss: stalks the player on the ground, periodically leaping at them.
-      if (e.vy !== 0 || e.y < e.baseY) { // airborne mid-leap
+      if (e._sliding) {  // slider boss: high-speed ice dash across arena
+        e.dir = e._slideDir;
+        e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + e._slideDir * e._slideV * dt));
+        e._slideT -= dt;
+        if (e._slideT <= 0 || e.x <= e.patrolMin + 4 || e.x >= e.patrolMax - 4) {
+          e._sliding = false;
+          addHitParticles(ecx, ecy, '#82ccdd', 8); // ice shatter on stop
+        }
+      } else if (e.vy !== 0 || e.y < e.baseY) { // airborne mid-leap
         e.vy += E_GRAVITY * dt;
         e.y += e.vy * dt;
         e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + (e._vx || 0) * dt));
@@ -610,6 +696,24 @@ export function updateEnemies(dt, platforms, player) {
       }
     }
 
+    // Boss special attack system: per-species cooldown + rage at 50% HP
+    if (e.boss) {
+      if (!e._rage && e.hp > 0 && e.hp <= e.maxHp * 0.5) {
+        e._rage = true;
+        e.speed = Math.round((e.speed || 60) * 1.4);
+        if (e.leapEvery) e.leapEvery = Math.max(0.9, e.leapEvery * 0.7);
+        e.swoopSpeed = Math.round((e.swoopSpeed || 300) * 1.3);
+        addExplosion(ecx, ecy, e.color);
+        addExplosion(ecx, ecy - 24, '#ff4500');
+      }
+      if (e._atkFlash > 0) e._atkFlash -= dt;
+      e._specialCD -= dt;
+      if (e._specialCD <= 0) {
+        triggerBossSpecial(e, pcx, pcy);
+        e._specialCD = e._baseCD * (e._rage ? 0.65 : 1.0);
+      }
+    }
+
     if (player.dead) continue;
     if (rectsOverlap(player.x, player.y, player.w, player.h, e.x, e.y, e.w, e.h)) {
       const prevBottom = player._prevY + player.h;
@@ -631,10 +735,12 @@ export function updateEnemies(dt, platforms, player) {
     }
   }
 
-  // Turret bolts: fly straight, die on platforms, sting the player.
+  // Enemy shots: turret bolts (straight) + boss specials (may arc with vy/grav).
   for (let i = enemyShots.length - 1; i >= 0; i--) {
     const s = enemyShots[i];
     s.x += s.vx * dt;
+    s.y += (s.vy || 0) * dt;
+    s.vy = (s.vy || 0) + (s.grav || 0) * dt;
     s.life -= dt;
     let dead = s.life <= 0;
     if (!dead) {
@@ -647,12 +753,19 @@ export function updateEnemies(dt, platforms, player) {
         }
       }
     }
-    if (!dead && !player.dead &&
-        s.x > player.x && s.x < player.x + player.w &&
-        s.y > player.y && s.y < player.y + player.h) {
-      hurtPlayer(s.dmg, s.x - s.vx); // knock opposite to bolt travel
-      addHitParticles(s.x, s.y, '#7fdfff', 5);
-      dead = true;
+    if (!dead && !player.dead) {
+      // Boss specials use circular hit detection scaled to the projectile radius;
+      // regular turret bolts keep the original simple box check.
+      const sr = s.r || 3;
+      const pCx = player.x + player.w / 2, pCy = player.y + player.h / 2;
+      const hit = s.boss
+        ? Math.hypot(s.x - pCx, s.y - pCy) < sr + player.w * 0.35
+        : s.x > player.x && s.x < player.x + player.w && s.y > player.y && s.y < player.y + player.h;
+      if (hit) {
+        hurtPlayer(s.dmg, s.x - s.vx * 0.1);
+        addHitParticles(s.x, s.y, s.color || '#7fdfff', s.boss ? 8 : 5);
+        dead = true;
+      }
     }
     if (dead) enemyShots.splice(i, 1);
   }
@@ -696,13 +809,21 @@ export function drawEnemies(ctx, camX, W, t) {
 
     const sd = SPECIES_DRAW[e.species];
     if (sd) {
-      if (e.boss) { // menacing aura behind the boss
-        const ar = Math.max(e.w, e.h) * 0.78;
+      if (e.boss) { // menacing aura — expands and turns orange when enraged
+        const raging = !!e._rage;
+        const ar = Math.max(e.w, e.h) * (raging ? 0.95 : 0.78);
         const g = ctx.createRadialGradient(0, e.h / 2, ar * 0.3, 0, e.h / 2, ar);
-        g.addColorStop(0, 'rgba(255,40,40,0.16)');
-        g.addColorStop(1, 'rgba(255,40,40,0)');
+        g.addColorStop(0, raging ? 'rgba(255,90,0,0.22)' : 'rgba(255,40,40,0.16)');
+        g.addColorStop(1, 'rgba(255,40,0,0)');
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(0, e.h / 2, ar, 0, Math.PI * 2); ctx.fill();
+        if (raging) { // pulsing ring
+          const pls = 0.5 + Math.sin(e.t * 8) * 0.5;
+          ctx.strokeStyle = `rgba(255,110,0,${pls * 0.65})`;
+          ctx.lineWidth = 3.5;
+          ctx.beginPath(); ctx.arc(0, e.h / 2, ar * 0.82, 0, Math.PI * 2); ctx.stroke();
+          ctx.lineWidth = 1;
+        }
       }
       ctx.save();
       if (e.dir < 0) ctx.scale(-1, 1); // species art faces +x; flip to face travel
@@ -726,16 +847,33 @@ export function drawEnemies(ctx, camX, W, t) {
       ctx.fillRect(-e.w / 2, 0, e.w, e.h);
       ctx.globalAlpha = 1;
     }
+    // special attack charge flash (yellow burst when a boss special fires)
+    if (e._atkFlash > 0) {
+      ctx.globalAlpha = (e._atkFlash / 0.45) * 0.72;
+      ctx.fillStyle = '#ffe066';
+      ctx.fillRect(-e.w / 2, 0, e.w, e.h);
+      ctx.globalAlpha = 1;
+    }
     ctx.restore();
 
     if (e.boss) {
-      // chunky boss HP bar
+      // chunky boss HP bar — turns orange in rage, shows 50% rage threshold marker
       const bw = e.w + 14;
       const bx = e.x + e.w / 2 - bw / 2;
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.fillRect(bx - 2, e.y - 18, bw + 4, 10);
-      ctx.fillStyle = '#e74c3c';
-      ctx.fillRect(bx, e.y - 16, bw * Math.max(0, e.hp / e.maxHp), 6);
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(bx - 2, e.y - 20, bw + 4, 12);
+      ctx.fillStyle = e._rage ? '#ff6b35' : '#e74c3c';
+      ctx.fillRect(bx, e.y - 18, bw * Math.max(0, e.hp / e.maxHp), 8);
+      // rage threshold marker at 50%
+      ctx.fillStyle = 'rgba(255,220,50,0.85)';
+      ctx.fillRect(bx + bw * 0.5 - 1, e.y - 20, 2, 12);
+      if (e._rage) {
+        ctx.fillStyle = '#ff8c42';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('ENRAGED', e.x + e.w / 2, e.y - 24);
+        ctx.textAlign = 'left';
+      }
     } else if (e.maxHp > 1) {
       // HP pips above tougher enemies
       const pw = e.w / e.maxHp;
@@ -746,17 +884,30 @@ export function drawEnemies(ctx, camX, W, t) {
     }
   }
 
-  // Turret bolts
+  // Enemy shots: boss specials (glowing orbs) and turret bolts
   for (const s of enemyShots) {
-    if (s.x < camX - 20 || s.x > camX + W + 20) continue;
-    const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 9);
-    g.addColorStop(0, '#bff4ff');
-    g.addColorStop(0.4, '#46d5ff');
-    g.addColorStop(1, 'rgba(70,213,255,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(s.x, s.y, 9, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(s.x - (s.vx > 0 ? 6 : 0), s.y - 1.5, 6, 3);
+    if (s.x < camX - 30 || s.x > camX + W + 30) continue;
+    if (s.boss) {
+      const r = s.r || 7;
+      const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r * 1.9);
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(0.3, s.color || '#ff4444');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(s.x, s.y, r * 1.9, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(s.x, s.y, r * 0.32, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // turret bolt
+      const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 9);
+      g.addColorStop(0, '#bff4ff');
+      g.addColorStop(0.4, '#46d5ff');
+      g.addColorStop(1, 'rgba(70,213,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(s.x - (s.vx > 0 ? 6 : 0), s.y - 1.5, 6, 3);
+    }
   }
 }
 

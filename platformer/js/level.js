@@ -137,6 +137,11 @@ function makeBoss(stageIdx, p, arena) {
     e.speed = 60 + p * 60;
     e.leapForce = 660; e.leapEvery = Math.max(1.3, 2.3 - p);
   }
+  // Per-species special attack cooldowns
+  const SP_CD = { slime: 4.0, crawler: 5.0, slider: 3.5, scorpion: 4.2, lavablob: 3.0,
+                  bird: 4.0, shroom: 4.5, drone: 3.8, golem: 5.5, knight: 4.0 };
+  e._baseCD = SP_CD[sp] || 4.0;
+  e._specialCD = e._baseCD * 0.45; // first special fires sooner so players see it quickly
   return e;
 }
 
