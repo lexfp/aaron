@@ -73,6 +73,11 @@ export const player = {
   swingT: 0,          // remaining swing-animation time
   swingDur: 0.16,
   weapon: null,       // equipped weapon def (for drawing)
+  // Signature effect timers (set to 0 in initPlayer; decayed in updatePlayer)
+  iceSlipT: 0,     // slider ice trail: override friction toward slippery
+  windPushT: 0,    // bird wind gust: horizontal push duration
+  windPushDir: 0,  // bird wind gust: push direction (-1 or 1)
+  dazeT: 0,        // shroom spore: dampen horizontal input
   // Computed from upgrades each level
   jumpForce: BASE_JUMP,
   djForce: BASE_DJ,
@@ -103,6 +108,12 @@ export function initPlayer(spawnX, spawnY) {
   player.attackCD = 0;
   player.swingT = 0;
   player.weapon = getEquippedWeapon();
+
+  // Signature effect timers — always reset to 0 on every spawn/respawn
+  player.iceSlipT = 0;
+  player.windPushT = 0;
+  player.windPushDir = 0;
+  player.dazeT = 0;
 
   player.jumpForce = BASE_JUMP * getJumpMult() * _mod.jMul;
   player.djForce = BASE_DJ * getDJMult() * _mod.jMul;
@@ -150,14 +161,31 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
 
   _modT += dt;
 
+  // Decay signature effect timers
+  if (player.iceSlipT > 0) player.iceSlipT = Math.max(0, player.iceSlipT - dt);
+  if (player.windPushT > 0) player.windPushT = Math.max(0, player.windPushT - dt);
+  if (player.dazeT > 0) player.dazeT = Math.max(0, player.dazeT - dt);
+
   // Horizontal movement (idle damping varies by stage: slippery ice vs. mossy grip)
-  const targetVx = isLeft() ? -player.speed : isRight() ? player.speed : 0;
+  // iceSlipT overrides friction toward slippery; dazeT dampens input control.
+  const inputLeft = isLeft(), inputRight = isRight();
+  const rawTarget = inputLeft ? -player.speed : inputRight ? player.speed : 0;
+  const targetVx = player.dazeT > 0 ? rawTarget * 0.35 : rawTarget; // shroom daze: reduced input
   if (targetVx !== 0) {
     player.vx = targetVx;
     player.facing = targetVx > 0 ? 1 : -1;
   } else {
-    player.vx *= _mod.fric;
+    // ice trail overrides friction toward 0.965 (slippery) while iceSlipT > 0
+    const activeFric = player.iceSlipT > 0 ? Math.max(_mod.fric, 0.965) : _mod.fric;
+    player.vx *= activeFric;
     if (Math.abs(player.vx) < 8) player.vx = 0;
+  }
+
+  // Bird wind push: horizontal shove, magnitude never exceeds base run speed;
+  // player still moves and jumps against it.
+  if (player.windPushT > 0) {
+    const pushAmt = Math.min(280, player.speed) * player.windPushDir * dt * 1.2;
+    player.vx = Math.max(-player.speed, Math.min(player.speed, player.vx + pushAmt));
   }
 
   // Desert gusts: oscillating sideways push you must lean against.
@@ -334,6 +362,34 @@ export function drawPlayer(ctx, t) {
     roundRect(ctx, -hw, -hh, w, h, 6);
     ctx.fill();
     ctx.globalAlpha = 1;
+  }
+
+  // Spore daze overlay — green-brown haze while dazeT > 0
+  if (player.dazeT > 0) {
+    const dAlpha = Math.min(0.55, player.dazeT / 1.5 * 0.55);
+    ctx.globalAlpha = dAlpha;
+    ctx.fillStyle = '#8b6914';
+    roundRect(ctx, -hw - 4, -hh - 4, w + 8, h + 8, 8);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    // pulsing spore ring
+    ctx.strokeStyle = `rgba(162,105,12,${0.5 + Math.sin(t * 8) * 0.3})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, hw * 1.6, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+
+  // Wind push overlay — cyan streaks while windPushT > 0
+  if (player.windPushT > 0) {
+    const wAlpha = Math.min(0.45, player.windPushT / 1.2 * 0.45);
+    ctx.strokeStyle = `rgba(100,200,255,${wAlpha * 2})`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      const oy = -hh * 0.4 + i * hh * 0.4;
+      const ox = player.windPushDir * (hw + 5 + i * 4);
+      ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + player.windPushDir * 10, oy); ctx.stroke();
+    }
+    ctx.lineWidth = 1;
   }
 
   // Double-jump flash outline

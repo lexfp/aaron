@@ -6,6 +6,13 @@ export const enemies = [];
 export const projectiles = [];
 export const enemyShots = []; // bolts fired by 'shoot' species (space turrets)
 
+// ─── BOSS SIGNATURE ZONES ────────────────────────────────────────────────────
+// One flat array for all lingering boss zones; cleared in initEntities.
+// Entry shape: { x, y, w, h, kind, life, maxLife, warn }
+//   kind: 'ice' | 'poison' | 'fire' | 'dust' | 'crystal' | 'spore'
+//   warn: seconds of non-damaging telegraph remaining (counts down)
+export const bossZones = [];
+
 // Enemy tuning
 const E_GRAVITY = 1600;
 const STOMP_DAMAGE = 2;   // a head-stomp deals this much (kills 1-2 HP foes)
@@ -24,6 +31,7 @@ export function initEntities(levelData) {
   enemies.length = 0;
   projectiles.length = 0;
   enemyShots.length = 0;
+  bossZones.length = 0; // clear all lingering signature zones on respawn
 
   for (const c of levelData.coins) {
     coins.push({ x: c.x, y: c.y, collected: false, spinAngle: c.spinAngle || 0 });
@@ -302,6 +310,12 @@ function dropCoins(cx, cy, n) {
 
 function damageEnemy(e, dmg, knockDir, knock) {
   if (!e.alive) return;
+  // Drone shield: absorbs incoming damage until shieldHp is depleted
+  if (e.boss && e.shieldHp > 0) {
+    e.shieldHp = Math.max(0, e.shieldHp - dmg);
+    addHitParticles(e.x + e.w / 2, e.y + e.h / 2, '#00d2d3', 5); // shield spark
+    return;
+  }
   e.hp -= dmg;
   e.hitFlash = 0.13;
   if (!e.air) {
@@ -335,9 +349,26 @@ export function playerMeleeAttack(player, weapon) {
   const hw = reach + 8;
   const hy = player.y - 4, hh = player.h + 8;
   let kills = 0;
+  const pcx = player.x + player.w / 2;
   for (const e of enemies) {
     if (!e.alive) continue;
     if (rectsOverlap(hx, hy, hw, hh, e.x, e.y, e.w, e.h)) {
+      // Knight parry: melee during parry window triggers a counter-knockback, no damage
+      if (e.boss && e.parryT > 0) {
+        // Counter: shove the player away from the knight
+        const hurtPlayer_local = (dmg, fromX) => {
+          if (player.invuln > 0 || player.dead) return;
+          player.hp -= dmg;
+          player.invuln = INVULN_TIME;
+          player.hurtFlash = 0.3;
+          player.vx = (fromX >= pcx ? -1 : 1) * 320;
+          player.vy = -220;
+          if (player.hp <= 0) player.hp = 0;
+        };
+        hurtPlayer_local(e.dmg * 0.5, e.x + e.w / 2);
+        addHitParticles(e.x + e.w / 2, e.y + e.h * 0.4, '#a29bfe', 8);
+        continue; // no boss damage
+      }
       damageEnemy(e, weapon.damage, dir, weapon.knockback);
       if (!e.alive) kills++;
     }
@@ -404,12 +435,30 @@ export function updateProjectiles(dt, platforms) {
     if (!hit) {
       for (const e of enemies) {
         if (!e.alive) continue;
-        if (rectsOverlap(pr.x - 2, pr.y - 2, 4, 4, e.x, e.y, e.w, e.h)) { hit = true; break; }
+        if (rectsOverlap(pr.x - 2, pr.y - 2, 4, 4, e.x, e.y, e.w, e.h)) {
+          // Knight parry: reflect/destroy the projectile, no boss damage
+          if (e.boss && e.parryT > 0) {
+            addHitParticles(pr.x, pr.y, '#a29bfe', 6);
+            hit = true; // consume the projectile without damaging
+          } else {
+            hit = true;
+          }
+          break;
+        }
       }
     }
 
     if (hit || pr.life <= 0) {
-      if (hit) detonate(pr);
+      // Only detonate (deal damage) if not parried — a parried shot hits no enemy
+      if (hit) {
+        // Check if the hit was a parry (boss with parryT > 0 overlapping the shot)
+        let parried = false;
+        for (const e of enemies) {
+          if (!e.alive || !e.boss || e.parryT <= 0) continue;
+          if (rectsOverlap(pr.x - 2, pr.y - 2, 4, 4, e.x, e.y, e.w, e.h)) { parried = true; break; }
+        }
+        if (!parried) detonate(pr);
+      }
       projectiles.splice(i, 1);
     }
   }
@@ -897,12 +946,203 @@ export function updateEnemies(dt, platforms, player) {
         e.swoopSpeed = Math.round((e.swoopSpeed || 300) * 1.3);
         addExplosion(ecx, ecy, e.color);
         addExplosion(ecx, ecy - 24, '#ff4500');
+
+        // slime split: exactly once on crossing ≤50% HP, spawns 2 mini-slimes (one each side)
+        if (e.species === 'slime' && !e._split) {
+          e._split = true;
+          const savedX = e.x;
+          // First minion spawns opposite the boss's current side
+          spawnBossMinion(e);
+          // Temporarily place boss on the other side so second minion spawns on the first side
+          e.x = e.x > e.patrolMin + (e.patrolMax - e.patrolMin) * 0.5
+            ? e.patrolMin + 4
+            : e.patrolMax + 4;
+          spawnBossMinion(e);
+          e.x = savedX; // restore boss position
+        }
       }
       if (e._atkFlash > 0) e._atkFlash -= dt;
       e._specialCD -= dt;
       if (e._specialCD <= 0) {
         triggerBossSpecial(e, pcx, pcy);
         e._specialCD = e._baseCD * (e._rage ? 0.65 : 1.0);
+      }
+
+      // ── Per-species signature mechanics ─────────────────────────────────
+      // Signature cooldown counts down; fires when ≤0 then resets.
+      if (e._sigCD !== undefined) e._sigCD -= dt;
+
+      // crawler burrow: telegraph dust marker at player x, go underground, re-emerge
+      if (e.species === 'crawler') {
+        if (e._sigCD <= 0 && e._burrowState === 0) {
+          // Start telegraph: drop a dust zone at player's current x
+          e._burrowMarkerX = Math.max(e.patrolMin + e.w / 2, Math.min(e.patrolMax + e.w / 2, pcx));
+          e._burrowState = 1;
+          e._burrowT = 0.5; // telegraph duration ≥ 0.4s
+          bossZones.push({ x: e._burrowMarkerX - 22, y: e.baseY - 6, w: 44, h: 6,
+            kind: 'dust', life: 1.5, maxLife: 1.5, warn: 0.5 });
+          e._sigCD = (e._baseCD * 1.4) * (e._rage ? 0.65 : 1.0);
+        }
+        if (e._burrowState === 1) { // telegraphing
+          e._burrowT -= dt;
+          if (e._burrowT <= 0) { e._burrowState = 2; e._burrowT = 0.7; } // go underground
+        } else if (e._burrowState === 2) { // underground (non-collidable)
+          e._burrowT -= dt;
+          e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e._burrowMarkerX - e.w / 2));
+          if (e._burrowT <= 0) { e._burrowState = 3; e._burrowT = 0.18; } // emerge
+        } else if (e._burrowState === 3) { // emerging
+          e._burrowT -= dt;
+          if (e._burrowT <= 0) e._burrowState = 0;
+        }
+      }
+
+      // slider ice trail: while _sliding, leave ice-trail zones along the floor
+      if (e.species === 'slider' && e._sliding) {
+        bossZones.push({ x: e.x, y: e.baseY - 4, w: e.w, h: 4,
+          kind: 'ice', life: 3.5, maxLife: 3.5, warn: 0 });
+      }
+
+      // scorpion poison cloud: spawn 1–2 clouds on timer
+      if (e.species === 'scorpion' && e._sigCD <= 0) {
+        const n = Math.random() < 0.5 ? 1 : 2;
+        for (let k = 0; k < n; k++) {
+          const cx = e.patrolMin + Math.random() * (e.patrolMax - e.patrolMin + e.w);
+          bossZones.push({ x: cx - 36, y: e.baseY - 28, w: 72, h: 28,
+            kind: 'poison', life: 4.5, maxLife: 4.5, warn: 0 });
+        }
+        e._sigCD = (e._baseCD * 1.2) * (e._rage ? 0.65 : 1.0);
+      }
+
+      // lavablob fire patches: telegraph then burn
+      if (e.species === 'lavablob' && e._sigCD <= 0) {
+        const n = 2 + Math.floor(Math.random() * 2); // 2–3 patches
+        for (let k = 0; k < n; k++) {
+          const px = e.patrolMin + Math.random() * (e.patrolMax - e.patrolMin + e.w);
+          // warn=0.55 → 0.55s telegraph, then life=3.5s burn
+          bossZones.push({ x: px - 28, y: e.baseY - 6, w: 56, h: 6,
+            kind: 'fire', life: 4.05, maxLife: 4.05, warn: 0.55 });
+        }
+        e._sigCD = (e._baseCD * 1.5) * (e._rage ? 0.65 : 1.0);
+      }
+
+      // bird wind gust: telegraph, then push player
+      if (e.species === 'bird') {
+        if (e._sigCD !== undefined && e._sigCD <= 0 && !(e._windTelegraph > 0) && !(e._windActive > 0)) {
+          e._windTelegraph = 0.5; // ≥0.4s telegraph
+          e._sigCD = (e._baseCD * 1.3) * (e._rage ? 0.65 : 1.0);
+        }
+        if (e._windTelegraph > 0) {
+          e._windTelegraph -= dt;
+          if (e._windTelegraph <= 0) {
+            e._windActive = 1.0; // the gust fires after telegraph
+            e._windDir = ecx <= pcx ? 1 : -1; // push away from bird
+          }
+        }
+        if (e._windActive > 0) {
+          e._windActive -= dt;
+          // Apply push to player; capped to base run speed, player keeps control
+          player.windPushT = Math.min(1.2, (player.windPushT || 0) + dt * 1.5);
+          player.windPushDir = e._windDir;
+          if (e._windActive <= 0) { player.windPushT = Math.min(1.2, player.windPushT); }
+        }
+      }
+
+      // shroom spore daze: release cloud, daze player inside it
+      if (e.species === 'shroom') {
+        if (e._sigCD !== undefined && e._sigCD <= 0 && !(e._sporeTelegraph > 0) && !(e._sporeActive > 0)) {
+          e._sporeTelegraph = 0.5; // ≥0.4s telegraph
+          e._sigCD = (e._baseCD * 1.4) * (e._rage ? 0.65 : 1.0);
+        }
+        if (e._sporeTelegraph > 0) {
+          e._sporeTelegraph -= dt;
+          if (e._sporeTelegraph <= 0) {
+            e._sporeActive = 1.8; // spore zone active duration
+            bossZones.push({ x: ecx - 70, y: e.y, w: 140, h: e.h * 2,
+              kind: 'spore', life: 1.8, maxLife: 1.8, warn: 0 });
+          }
+        }
+        if (e._sporeActive > 0) {
+          e._sporeActive -= dt;
+        }
+      }
+
+      // drone shield: absorbs incoming damage for ≤6s, with cooldown
+      if (e.species === 'drone') {
+        if (e._shieldT > 0) {
+          e._shieldT -= dt;
+          if (e._shieldT <= 0 || e.shieldHp <= 0) {
+            e.shieldHp = 0; e._shieldT = 0;
+            e._shieldCD = 7.0 * (e._rage ? 0.7 : 1.0); // fixed cooldown before reactivating
+          }
+        } else {
+          if (e._shieldCD > 0) e._shieldCD -= dt;
+          if (e._sigCD <= 0 && e._shieldCD <= 0) {
+            // Activate shield
+            e.shieldHp = 30 + Math.round((e.maxHp || 30) * 0.3);
+            e._shieldT = 5.5; // ≤6s uptime
+            e._sigCD = (e._baseCD * 1.8) * (e._rage ? 0.65 : 1.0); // long gap before next activation
+          }
+        }
+      }
+
+      // golem crystal fall: shadow markers then falling crystals
+      if (e.species === 'golem' && e._sigCD <= 0 && !(e._crystalPending > 0)) {
+        const n = 2 + Math.floor(Math.random() * 3); // 2–4
+        e._crystalDrops = [];
+        for (let k = 0; k < n; k++) {
+          const cx = e.patrolMin + Math.random() * (e.patrolMax - e.patrolMin + e.w);
+          // Shadow marker: warn=0.55s, then crystal falls
+          bossZones.push({ x: cx - 12, y: e.baseY - 8, w: 24, h: 8,
+            kind: 'crystal', life: 2.5, maxLife: 2.5, warn: 0.55 });
+          e._crystalDrops.push({ x: cx, fireAt: e.t + 0.55, fired: false, y: -60, vy: 0 });
+        }
+        e._crystalPending = n;
+        e._sigCD = (e._baseCD * 1.6) * (e._rage ? 0.65 : 1.0);
+      }
+      // Tick pending crystal falls
+      if (e._crystalDrops && e._crystalDrops.length > 0) {
+        let allDone = true;
+        for (const cd of e._crystalDrops) {
+          if (!cd.fired) {
+            if (e.t >= cd.fireAt) {
+              cd.fired = true;
+              cd.y = e.baseY - 280; // start high
+              cd.vy = 0;
+            } else {
+              allDone = false;
+            }
+          }
+          if (cd.fired && cd.y < e.baseY) {
+            allDone = false;
+            cd.vy += 1800 * dt;
+            cd.y += cd.vy * dt;
+            // Check player hit during fall
+            const cr = 14;
+            if (Math.hypot(cd.x - pcx, cd.y - pcy) < cr + player.w * 0.35) {
+              hurtPlayer(e.dmg * 0.65, cd.x);
+              cd.y = e.baseY + 999; // remove after impact
+            }
+            if (cd.y >= e.baseY) cd.y = e.baseY + 999; // landed (no permanent obstacle)
+          }
+        }
+        if (allDone) { e._crystalDrops = null; e._crystalPending = 0; } // ready for next cycle
+      }
+
+      // knight parry: raise shield for ≤1.2s on cooldown
+      if (e.species === 'knight') {
+        if (e.parryT > 0) {
+          e.parryT -= dt;
+          if (e.parryT <= 0) {
+            e.parryT = 0;
+            e._parryCD = 3.5 * (e._rage ? 0.7 : 1.0); // fixed post-parry cooldown
+          }
+        } else {
+          if (e._parryCD > 0) e._parryCD -= dt;
+          if (e._sigCD <= 0 && e._parryCD <= 0) {
+            e.parryT = 1.1; // ≤1.2s parry window
+            e._sigCD = (e._baseCD * 1.2) * (e._rage ? 0.65 : 1.0);
+          }
+        }
       }
     }
 
@@ -925,6 +1165,36 @@ export function updateEnemies(dt, platforms, player) {
         if (!guarding) hurtPlayer(e.dmg || CONTACT_DAMAGE[e.type] || 8, eCx);
       }
     }
+  }
+
+  // ── Boss signature zone update ────────────────────────────────────────────
+  // Tick zone life timers, apply player effects, expire spent zones.
+  const playerFeet = player.y + player.h;
+  let inIce = false;
+  for (let i = bossZones.length - 1; i >= 0; i--) {
+    const z = bossZones[i];
+    z.life -= dt;
+    if (z.warn > 0) z.warn -= dt;
+    if (z.life <= 0) { bossZones.splice(i, 1); continue; }
+
+    if (!player.dead && z.warn <= 0) {
+      const zBottom = z.y + z.h;
+      const onZone = player.x + player.w > z.x && player.x < z.x + z.w
+                  && playerFeet >= z.y && player.y < zBottom;
+      const inZone = player.x + player.w > z.x && player.x < z.x + z.w
+                  && player.y + player.h > z.y && player.y < z.y + z.h;
+
+      if (z.kind === 'ice' && onZone) inIce = true;
+      if (z.kind === 'poison' && inZone) hurtPlayer(8, z.x + z.w / 2); // i-frames gate ticks
+      if (z.kind === 'fire' && onZone) hurtPlayer(12, z.x + z.w / 2);
+      if (z.kind === 'spore' && inZone) {
+        player.dazeT = Math.min(1.5, (player.dazeT || 0) + dt * 1.8); // refresh, cap ≤1.5s
+      }
+    }
+  }
+  // Ice slip: set iceSlipT when standing on an active ice trail, cap at 2.5s
+  if (inIce && !player.dead) {
+    player.iceSlipT = Math.min(2.5, (player.iceSlipT || 0) + dt * 2.5);
   }
 
   // Enemy shots: turret bolts (straight) + boss specials (may arc with vy/grav).
@@ -991,6 +1261,91 @@ export function drawProjectiles(ctx, camX, W) {
 }
 
 export function drawEnemies(ctx, camX, W, t) {
+  // ── Draw lingering boss zones (telegraph + live) ─────────────────────────
+  for (const z of bossZones) {
+    if (z.x + z.w < camX - 10 || z.x > camX + W + 10) continue;
+    const alive = z.warn <= 0; // false = still telegraphing (no damage yet)
+    ctx.save();
+    if (z.kind === 'dust') {
+      // Crawler burrow marker: brown puff cloud
+      ctx.globalAlpha = alive ? 0.55 : 0.85;
+      ctx.fillStyle = alive ? '#b8860b' : '#d4a520';
+      ctx.beginPath(); ctx.ellipse(z.x + z.w / 2, z.y + z.h / 2, z.w / 2, z.h / 2 + 4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#a07010'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(z.x + z.w / 2, z.y + z.h / 2, z.w / 2, z.h / 2 + 4, 0, 0, Math.PI * 2); ctx.stroke();
+    } else if (z.kind === 'ice') {
+      // Ice trail: frosty tinted strip
+      ctx.globalAlpha = 0.42 * (z.life / z.maxLife);
+      ctx.fillStyle = '#a8e6ff';
+      ctx.fillRect(z.x, z.y, z.w, z.h);
+      ctx.strokeStyle = '#cdf0ff'; ctx.lineWidth = 1;
+      ctx.strokeRect(z.x, z.y, z.w, z.h);
+    } else if (z.kind === 'poison') {
+      // Poison cloud: green pulsing haze
+      const pls = 0.35 + Math.sin(t * 5) * 0.15;
+      ctx.globalAlpha = pls;
+      ctx.fillStyle = '#6ab04c';
+      ctx.beginPath(); ctx.ellipse(z.x + z.w / 2, z.y + z.h / 2, z.w / 2, z.h / 2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#a8e063'; ctx.lineWidth = 1.5; ctx.globalAlpha = pls * 0.7;
+      ctx.beginPath(); ctx.ellipse(z.x + z.w / 2, z.y + z.h / 2, z.w / 2 - 2, z.h / 2 - 2, 0, 0, Math.PI * 2); ctx.stroke();
+    } else if (z.kind === 'fire') {
+      if (z.warn > 0) {
+        // Telegraph: orange flickering outline
+        const flash = 0.4 + Math.sin(t * 18) * 0.3;
+        ctx.globalAlpha = flash;
+        ctx.strokeStyle = '#ff9f43'; ctx.lineWidth = 2;
+        ctx.strokeRect(z.x, z.y, z.w, z.h);
+      } else {
+        // Burning patch: red-orange glow
+        const fl = 0.45 + Math.sin(t * 14 + z.x * 0.02) * 0.2;
+        ctx.globalAlpha = fl;
+        ctx.fillStyle = '#ff4500';
+        ctx.fillRect(z.x, z.y, z.w, z.h);
+        ctx.globalAlpha = fl * 0.5;
+        ctx.fillStyle = '#ffd32a';
+        ctx.fillRect(z.x + 4, z.y, z.w - 8, z.h * 0.6);
+      }
+    } else if (z.kind === 'crystal') {
+      if (z.warn > 0) {
+        // Shadow marker below crystal drop point
+        ctx.globalAlpha = 0.55 + Math.sin(t * 12) * 0.2;
+        ctx.fillStyle = '#1b6f8c';
+        ctx.beginPath(); ctx.ellipse(z.x + z.w / 2, z.y + z.h / 2, z.w / 2, z.h / 2, 0, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (z.kind === 'spore') {
+      // Spore cloud: brown-green haze
+      const sp = 0.28 + Math.sin(t * 4) * 0.1;
+      ctx.globalAlpha = sp * (z.life / z.maxLife);
+      ctx.fillStyle = '#9b8427';
+      ctx.beginPath(); ctx.ellipse(z.x + z.w / 2, z.y + z.h / 2, z.w / 2, z.h / 2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#c8a830'; ctx.lineWidth = 1.5; ctx.globalAlpha = sp * 0.5;
+      ctx.beginPath(); ctx.ellipse(z.x + z.w / 2, z.y + z.h / 2, z.w / 2, z.h / 2, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.globalAlpha = 1; ctx.lineWidth = 1;
+    ctx.restore();
+  }
+
+  // Draw falling crystals (tracked on boss enemy objects)
+  for (const e of enemies) {
+    if (!e.alive || !e.boss || e.species !== 'golem' || !e._crystalDrops) continue;
+    for (const cd of e._crystalDrops) {
+      if (!cd.fired || cd.y >= e.baseY) continue;
+      if (cd.y < camX - 30 || cd.y > camX + W + 30) continue; // rough cull (x not cx here)
+      ctx.save();
+      ctx.translate(cd.x, cd.y);
+      const cw = 18, ch = 30;
+      const grad = ctx.createLinearGradient(0, -ch / 2, 0, ch / 2);
+      grad.addColorStop(0, '#bff4ff'); grad.addColorStop(1, '#48dbfb');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(0, -ch / 2); ctx.lineTo(cw / 2, 0); ctx.lineTo(0, ch / 2); ctx.lineTo(-cw / 2, 0);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, -ch / 2); ctx.lineTo(0, ch / 2); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   for (const e of enemies) {
     if (!e.alive) continue;
     if (e.x + e.w < camX - 40 || e.x > camX + W + 80) continue;
@@ -1045,6 +1400,68 @@ export function drawEnemies(ctx, camX, W, t) {
       ctx.fillStyle = '#ffe066';
       ctx.fillRect(-e.w / 2, 0, e.w, e.h);
       ctx.globalAlpha = 1;
+    }
+
+    // ── Signature visual overlays (drawn in the boss's translated ctx) ──────
+    if (e.boss) {
+      // Drone shield: glowing cyan ring while shieldHp > 0 or _shieldT > 0
+      if (e.shieldHp > 0 && e._shieldT > 0) {
+        const sr = Math.max(e.w, e.h) * 0.72;
+        const pls = 0.55 + Math.sin(e.t * 10) * 0.3;
+        ctx.strokeStyle = `rgba(0,210,211,${pls})`;
+        ctx.lineWidth = 3.5;
+        ctx.beginPath(); ctx.arc(0, e.h / 2, sr, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = `rgba(190,255,255,${pls * 0.4})`;
+        ctx.lineWidth = 7;
+        ctx.beginPath(); ctx.arc(0, e.h / 2, sr * 0.9, 0, Math.PI * 2); ctx.stroke();
+        ctx.lineWidth = 1;
+      }
+
+      // Knight parry: raised-shield pose + purple flash border
+      if (e.parryT > 0) {
+        const pAlpha = Math.min(0.85, e.parryT / 1.1 * 0.85);
+        ctx.globalAlpha = pAlpha;
+        ctx.strokeStyle = '#a29bfe';
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(0, e.h / 2, Math.max(e.w, e.h) * 0.62, 0, Math.PI * 2); ctx.stroke();
+        // Shield icon in front of the knight (facing dir)
+        const sd2 = e.dir > 0 ? 1 : -1;
+        ctx.fillStyle = '#a29bfe';
+        ctx.fillRect(sd2 * (e.w * 0.38), e.h * 0.18, sd2 * 10, e.h * 0.55);
+        ctx.lineWidth = 1; ctx.globalAlpha = 1;
+      }
+
+      // Crawler burrow: fade out during underground phase
+      if (e._burrowState === 2) {
+        ctx.globalAlpha = 0.25; // mostly hidden underground
+        ctx.fillStyle = 'rgba(100,80,50,0.55)';
+        ctx.fillRect(-e.w / 2, 0, e.w, e.h);
+        ctx.globalAlpha = 1;
+      }
+
+      // Bird wind telegraph: lean + streaks
+      if (e._windTelegraph > 0) {
+        const wa = Math.min(0.7, e._windTelegraph * 1.5);
+        ctx.globalAlpha = wa;
+        ctx.strokeStyle = '#74b9ff';
+        ctx.lineWidth = 2;
+        const dir = (e.dir > 0 ? 1 : -1);
+        for (let k = 0; k < 4; k++) {
+          const oy = e.h * 0.2 + k * e.h * 0.18;
+          ctx.beginPath(); ctx.moveTo(dir * (e.w * 0.55), oy); ctx.lineTo(dir * (e.w * 0.8 + k * 8), oy); ctx.stroke();
+        }
+        ctx.lineWidth = 1; ctx.globalAlpha = 1;
+      }
+
+      // Shroom spore telegraph: expanding cloud before burst
+      if (e._sporeTelegraph > 0) {
+        const pct = 1 - e._sporeTelegraph / 0.5;
+        const sr = (e.w * 1.5) * pct;
+        ctx.globalAlpha = 0.4 * pct;
+        ctx.fillStyle = '#9b8427';
+        ctx.beginPath(); ctx.arc(0, e.h / 2, sr, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
     }
     ctx.restore();
 

@@ -142,6 +142,35 @@ function makeBoss(stageIdx, p, arena) {
                   bird: 4.0, shroom: 4.5, drone: 3.8, golem: 5.5, knight: 4.0 };
   e._baseCD = SP_CD[sp] || 4.0;
   e._specialCD = e._baseCD * 0.45; // first special fires sooner so players see it quickly
+
+  // ── Signature mechanic fields seeded per species ──────────────────────────
+  // slime: split minions on first drop to ≤50% HP
+  e._split = false;
+  // Minion template + arena reference needed by spawnBossMinion
+  const roster = STAGE_ROSTER[((stageIdx % 10) + 10) % 10];
+  const groundSp = roster.ground.length ? roster.ground[0][0] : sp;
+  e._minionTemplate = { ...SPECIES[groundSp](p), species: groundSp };
+  e._minionArena = arena;
+
+  // Signature cooldowns (separate from the projectile rotation)
+  const SIG_CD = { slime: 999, crawler: 5.5, slider: 0, scorpion: 5.0, lavablob: 4.5,
+                   bird: 5.0, shroom: 5.5, drone: 6.5, golem: 6.0, knight: 4.5 };
+  e._sigCD = SIG_CD[sp] || 5.0; // counts down; fires when ≤0
+
+  // crawler burrow state machine: 0=idle, 1=telegraphing, 2=underground, 3=emerging
+  e._burrowState = 0;
+  e._burrowT = 0;
+  e._burrowMarkerX = 0; // x captured at telegraph start (player can step away)
+
+  // drone shield
+  e.shieldHp = 0;          // 0 = no active shield; >0 absorbs damage
+  e._shieldT = 0;           // remaining uptime
+  e._shieldCD = 0;          // cooldown before next activation
+
+  // knight parry window
+  e.parryT = 0;             // >0 = parry active; melee hits countered, projectiles reflected
+  e._parryCD = 0;           // cooldown before next parry
+
   return e;
 }
 

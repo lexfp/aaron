@@ -208,8 +208,8 @@ function gameLoop(timestamp) {
     updateHUD(currentStage, currentLevel, coinsThisLevel, playerData.coins, lives, player.hp, player.maxHp);
   }
 
-  // Check death (fell off bottom, touched a hazard, or hit by an enemy)
-  if (player.y > GH + 100 || hazardHit(player, levelData.hazards) || enemyRes.playerHit) {
+  // Check death (fell off bottom, touched a hazard, hit by enemy, or hp drained to 0)
+  if (player.y > GH + 100 || hazardHit(player, levelData.hazards) || enemyRes.playerHit || (!player.dead && player.hp <= 0)) {
     deathTimer = 0.35;
   }
 
