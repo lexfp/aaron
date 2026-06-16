@@ -5,6 +5,7 @@ export const particles = [];
 export const enemies = [];
 export const projectiles = [];
 export const enemyShots = []; // bolts fired by 'shoot' species (space turrets)
+export const sigZones = [];  // signature-mechanic lingering zones (ice/poison/fire/dust/crystal/spore)
 
 // Enemy tuning
 const E_GRAVITY = 1600;
@@ -24,6 +25,7 @@ export function initEntities(levelData) {
   enemies.length = 0;
   projectiles.length = 0;
   enemyShots.length = 0;
+  sigZones.length = 0;
 
   for (const c of levelData.coins) {
     coins.push({ x: c.x, y: c.y, collected: false, spinAngle: c.spinAngle || 0 });
@@ -302,6 +304,13 @@ function dropCoins(cx, cy, n) {
 
 function damageEnemy(e, dmg, knockDir, knock) {
   if (!e.alive) return;
+  if (e.boss && e.shieldHp > 0) {
+    e.shieldHp = Math.max(0, e.shieldHp - dmg);
+    e.hitFlash = 0.1;
+    addHitParticles(e.x + e.w / 2, e.y + e.h / 2, '#00d2d3', 3);
+    return;
+  }
+  if (e.boss && e.parryT > 0) { return; } // projectile parried
   e.hp -= dmg;
   e.hitFlash = 0.13;
   if (!e.air) {
@@ -338,6 +347,17 @@ export function playerMeleeAttack(player, weapon) {
   for (const e of enemies) {
     if (!e.alive) continue;
     if (rectsOverlap(hx, hy, hw, hh, e.x, e.y, e.w, e.h)) {
+      if (e.boss && e.parryT > 0 && player.invuln <= 0) {
+        // Knight counter: melee swing blocked, player knocked back
+        const ecx = e.x + e.w / 2;
+        player.hp = Math.max(0, player.hp - Math.round(e.dmg * 0.6));
+        player.invuln = INVULN_TIME;
+        player.hurtFlash = 0.3;
+        player.vx = (ecx >= player.x + player.w / 2 ? -1 : 1) * 380;
+        player.vy = -290;
+        addHitParticles(ecx, e.y + e.h * 0.5, '#8854d0', 7);
+        continue;
+      }
       damageEnemy(e, weapon.damage, dir, weapon.knockback);
       if (!e.alive) kills++;
     }
@@ -897,6 +917,12 @@ export function updateEnemies(dt, platforms, player) {
         e.swoopSpeed = Math.round((e.swoopSpeed || 300) * 1.3);
         addExplosion(ecx, ecy, e.color);
         addExplosion(ecx, ecy - 24, '#ff4500');
+        // slime split: spawn 2 mini-slimes on first rage entry (one-shot)
+        if (e.species === 'slime' && !e._split) {
+          e._split = true;
+          spawnBossMinion(e);
+          spawnBossMinion(e);
+        }
       }
       if (e._atkFlash > 0) e._atkFlash -= dt;
       e._specialCD -= dt;
@@ -904,10 +930,122 @@ export function updateEnemies(dt, platforms, player) {
         triggerBossSpecial(e, pcx, pcy);
         e._specialCD = e._baseCD * (e._rage ? 0.65 : 1.0);
       }
+
+      // ── Signature mechanics ──────────────────────────────────────────────
+      const floorY = e.baseY !== undefined ? e.baseY + e.h : ecy + e.h * 0.5;
+      if (e.species === 'crawler') {
+        // burrow: telegraph → underground → emerge at player's last known x
+        if (e._burrowState === 1) {
+          e._burrowT = Math.max(0, e._burrowT - dt);
+          if (e._burrowT <= 0) { e._burrowState = 2; e._burrowT = 0.55; e._burrowed = true; e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e._burrowTargetX - e.w / 2)); }
+        } else if (e._burrowState === 2) {
+          e._burrowT = Math.max(0, e._burrowT - dt);
+          if (e._burrowT <= 0) { e._burrowState = 0; e._burrowed = false; addHitParticles(ecx, floorY, '#7f8c8d', 12); e._sigCD = 9.0; }
+        } else {
+          e._sigCD = Math.max(0, (e._sigCD || 7.0) - dt);
+          if (e._sigCD <= 0) {
+            e._burrowState = 1; e._burrowT = 0.45; e._burrowTargetX = pcx;
+            sigZones.push({ kind: 'dust', x: pcx - 18, y: floorY - 24, w: 36, h: 24, life: 1.5, warn: 0.45 });
+          }
+        }
+      } else if (e.species === 'slider') {
+        // iceTrail: deposit trail zones while sliding
+        if (e._sliding) {
+          e._iceTrailT = (e._iceTrailT || 0) + dt;
+          if (e._iceTrailT >= 0.08) {
+            e._iceTrailT = 0;
+            sigZones.push({ kind: 'ice', x: e.x + 4, y: floorY - 10, w: e.w - 8, h: 12, life: 2.5 });
+          }
+        }
+      } else if (e.species === 'scorpion') {
+        // poisonCloud: drop 1-2 zones on floor
+        e._sigCD = Math.max(0, (e._sigCD || 6.0) - dt);
+        if (e._sigCD <= 0) {
+          const n = 1 + (Math.random() > 0.5 ? 1 : 0);
+          for (let k = 0; k < n; k++) {
+            const cx = e.patrolMin + Math.random() * (e.patrolMax - e.patrolMin);
+            sigZones.push({ kind: 'poison', x: cx - 30, y: floorY - 40, w: 60, h: 44, life: 4.5, warn: 0.35, dmg: Math.round(e.dmg * 0.5) });
+          }
+          e._sigCD = 8.0;
+        }
+      } else if (e.species === 'lavablob') {
+        // firePatch: mark 2-3 floor spots, then ignite
+        e._sigCD = Math.max(0, (e._sigCD || 5.0) - dt);
+        if (e._sigCD <= 0) {
+          const n = 2 + (Math.random() > 0.5 ? 1 : 0);
+          const span = e.patrolMax - e.patrolMin;
+          for (let k = 0; k < n; k++) {
+            const cx = e.patrolMin + (k + 1) * span / (n + 1) + (Math.random() - 0.5) * 80;
+            sigZones.push({ kind: 'fire', x: cx - 28, y: floorY - 14, w: 56, h: 14, life: 4.5, warn: 0.55, dmg: Math.round(e.dmg * 0.7) });
+          }
+          e._sigCD = 7.0;
+        }
+      } else if (e.species === 'bird') {
+        // windGust: telegraph lean, then push player
+        if (e._windTelegraph > 0) {
+          e._windTelegraph = Math.max(0, e._windTelegraph - dt);
+          if (e._windTelegraph <= 0) {
+            player.windPushT = 1.1;
+            player.windPushDir = pcx < ecx ? -1 : 1;
+            e._sigCD = 8.0;
+          }
+        } else {
+          e._sigCD = Math.max(0, (e._sigCD || 5.5) - dt);
+          if (e._sigCD <= 0) e._windTelegraph = 0.45;
+        }
+      } else if (e.species === 'shroom') {
+        // sporeDaze: telegraph cloud, then daze on burst
+        e._sigCD = Math.max(0, (e._sigCD || 6.5) - dt);
+        if (e._sigCD <= 0) {
+          const r = 58;
+          sigZones.push({ kind: 'spore', x: ecx - r, y: e.y - 4, w: r * 2, h: e.h + 20, life: 1.4, warn: 0.45, dmg: 0, burstDone: false });
+          e._sigCD = 10.0;
+        }
+      } else if (e.species === 'drone') {
+        // shield: absorbs all damage for up to 5.5s, then cooldown
+        if (e._shieldT > 0) {
+          e._shieldT = Math.max(0, e._shieldT - dt);
+          if (e._shieldT <= 0) { e.shieldHp = 0; e._shieldCD = 9.0; }
+        } else {
+          e._shieldCD = Math.max(0, (e._shieldCD || 0) - dt);
+          e._sigCD = Math.max(0, (e._sigCD || 5.0) - dt);
+          if (e._sigCD <= 0 && e._shieldCD <= 0) {
+            e.shieldHp = Math.max(20, Math.round(e.maxHp * 0.35));
+            e._shieldT = 5.5;
+            e._sigCD = 12.0;
+          }
+        }
+      } else if (e.species === 'golem') {
+        // crystalFall: shadow markers then falling crystals
+        e._sigCD = Math.max(0, (e._sigCD || 7.0) - dt);
+        if (e._sigCD <= 0) {
+          const n = 2 + Math.floor(Math.random() * 3);
+          const span = e.patrolMax - e.patrolMin;
+          const arenaTop = e.baseY !== undefined ? e.baseY - 160 : floorY - 160;
+          for (let k = 0; k < n; k++) {
+            const cx = e.patrolMin + (k + 1) * span / (n + 1) + (Math.random() - 0.5) * 60;
+            sigZones.push({ kind: 'crystal', x: cx - 14, y: floorY - 10, w: 28, h: 10, life: 3.5, warn: 0.6, floorY, spawnY: arenaTop, dmg: Math.round(e.dmg * 0.9), falling: false, vy: 0 });
+          }
+          e._sigCD = 9.0;
+        }
+      } else if (e.species === 'knight') {
+        // parry: raise shield for ≤1.2s, then cooldown
+        if (e.parryT > 0) {
+          e.parryT = Math.max(0, e.parryT - dt);
+          if (e.parryT <= 0) e._parryCD = 8.0;
+        } else {
+          e._parryCD = Math.max(0, (e._parryCD || 0) - dt);
+          e._sigCD = Math.max(0, (e._sigCD || 5.0) - dt);
+          if (e._sigCD <= 0 && e._parryCD <= 0) {
+            e.parryT = 0.85 + Math.random() * 0.3;
+            e._sigCD = 8.0;
+          }
+        }
+      }
     }
 
     if (player.dead) continue;
-    if (rectsOverlap(player.x, player.y, player.w, player.h, e.x, e.y, e.w, e.h)) {
+    if (!e._burrowed && rectsOverlap(player.x, player.y, player.w, player.h, e.x, e.y, e.w, e.h)) {
       const prevBottom = player._prevY + player.h;
       const stomping = player.vy > 0 && prevBottom <= e.y + 12;
       if (stomping) {
@@ -925,6 +1063,59 @@ export function updateEnemies(dt, platforms, player) {
         if (!guarding) hurtPlayer(e.dmg || CONTACT_DAMAGE[e.type] || 8, eCx);
       }
     }
+  }
+
+  // Signature zone updates: warn→active, per-kind effects, expiry.
+  for (let i = sigZones.length - 1; i >= 0; i--) {
+    const z = sigZones[i];
+    if (z.warn > 0) {
+      z.warn -= dt;
+      z.life -= dt;
+      if (z.warn <= 0 && z.kind === 'spore' && !z.burstDone) {
+        z.burstDone = true;
+        if (!player.dead && rectsOverlap(player.x, player.y, player.w, player.h, z.x, z.y, z.w, z.h)) {
+          player.dazeT = Math.min(1.5, player.dazeT + 1.5);
+        }
+      }
+      if (z.warn <= 0 && z.kind === 'crystal' && !z.falling) {
+        z.falling = true;
+        z.y = z.spawnY;
+        z.w = 18; z.h = 28;
+        z.vy = 0;
+      }
+      if (z.life <= 0) sigZones.splice(i, 1);
+      continue;
+    }
+    if (z.kind === 'crystal' && z.falling) {
+      z.vy = (z.vy || 0) + 900 * dt;
+      z.y += z.vy * dt;
+      if (!player.dead && rectsOverlap(player.x, player.y, player.w, player.h, z.x, z.y, z.w, z.h)) {
+        hurtPlayer(z.dmg, z.x + z.w / 2);
+        addHitParticles(z.x + z.w / 2, z.y + z.h, '#48dbfb', 7);
+        sigZones.splice(i, 1);
+        continue;
+      }
+      if (z.y > z.floorY || z.y > 600) { sigZones.splice(i, 1); continue; }
+      z.life -= dt;
+    } else if (z.kind === 'ice') {
+      z.life -= dt;
+      if (!player.dead && rectsOverlap(player.x, player.y, player.w, player.h, z.x, z.y, z.w, z.h)) {
+        player.iceSlipT = Math.min(2.5, Math.max(player.iceSlipT, 2.0));
+      }
+    } else if (z.kind === 'poison') {
+      z.life -= dt;
+      if (!player.dead && rectsOverlap(player.x, player.y, player.w, player.h, z.x, z.y, z.w, z.h)) {
+        hurtPlayer(z.dmg, z.x + z.w / 2);
+      }
+    } else if (z.kind === 'fire') {
+      z.life -= dt;
+      if (!player.dead && rectsOverlap(player.x, player.y, player.w, player.h, z.x, z.y, z.w, z.h)) {
+        hurtPlayer(z.dmg, z.x + z.w / 2);
+      }
+    } else {
+      z.life -= dt; // dust, spore (post-burst)
+    }
+    if (z.life <= 0) sigZones.splice(i, 1);
   }
 
   // Enemy shots: turret bolts (straight) + boss specials (may arc with vy/grav).
@@ -991,6 +1182,59 @@ export function drawProjectiles(ctx, camX, W) {
 }
 
 export function drawEnemies(ctx, camX, W, t) {
+  // Signature zones (drawn below enemies)
+  for (const z of sigZones) {
+    const sx = z.x - camX;
+    if (sx + z.w < -40 || sx > W + 40) continue;
+    const alpha = z.warn > 0 ? 0.35 + Math.sin(t * 12) * 0.2 : 0.72;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    if (z.kind === 'ice') {
+      ctx.fillStyle = '#aee3ff';
+      ctx.fillRect(sx, z.y, z.w, z.h);
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillRect(sx + 2, z.y + 1, z.w - 4, 3);
+    } else if (z.kind === 'poison') {
+      const g = ctx.createRadialGradient(sx + z.w / 2, z.y + z.h / 2, 4, sx + z.w / 2, z.y + z.h / 2, z.w / 2);
+      g.addColorStop(0, 'rgba(180,110,20,0.85)'); g.addColorStop(1, 'rgba(100,60,0,0)');
+      ctx.fillStyle = g; ctx.fillRect(sx, z.y, z.w, z.h);
+    } else if (z.kind === 'fire') {
+      const g2 = ctx.createRadialGradient(sx + z.w / 2, z.y + z.h, 2, sx + z.w / 2, z.y + z.h / 2, z.w / 2);
+      g2.addColorStop(0, z.warn > 0 ? 'rgba(255,200,50,0.7)' : 'rgba(255,100,0,0.9)');
+      g2.addColorStop(1, 'rgba(180,40,0,0)');
+      ctx.fillStyle = g2; ctx.fillRect(sx - 4, z.y - 6, z.w + 8, z.h + 8);
+    } else if (z.kind === 'dust') {
+      ctx.fillStyle = 'rgba(160,150,130,0.6)';
+      ctx.fillRect(sx, z.y, z.w, z.h);
+      // pulsing X marker
+      ctx.strokeStyle = 'rgba(255,220,120,0.85)'; ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(sx + 4, z.y + 4); ctx.lineTo(sx + z.w - 4, z.y + z.h - 4);
+      ctx.moveTo(sx + z.w - 4, z.y + 4); ctx.lineTo(sx + 4, z.y + z.h - 4);
+      ctx.stroke();
+    } else if (z.kind === 'spore') {
+      const g3 = ctx.createRadialGradient(sx + z.w / 2, z.y + z.h / 2, 8, sx + z.w / 2, z.y + z.h / 2, z.w / 2);
+      g3.addColorStop(0, 'rgba(200,100,80,0.55)'); g3.addColorStop(1, 'rgba(100,40,30,0)');
+      ctx.fillStyle = g3; ctx.fillRect(sx, z.y, z.w, z.h);
+    } else if (z.kind === 'crystal') {
+      if (z.falling) {
+        // falling crystal shard
+        const g4 = ctx.createLinearGradient(sx, z.y, sx, z.y + z.h);
+        g4.addColorStop(0, '#bff4ff'); g4.addColorStop(1, '#2e9cb8');
+        ctx.fillStyle = g4;
+        ctx.beginPath();
+        ctx.moveTo(sx + z.w / 2, z.y); ctx.lineTo(sx + z.w, z.y + z.h * 0.45);
+        ctx.lineTo(sx + z.w * 0.6, z.y + z.h); ctx.lineTo(sx + z.w * 0.4, z.y + z.h);
+        ctx.lineTo(sx, z.y + z.h * 0.45); ctx.closePath(); ctx.fill();
+      } else {
+        // shadow marker on floor
+        ctx.fillStyle = 'rgba(72,219,251,0.45)';
+        ctx.beginPath(); ctx.ellipse(sx + z.w / 2, z.y + z.h / 2, z.w / 2, z.h / 2, 0, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
   for (const e of enemies) {
     if (!e.alive) continue;
     if (e.x + e.w < camX - 40 || e.x > camX + W + 80) continue;
@@ -1072,6 +1316,52 @@ export function drawEnemies(ctx, camX, W, t) {
       for (let i = 0; i < e.maxHp; i++) {
         ctx.fillStyle = i < e.hp ? '#e74c3c' : 'rgba(255,255,255,0.18)';
         ctx.fillRect(e.x + i * pw + 1, e.y - 9, pw - 2, 4);
+      }
+    }
+
+    // Signature visuals
+    if (e.boss) {
+      const bx = e.x - camX;
+      const bcx = bx + e.w / 2;
+      if (e.shieldHp > 0) {
+        // Drone energy shield ring
+        const sr = Math.max(e.w, e.h) * 0.68;
+        const sp = 0.45 + Math.sin(t * 6) * 0.25;
+        ctx.save();
+        ctx.strokeStyle = `rgba(0,210,211,${sp})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(bcx, e.y + e.h / 2, sr, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = `rgba(180,255,255,${sp * 0.55})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(bcx, e.y + e.h / 2, sr * 0.82, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+      if (e.parryT > 0) {
+        // Knight raised-shield pose overlay
+        ctx.save();
+        const pAlpha = 0.6 + Math.sin(t * 8) * 0.2;
+        ctx.globalAlpha = pAlpha;
+        ctx.fillStyle = '#8854d0';
+        ctx.fillRect(bx + e.w * 0.38, e.y + e.h * 0.28, e.w * 0.14, e.h * 0.5);
+        ctx.fillStyle = '#c8d6e5';
+        ctx.fillRect(bx + e.w * 0.44, e.y + e.h * 0.22, e.w * 0.18, e.h * 0.44);
+        ctx.restore();
+      }
+      if (e._windTelegraph > 0) {
+        // Bird lean telegraph: wavy lines radiating outward
+        ctx.save();
+        ctx.globalAlpha = (1 - e._windTelegraph / 0.45) * 0.75;
+        ctx.strokeStyle = '#c0d8ff'; ctx.lineWidth = 2;
+        for (let wi = 0; wi < 4; wi++) {
+          const wy = e.y + e.h * (0.3 + wi * 0.15);
+          ctx.beginPath();
+          ctx.moveTo(bcx - e.w * 0.6, wy);
+          ctx.lineTo(bcx - e.w, wy + Math.sin(t * 12 + wi) * 4);
+          ctx.moveTo(bcx + e.w * 0.6, wy);
+          ctx.lineTo(bcx + e.w, wy + Math.sin(t * 12 + wi) * 4);
+          ctx.stroke();
+        }
+        ctx.restore();
       }
     }
   }
