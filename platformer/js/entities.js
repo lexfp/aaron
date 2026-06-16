@@ -322,6 +322,7 @@ function damageEnemy(e, dmg, knockDir, knock) {
   const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
   if (e.hp <= 0) {
     e.alive = false;
+    e._deathT = e.boss ? 0.4 : 0.35;
     addHitParticles(cx, cy, e.color, 12);
     if (e.boss) {
       addExplosion(cx, cy, e.color);
@@ -1181,7 +1182,7 @@ export function drawProjectiles(ctx, camX, W) {
   }
 }
 
-export function drawEnemies(ctx, camX, W, t) {
+export function drawEnemies(ctx, camX, W, t, player, dt = 0) {
   // Signature zones (drawn below enemies)
   for (const z of sigZones) {
     const sx = z.x - camX;
@@ -1234,9 +1235,25 @@ export function drawEnemies(ctx, camX, W, t) {
     }
     ctx.restore();
   }
-
   for (const e of enemies) {
-    if (!e.alive) continue;
+    if (!e.alive) {
+      if (e._deathT <= 0) { continue; }
+      e._deathT -= dt;
+      if (e._deathT > 0 && e.x + e.w >= camX - 40 && e.x <= camX + W + 80) {
+        const _cx = e.x + e.w / 2;
+        const dur = e.boss ? 0.4 : 0.35;
+        const frac = Math.max(0, e._deathT / dur);
+        ctx.save();
+        ctx.translate(_cx, e.y + e.h / 2);
+        ctx.globalAlpha = frac;
+        ctx.scale(1.2 - frac * 0.2, frac * 0.9 + 0.1);
+        ctx.fillStyle = e.color || '#aaa';
+        ctx.fillRect(-e.w / 2, -e.h / 2, e.w, e.h);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+      continue;
+    }
     if (e.x + e.w < camX - 40 || e.x > camX + W + 80) continue;
 
     const cx = e.x + e.w / 2;
@@ -1266,9 +1283,9 @@ export function drawEnemies(ctx, camX, W, t) {
       if (e.bossScale > 1) {
         // draw the species at its native proportions, scaled up to boss size
         ctx.scale(e.bossScale, e.bossScale);
-        sd(ctx, { ...e, w: e.w / e.bossScale, h: e.h / e.bossScale }, t);
+        sd(ctx, { ...e, w: e.w / e.bossScale, h: e.h / e.bossScale }, t, player);
       } else {
-        sd(ctx, e, t);
+        sd(ctx, e, t, player);
       }
       ctx.restore();
     } else if (e.type === 'flyer') drawFlyer(ctx, e);
@@ -1276,12 +1293,17 @@ export function drawEnemies(ctx, camX, W, t) {
     else if (e.type === 'brute') drawBrute(ctx, e);
     else drawWalker(ctx, e, t);
 
-    // hit flash
+    // hit scale-pulse then white flash
     if (e.hitFlash > 0) {
-      ctx.globalAlpha = e.hitFlash / 0.13 * 0.8;
+      const pulseFrac = e.hitFlash / 0.13;
+      ctx.save();
+      const ps = 1 + pulseFrac * 0.08;
+      ctx.scale(ps, ps);
+      ctx.globalAlpha = pulseFrac * 0.8;
       ctx.fillStyle = '#fff';
       ctx.fillRect(-e.w / 2, 0, e.w, e.h);
       ctx.globalAlpha = 1;
+      ctx.restore();
     }
     // special attack charge flash (yellow burst when a boss special fires)
     if (e._atkFlash > 0) {
@@ -1292,34 +1314,7 @@ export function drawEnemies(ctx, camX, W, t) {
     }
     ctx.restore();
 
-    if (e.boss) {
-      // chunky boss HP bar — turns orange in rage, shows 50% rage threshold marker
-      const bw = e.w + 14;
-      const bx = e.x + e.w / 2 - bw / 2;
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(bx - 2, e.y - 20, bw + 4, 12);
-      ctx.fillStyle = e._rage ? '#ff6b35' : '#e74c3c';
-      ctx.fillRect(bx, e.y - 18, bw * Math.max(0, e.hp / e.maxHp), 8);
-      // rage threshold marker at 50%
-      ctx.fillStyle = 'rgba(255,220,50,0.85)';
-      ctx.fillRect(bx + bw * 0.5 - 1, e.y - 20, 2, 12);
-      if (e._rage) {
-        ctx.fillStyle = '#ff8c42';
-        ctx.font = 'bold 9px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('ENRAGED', e.x + e.w / 2, e.y - 24);
-        ctx.textAlign = 'left';
-      }
-    } else if (e.maxHp > 1) {
-      // HP pips above tougher enemies
-      const pw = e.w / e.maxHp;
-      for (let i = 0; i < e.maxHp; i++) {
-        ctx.fillStyle = i < e.hp ? '#e74c3c' : 'rgba(255,255,255,0.18)';
-        ctx.fillRect(e.x + i * pw + 1, e.y - 9, pw - 2, 4);
-      }
-    }
-
-    // Signature visuals
+    // Signature visuals (shield, parry, wind telegraph) — rendered before HP bar so HP bar is topmost
     if (e.boss) {
       const bx = e.x - camX;
       const bcx = bx + e.w / 2;
@@ -1362,6 +1357,34 @@ export function drawEnemies(ctx, camX, W, t) {
           ctx.stroke();
         }
         ctx.restore();
+      }
+    }
+
+    // HP bar / pips (rendered last — on top of all other visuals)
+    if (e.boss) {
+      // chunky boss HP bar — turns orange in rage, shows 50% rage threshold marker
+      const bw = e.w + 14;
+      const bx = e.x + e.w / 2 - bw / 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(bx - 2, e.y - 20, bw + 4, 12);
+      ctx.fillStyle = e._rage ? '#ff6b35' : '#e74c3c';
+      ctx.fillRect(bx, e.y - 18, bw * Math.max(0, e.hp / e.maxHp), 8);
+      // rage threshold marker at 50%
+      ctx.fillStyle = 'rgba(255,220,50,0.85)';
+      ctx.fillRect(bx + bw * 0.5 - 1, e.y - 20, 2, 12);
+      if (e._rage) {
+        ctx.fillStyle = '#ff8c42';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('ENRAGED', e.x + e.w / 2, e.y - 24);
+        ctx.textAlign = 'left';
+      }
+    } else if (e.maxHp > 1) {
+      // HP pips above tougher enemies
+      const pw = e.w / e.maxHp;
+      for (let i = 0; i < e.maxHp; i++) {
+        ctx.fillStyle = i < e.hp ? '#e74c3c' : 'rgba(255,255,255,0.18)';
+        ctx.fillRect(e.x + i * pw + 1, e.y - 9, pw - 2, 4);
       }
     }
   }
@@ -1511,9 +1534,10 @@ function drawSlime(ctx, e, t) {
   ctx.fill();
 }
 
-function drawBee(ctx, e, t) {
+function drawBee(ctx, e, t, player) {
   const w = e.w, h = e.h;
-  const flap = Math.sin(e.t * 26) * 0.6;
+  const chasing = player && Math.hypot(player.x + player.w / 2 - (e.x + e.w / 2), player.y + player.h / 2 - (e.y + e.h / 2)) < 300;
+  const flap = Math.sin(e.t * (chasing ? 38 : 26)) * 0.6;
   ctx.fillStyle = 'rgba(255,255,255,0.75)';
   ctx.save(); ctx.translate(-2, h * 0.25); ctx.rotate(-0.5 - flap);
   ctx.beginPath(); ctx.ellipse(0, -6, 5, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
@@ -1616,6 +1640,7 @@ function drawIcicle(ctx, e, t) {
 function drawScorpion(ctx, e, t) {
   const w = e.w, h = e.h;
   const winding = e._st === 1, dashing = e._st === 2;
+  if (winding) ctx.translate(Math.sin(t * 42) * 1.5, 0);
   ctx.strokeStyle = '#8a5a20'; ctx.lineWidth = 2; // legs
   for (let i = 0; i < 3; i++) {
     const lx = -w * 0.25 + i * w * 0.18;
@@ -1666,7 +1691,9 @@ function drawLavaBlob(ctx, e, t) {
   g.addColorStop(0, 'rgba(255,170,60,0.55)'); g.addColorStop(1, 'rgba(255,80,0,0)');
   ctx.fillStyle = g;
   ctx.fillRect(-w, cy - w, w * 2, w * 2);
-  const wob = Math.sin(e.t * 9) * 0.08;
+  const _vy = e.vy || 0;
+  const air = Math.abs(_vy) > 30;
+  const wob = air ? (_vy < 0 ? 0.12 : -0.06) : Math.sin(e.t * 9) * 0.08;
   ctx.fillStyle = '#ff793f';
   ctx.beginPath(); ctx.ellipse(0, cy, w * 0.46 * (1 + wob), h * 0.42 * (1 - wob), 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#ffd32a';
@@ -1678,9 +1705,10 @@ function drawLavaBlob(ctx, e, t) {
   ctx.fill();
 }
 
-function drawEmber(ctx, e, t) {
+function drawEmber(ctx, e, t, player) {
   const w = e.w, h = e.h;
-  const fl = Math.sin(e.t * 13) * 2;
+  const chasing = player && Math.hypot(player.x + player.w / 2 - (e.x + e.w / 2), player.y + player.h / 2 - (e.y + e.h / 2)) < 300;
+  const fl = Math.sin(e.t * (chasing ? 20 : 13)) * 2;
   ctx.fillStyle = '#ff793f';
   ctx.beginPath();
   ctx.moveTo(0, fl * 0.4);
@@ -1862,6 +1890,7 @@ function drawShard(ctx, e, t) {
 function drawKnight(ctx, e, t) {
   const w = e.w, h = e.h;
   const winding = e._st === 1, dashing = e._st === 2;
+  if (winding) ctx.translate(Math.sin(t * 42) * 1.5, 0);
   ctx.fillStyle = '#23233c';
   ctx.fillRect(-w * 0.3, h - 7, w * 0.22, 7);
   ctx.fillRect(w * 0.08, h - 7, w * 0.22, 7);

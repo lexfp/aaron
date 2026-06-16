@@ -31,6 +31,7 @@ let gameActive = false;
 let paused = false;
 let prevTimestamp = null;
 let deathTimer = 0;
+let _lastDt = 0;
 let _lastHp = 100;
 
 // UI callbacks object
@@ -154,6 +155,7 @@ function gameLoop(timestamp) {
   if (!prevTimestamp) { prevTimestamp = timestamp; return; }
   const dt = Math.min((timestamp - prevTimestamp) / 1000, 0.033);
   prevTimestamp = timestamp;
+  _lastDt = dt;
 
   // ESC to pause/unpause
   if (consumeEsc()) {
@@ -235,7 +237,7 @@ function renderFrame() {
   drawPlatforms(ctx, levelData.platforms, currentStage, gameTime);
   drawHazards(ctx, levelData.hazards, currentStage);
   drawEntities(ctx, camX, currentStage, gameTime);
-  drawEnemies(ctx, camX, GW, gameTime);
+  drawEnemies(ctx, camX, GW, gameTime, player, _lastDt);
   drawPlayer(ctx, gameTime);
   drawProjectiles(ctx, camX, GW);
 
