@@ -73,6 +73,11 @@ export const player = {
   swingT: 0,          // remaining swing-animation time
   swingDur: 0.16,
   weapon: null,       // equipped weapon def (for drawing)
+  // Boss signature effect timers (all decay to 0; reset by initPlayer)
+  iceSlipT: 0,        // slider ice trail: overrides idle friction toward slippery
+  windPushT: 0,       // bird wind gust: horizontal push for this many seconds
+  windPushDir: 0,     // direction of the wind push (+1 or -1)
+  dazeT: 0,           // shroom spore: dampens horizontal input
   // Computed from upgrades each level
   jumpForce: BASE_JUMP,
   djForce: BASE_DJ,
@@ -103,6 +108,10 @@ export function initPlayer(spawnX, spawnY) {
   player.attackCD = 0;
   player.swingT = 0;
   player.weapon = getEquippedWeapon();
+  player.iceSlipT = 0;
+  player.windPushT = 0;
+  player.windPushDir = 0;
+  player.dazeT = 0;
 
   player.jumpForce = BASE_JUMP * getJumpMult() * _mod.jMul;
   player.djForce = BASE_DJ * getDJMult() * _mod.jMul;
@@ -151,17 +160,26 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
   _modT += dt;
 
   // Horizontal movement (idle damping varies by stage: slippery ice vs. mossy grip)
-  const targetVx = isLeft() ? -player.speed : isRight() ? player.speed : 0;
+  const dazeScale = player.dazeT > 0 ? 0.35 : 1.0; // shroom daze dampens input
+  const targetVx = isLeft() ? -player.speed * dazeScale : isRight() ? player.speed * dazeScale : 0;
   if (targetVx !== 0) {
     player.vx = targetVx;
     player.facing = targetVx > 0 ? 1 : -1;
   } else {
-    player.vx *= _mod.fric;
+    const activeFric = player.iceSlipT > 0 ? Math.max(_mod.fric, 0.965) : _mod.fric;
+    player.vx *= activeFric;
     if (Math.abs(player.vx) < 8) player.vx = 0;
   }
 
   // Desert gusts: oscillating sideways push you must lean against.
   if (_mod.wind) player.vx += _mod.wind * Math.sin(_modT * 0.6) * dt;
+
+  // Bird wind gust: horizontal push for capped duration
+  if (player.windPushT > 0) {
+    player.vx += player.windPushDir * 560 * dt; // sustained gust acceleration
+    player.vx = Math.max(-BASE_SPEED, Math.min(BASE_SPEED, player.vx));
+    player.windPushT = Math.max(0, player.windPushT - dt);
+  }
 
   // Gravity (per-stage multiplier; terminal velocity tracks it so low-g feels floaty)
   const grav = GRAVITY * _mod.gMul;
@@ -200,6 +218,9 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
   player.swingT = Math.max(0, player.swingT - dt);
   player.invuln = Math.max(0, player.invuln - dt);
   player.hurtFlash = Math.max(0, player.hurtFlash - dt);
+  player.iceSlipT = Math.max(0, player.iceSlipT - dt);
+  player.windPushT = Math.max(0, player.windPushT - dt);
+  player.dazeT = Math.max(0, player.dazeT - dt);
 
   // Walk distance for leg swing animation
   if (player.onGround && Math.abs(player.vx) > 15) {
@@ -333,6 +354,29 @@ export function drawPlayer(ctx, t) {
     ctx.fillStyle = '#ff2b2b';
     roundRect(ctx, -hw, -hh, w, h, 6);
     ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // Shroom spore daze overlay
+  if (player.dazeT > 0) {
+    const dAlpha = Math.min(0.55, player.dazeT / 1.5) * (0.6 + Math.sin(t * 9) * 0.3);
+    ctx.globalAlpha = dAlpha;
+    ctx.fillStyle = '#e17055';
+    ctx.beginPath(); ctx.arc(0, -hh * 0.1, hw * 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // Bird wind push overlay
+  if (player.windPushT > 0) {
+    const wAlpha = Math.min(0.5, player.windPushT / 1.1) * (0.5 + Math.sin(t * 14) * 0.3);
+    ctx.globalAlpha = wAlpha;
+    ctx.strokeStyle = '#c0d8ff'; ctx.lineWidth = 2;
+    for (let wi = 0; wi < 3; wi++) {
+      ctx.beginPath();
+      ctx.moveTo(player.windPushDir * (hw * 0.4 + wi * 5), -hh * 0.4 + wi * hh * 0.3);
+      ctx.lineTo(player.windPushDir * (hw * 1.1 + wi * 5), -hh * 0.4 + wi * hh * 0.3);
+      ctx.stroke();
+    }
     ctx.globalAlpha = 1;
   }
 
