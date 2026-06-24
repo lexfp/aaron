@@ -31,6 +31,7 @@ export function loadPlayerData() {
     if (!SKIN_MAP[playerData.equippedSkin] || (!playerData.skins[playerData.equippedSkin] && playerData.equippedSkin !== 'default')) {
       playerData.equippedSkin = 'default';
     }
+    grantCompletionSkin();
   } catch {}
 }
 
@@ -305,9 +306,9 @@ export const SKIN_DEFS = [
     palette: { body: '#006994', bodyStripe: '#005273', limb: '#4fc3f7', leg: '#004d70', skin: '#b3e5fc', hair: '#0277bd', accessory_type: 'visor', accessory_color: '#00e5ff' },
   },
   {
-    key: 'champion', label: 'Champion', icon: '🏆', cost: 0, unlock: { stage: 5 },
-    desc: 'Earned by completing Stage 5.',
-    palette: { body: '#f39c12', bodyStripe: '#d68910', limb: '#f5d6a8', leg: '#784212', skin: '#fdebd0', hair: '#6e2f00', accessory_type: 'cap', accessory_color: '#f39c12' },
+    key: 'champion', label: 'Champion', icon: '🏆', cost: 0, unlock: 'all-stages',
+    desc: 'Awarded for beating all 10 stages.',
+    palette: { body: '#f9c74f', bodyStripe: '#f0a800', limb: '#ffd166', leg: '#b5860e', skin: '#fae0a0', hair: '#c87f00', accessory_type: 'crown', accessory_color: '#f4a100' },
   },
   {
     key: 'shadowrunner', label: 'Shadow Runner', icon: '🌑', cost: 0, unlock: { stage: 8 },
@@ -350,4 +351,16 @@ export function getEquippedSkin() {
   const def = SKIN_MAP[key];
   if (def && ownsSkin(key)) return def;
   return SKIN_MAP['default'];
+}
+
+export function isGameComplete() {
+  return playerData.stagesUnlocked >= 10;
+}
+
+export function grantCompletionSkin() {
+  if (!isGameComplete()) return false;
+  if (ownsSkin('champion')) return false;
+  playerData.skins['champion'] = true;
+  savePlayerData();
+  return true;
 }
