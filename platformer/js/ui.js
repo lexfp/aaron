@@ -2,6 +2,7 @@ import {
   playerData, savePlayerData, isLevelComplete, isStageComplete,
   getLevelCompletedCount, UPGRADE_DEFS, resetAllProgress,
   WEAPON_DEFS, ownsWeapon, buyWeapon, equipWeapon, getEquippedWeapon,
+  SKIN_DEFS, ownsSkin, buySkin, equipSkin, getEquippedSkin,
 } from './state.js';
 import { STAGE_THEMES } from './renderer.js';
 import { STAGE_MODIFIERS } from './player.js';
@@ -284,6 +285,52 @@ function renderShop(callbacks) {
         savePlayerData();
         renderShop(callbacks);
       });
+    }
+    grid.appendChild(card);
+  }
+
+  // ── Skins section ──
+  const sTitle = document.createElement('div');
+  sTitle.className = 'shop-section-title';
+  sTitle.textContent = '🎨 Skins';
+  grid.appendChild(sTitle);
+
+  const equippedSkinKey = getEquippedSkin().key;
+  for (const s of SKIN_DEFS) {
+    const owned = ownsSkin(s.key);
+    const isEquipped = equippedSkinKey === s.key;
+    const isProgression = !!s.unlock;
+    const canAfford = !owned && !isProgression && playerData.coins >= s.cost;
+
+    let btnHTML;
+    if (isEquipped) {
+      btnHTML = '<div class="shop-maxed">EQUIPPED</div>';
+    } else if (owned) {
+      btnHTML = `<button class="shop-buy shop-equip" data-key="${s.key}">Equip</button>`;
+    } else if (isProgression) {
+      btnHTML = `<div class="shop-maxed">Stage ${s.unlock.stage}</div>`;
+    } else {
+      btnHTML = `<button class="shop-buy${canAfford ? '' : ' cant-afford'}" data-key="${s.key}">🪙 ${s.cost}</button>`;
+    }
+
+    const card = document.createElement('div');
+    card.className = 'shop-card' + (isEquipped ? ' equipped' : '');
+    card.innerHTML = `
+      <div class="shop-swatch" style="background:${s.palette.body};border-bottom:3px solid ${s.palette.bodyStripe}"></div>
+      <div class="shop-icon">${s.icon}</div>
+      <div class="shop-name">${s.label}</div>
+      <div class="shop-desc">${s.desc}</div>
+      ${btnHTML}
+    `;
+    const sbtn = card.querySelector('button');
+    if (sbtn) {
+      if (owned && !isEquipped) {
+        sbtn.addEventListener('click', () => { equipSkin(s.key); renderShop(callbacks); });
+      } else if (!owned && canAfford) {
+        sbtn.addEventListener('click', () => {
+          if (buySkin(s.key)) { equipSkin(s.key); renderShop(callbacks); }
+        });
+      }
     }
     grid.appendChild(card);
   }

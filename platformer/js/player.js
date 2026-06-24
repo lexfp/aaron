@@ -1,7 +1,7 @@
 import { isLeft, isRight } from './input.js';
 import { resolveX, resolveY } from './level.js';
 import { addDJParticles, addLandParticles } from './entities.js';
-import { getJumpMult, getDJMult, getSpeedMult, getEquippedWeapon } from './state.js';
+import { getJumpMult, getDJMult, getSpeedMult, getEquippedWeapon, getEquippedSkin } from './state.js';
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
@@ -219,6 +219,7 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
 }
 
 export function drawPlayer(ctx, t) {
+  const palette = getEquippedSkin().palette;
   const { x, y, w, h, facing, animState, animTimer, landSquash, djFlash, distanceTraveled } = player;
 
   const centerX = x + w / 2;
@@ -251,37 +252,37 @@ export function drawPlayer(ctx, t) {
 
   // --- Legs ---
   const legSwing = animState === 'walk' ? Math.sin(distanceTraveled * 0.048) * 0.55 : 0;
-  drawLimb(ctx, -hw * 0.38, hh * 0.25, legSwing, '#1a252f', 6, hh * 0.48);
-  drawLimb(ctx, hw * 0.38, hh * 0.25, -legSwing, '#1a252f', 6, hh * 0.48);
+  drawLimb(ctx, -hw * 0.38, hh * 0.25, legSwing, palette.leg, 6, hh * 0.48);
+  drawLimb(ctx, hw * 0.38, hh * 0.25, -legSwing, palette.leg, 6, hh * 0.48);
 
   // --- Body (shirt) ---
-  ctx.fillStyle = '#2980b9';
+  ctx.fillStyle = palette.body;
   roundRect(ctx, -hw * 0.72, -hh * 0.22, w * 0.72, h * 0.52, 5);
   ctx.fill();
   // Shirt detail (stripe)
-  ctx.fillStyle = '#1a6fa8';
+  ctx.fillStyle = palette.bodyStripe;
   ctx.fillRect(-hw * 0.72, hh * 0.06, w * 0.72, 4);
 
   // --- Arms ---
   const armSwing = animState === 'walk' ? -legSwing * 0.85 : 0;
   const armFall = animState === 'fall' ? 0.75 : 0;
-  drawLimb(ctx, hw * 0.72, -hh * 0.1, armFall + armSwing, '#f0a070', 5, hh * 0.38, true);
-  drawLimb(ctx, -hw * 0.72, -hh * 0.1, armFall - armSwing, '#f0a070', 5, hh * 0.38, true);
+  drawLimb(ctx, hw * 0.72, -hh * 0.1, armFall + armSwing, palette.limb, 5, hh * 0.38, true);
+  drawLimb(ctx, -hw * 0.72, -hh * 0.1, armFall - armSwing, palette.limb, 5, hh * 0.38, true);
 
   // --- Head ---
-  ctx.fillStyle = '#f5cba7';
+  ctx.fillStyle = palette.skin;
   ctx.beginPath();
   ctx.arc(0, -hh * 0.42, hw * 0.85, 0, Math.PI * 2);
   ctx.fill();
 
   // Ear
-  ctx.fillStyle = '#e8b898';
+  ctx.fillStyle = palette.skin;
   ctx.beginPath();
   ctx.arc(hw * 0.78, -hh * 0.38, 4, 0, Math.PI * 2);
   ctx.fill();
 
   // Hair
-  ctx.fillStyle = '#5d4037';
+  ctx.fillStyle = palette.hair;
   ctx.beginPath();
   ctx.arc(-hw * 0.08, -hh * 0.78, 7.5, 0, Math.PI * 2);
   ctx.arc(hw * 0.18, -hh * 0.82, 6.5, 0, Math.PI * 2);
@@ -293,6 +294,18 @@ export function drawPlayer(ctx, t) {
   ctx.beginPath();
   ctx.arc(0, -hh * 0.42, hw * 0.8, Math.PI * 1.1, Math.PI * 1.9);
   ctx.stroke();
+
+  // Accessory (visor or cap from active palette)
+  if (palette.accessory_type === 'visor') {
+    ctx.fillStyle = palette.accessory_color;
+    ctx.fillRect(-hw * 0.5, -hh * 0.52, hw * 0.9, hh * 0.14);
+  } else if (palette.accessory_type === 'cap') {
+    ctx.fillStyle = palette.accessory_color;
+    ctx.beginPath();
+    ctx.ellipse(hw * 0.08, -hh * 0.82, hw * 0.75, hh * 0.22, 0, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(-hw * 0.7, -hh * 0.82, hw * 1.4, hh * 0.06);
+  }
 
   // Eyes (right eye is front when facing right)
   const eyeY = -hh * 0.42;
@@ -324,7 +337,7 @@ export function drawPlayer(ctx, t) {
 
   // Weapon swing / attack
   if (player.swingT > 0 && player.weapon) {
-    drawWeaponSwing(ctx, hw, hh, player.weapon, 1 - player.swingT / player.swingDur);
+    drawWeaponSwing(ctx, hw, hh, player.weapon, 1 - player.swingT / player.swingDur, palette.limb);
   }
 
   // Hurt flash — red tint over the body when damaged
@@ -352,7 +365,7 @@ export function drawPlayer(ctx, t) {
 
 // Draws the equipped weapon mid-swing in front of the player. Called inside the
 // player's translated+facing-flipped context, so +x is always "forward".
-function drawWeaponSwing(ctx, hw, hh, weapon, prog) {
+function drawWeaponSwing(ctx, hw, hh, weapon, prog, limbColor) {
   ctx.save();
   ctx.translate(hw * 0.55, -hh * 0.05); // shoulder pivot
 
@@ -387,7 +400,7 @@ function drawWeaponSwing(ctx, hw, hh, weapon, prog) {
   ctx.stroke();
 
   // arm
-  ctx.strokeStyle = '#f0a070';
+  ctx.strokeStyle = limbColor || '#f0a070';
   ctx.lineWidth = 5;
   ctx.lineCap = 'round';
   ctx.beginPath();
