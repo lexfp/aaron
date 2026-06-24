@@ -1,7 +1,7 @@
 # SPEC: Dice Unlock Cheat
 
 ## Goal
-A player can click the 🎲 dice toy on the main menu 500 times so that all weapons and all 500 levels are unlocked through a hidden cheat with no separate cheat menu.
+A player can click the 🎲 dice toy on the main menu 500 times so that all weapons and all 500 levels are unlocked through a hidden cheat with no separate cheat menu, and the cheat fires at most once per menu session.
 
 ## Requirements
 1. `state.js` exports a new function `unlockEverything()`.
@@ -12,42 +12,44 @@ A player can click the 🎲 dice toy on the main menu 500 times so that all weap
 6. `unlockEverything()` never reads or writes `playerData.equippedWeapon`.
 7. `unlockEverything()` never calls `equipWeapon`, `equipSkin`, or any other equip function.
 8. `unlockEverything()` returns `undefined`.
-9. The dice click handler inside `setupMenuEffects` in `ui.js` maintains a click counter `_diceHits` (initialized to 0) declared as a local in the `setupMenuEffects` closure scope.
+9. The dice click handler inside `setupMenuEffects` in `ui.js` maintains a click counter `_diceHits` (initialized to 0) and a one-time flag `_diceUnlocked` (initialized to `false`), both declared as locals in the `setupMenuEffects` closure scope.
 10. On each dice click, the handler increments `_diceHits`.
-11. When `_diceHits` reaches 500 or more, the handler calls `unlockEverything()` and resets `_diceHits` to 0.
-12. The dice counter `_diceHits` is a separate local that does not read, write, or replace the existing `streak`, `prev`, `done`, or `goal` variables used by the `luckyRun` easter egg.
-13. The cheat produces no toast, no overlay, and no console/log output; only the standard dice burst that already fires per click occurs.
+11. When `_diceHits` reaches 500 or more and `_diceUnlocked` is `false`, the handler calls `unlockEverything()`, sets `_diceUnlocked = true`, and resets `_diceHits` to 0.
+12. When `_diceHits` reaches 500 or more and `_diceUnlocked` is already `true`, the handler resets `_diceHits` to 0 and does NOT call `unlockEverything()`.
+13. The dice counter `_diceHits` and flag `_diceUnlocked` are separate locals that do not read, write, or replace the existing `streak`, `prev`, `done`, or `goal` variables used by the `luckyRun` easter egg.
+14. The cheat produces no toast, no overlay, and no console/log output; only the standard dice burst that already fires per click occurs.
 
 ## Examples
-Example 1 — Threshold reached
-  Input: Player clicks `#toy-dice` 500 times (any pace, within the same menu session).
-  Expected output: On the 500th click `unlockEverything()` is called once; afterward `playerData.weapons` has all 11 keys true, `playerData.stagesUnlocked` is 10, `playerData.levelProgress` has all 500 `${s}-${l}` keys true, and `savePlayerData()` has persisted the data. `_diceHits` is reset to 0.
+Example 1 — First 500 clicks unlocks everything
+  Input: Player clicks `#toy-dice` 500 times within the same menu session, `_diceUnlocked` is `false`.
+  Expected output: On the 500th click `unlockEverything()` is called once; `playerData.weapons` has all 11 keys true, `playerData.stagesUnlocked` is 10, `playerData.levelProgress` has all 500 keys true, `savePlayerData()` called once, `_diceUnlocked` set to `true`, `_diceHits` reset to 0.
 
-Example 2 — Threshold not yet reached
-  Input: Player clicks `#toy-dice` 499 times.
-  Expected output: `_diceHits` is 499. `unlockEverything()` is not called; player data is unchanged by the cheat.
+Example 2 — Second 500 clicks does nothing
+  Input: `_diceUnlocked` is `true` (cheat already fired this session); player clicks `#toy-dice` 500 more times.
+  Expected output: On the 500th of those clicks `_diceHits >= 500` but `_diceUnlocked` is `true`, so `unlockEverything()` is NOT called. `_diceHits` resets to 0. No save occurs.
 
 Example 3 — equippedWeapon preserved
-  Input: `playerData.equippedWeapon` is `'sword'` and the player triggers the cheat on the 500th click.
+  Input: `playerData.equippedWeapon` is `'sword'` and the player triggers the cheat on the first 500th click.
   Expected output: After `unlockEverything()` runs, `playerData.equippedWeapon` is still `'sword'`; only weapons, stagesUnlocked, and levelProgress changed.
 
 ## Edge Cases
-- All weapons and levels are already unlocked: `unlockEverything()` overwrites with the same `true` values and saves; the result is identical (idempotent), with no error.
-- Menu re-render mid-streak: when `setupMenuEffects` is called again, `_diceHits` is freshly initialized to 0, so a partial streak from a prior render does not carry over.
-- Exactly 500 clicks: the cheat fires on the 500th click because `_diceHits >= 500` is satisfied at 500, not only above 500.
-- A 501st click after firing: because `_diceHits` was reset to 0 on the 500th click, the 501st click counts as `_diceHits = 1` and does not re-trigger.
+- All weapons and levels are already unlocked when the first 500-click threshold is hit: `unlockEverything()` overwrites with the same values and saves once; no error. `_diceUnlocked` becomes `true`.
+- Menu re-render mid-streak: when `setupMenuEffects` is called again, both `_diceHits` and `_diceUnlocked` are freshly initialized to 0/false, so a fired cheat from a prior render does not persist.
+- Exactly 500 clicks: the cheat fires on the 500th click because `_diceHits >= 500` is satisfied at 500.
+- 499 clicks after the cheat has already fired: `_diceHits` reaches 499 but `_diceUnlocked` is `true`, so even if it reaches 500 the cheat will not re-fire.
 
 ## Constraints
 - `unlockEverything()` MUST NOT modify `playerData.equippedWeapon`.
 - `unlockEverything()` MUST NOT call `equipWeapon`, `equipSkin`, or any equip function.
-- The dice counter MUST use a closure-scoped local in `setupMenuEffects`, NOT a module-level variable.
+- The dice counter and flag MUST use closure-scoped locals in `setupMenuEffects`, NOT module-level variables.
+- The cheat MUST fire at most once per `setupMenuEffects` invocation (per menu session).
 - The cheat MUST NOT alter, replace, or break the existing `luckyRun` easter egg trigger or its `streak`/`prev`/`done`/`goal` state.
 - The cheat MUST NOT add any visual or textual announcement beyond the existing per-click dice burst.
 - `savePlayerData()` MUST be called exactly once per `unlockEverything()` invocation.
 
 ## Affected Components
 - platformer/js/state.js — add and export `unlockEverything()` that sets all weapons, `stagesUnlocked = 10`, all 500 level-progress entries, then calls `savePlayerData()` once.
-- platformer/js/ui.js — in the `#toy-dice` click handler within `setupMenuEffects`, add closure-scoped `_diceHits` counter that calls `unlockEverything()` on the 500th click and resets, and import `unlockEverything` from state.js.
+- platformer/js/ui.js — in the `#toy-dice` click handler within `setupMenuEffects`, add closure-scoped `_diceHits` counter and `_diceUnlocked` flag; call `unlockEverything()` only on the first 500-click threshold; import `unlockEverything` from state.js.
 
 ## Interface Contracts
 - `unlockEverything()` — sets every `WEAPON_DEFS` key true in `playerData.weapons`, sets `playerData.stagesUnlocked = 10`, sets all 500 `playerData.levelProgress` keys true, calls `savePlayerData()` once, leaves `playerData.equippedWeapon` untouched, and returns `undefined`.

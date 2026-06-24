@@ -21,12 +21,12 @@ When:  The dice click counter variable is inspected.
 Then:  `_diceHits` is declared as a local inside `setupMenuEffects` (closure scope), not at module top level.
 Verify by: Read `setupMenuEffects` in platformer/js/ui.js and confirm `_diceHits` is declared with `let` inside the function body and that no module-level declaration of it exists.
 
-## Scenario 4 — 500 clicks triggers the cheat
+## Scenario 4 — 500 clicks triggers the cheat the first time
 Kind: code
-Given: The `#toy-dice` handler with `_diceHits = 0`.
+Given: The `#toy-dice` handler with `_diceHits = 0` and `_diceUnlocked = false`.
 When:  500 dice clicks occur.
-Then:  On the 500th click `unlockEverything()` is called and `_diceHits` is reset to 0.
-Verify by: Read the `#toy-dice` click handler in `setupMenuEffects` in platformer/js/ui.js and confirm it increments `_diceHits` and that `if (_diceHits >= 500)` calls `unlockEverything()` then resets `_diceHits = 0`.
+Then:  On the 500th click `unlockEverything()` is called, `_diceUnlocked` is set to `true`, and `_diceHits` is reset to 0.
+Verify by: Read the `#toy-dice` click handler in `setupMenuEffects` in platformer/js/ui.js and confirm it increments `_diceHits` and that the threshold branch checks `_diceHits >= 500 && !_diceUnlocked`, then calls `unlockEverything()`, sets `_diceUnlocked = true`, and resets `_diceHits = 0`.
 
 ## Scenario 5 — 499 clicks does not trigger the cheat
 Kind: code
@@ -46,8 +46,15 @@ Verify by: Read the `#toy-dice` click handler in platformer/js/ui.js and confirm
 Kind: code
 Given: The existing `luckyRun` easter egg uses the locals `streak`, `prev`, `done`, and `goal` in the dice handler.
 When:  The new cheat counter is added.
-Then:  The new counter uses only `_diceHits` and does not read, write, or remove `streak`, `prev`, `done`, `goal`, or the `luckyRun(callbacks)` call.
-Verify by: Read the `#toy-dice` click handler in platformer/js/ui.js and confirm the `luckyRun` trigger is intact and that the new counter only touches `_diceHits`.
+Then:  The new counter uses only `_diceHits` and `_diceUnlocked` and does not read, write, or remove `streak`, `prev`, `done`, `goal`, or the `luckyRun(callbacks)` call.
+Verify by: Read the `#toy-dice` click handler in platformer/js/ui.js and confirm the `luckyRun` trigger is intact and that the new counter only touches `_diceHits` and `_diceUnlocked`.
+
+## Scenario 9 — Second 500 clicks does nothing (must-NOT re-fire)
+Kind: code
+Given: The `#toy-dice` handler has already fired the cheat (`_diceUnlocked === true`); player clicks 500 more times.
+When:  `_diceHits` reaches 500 again.
+Then:  `unlockEverything()` is NOT called; `_diceHits` is reset to 0; `savePlayerData()` is not called a second time.
+Verify by: Read the `#toy-dice` click handler in platformer/js/ui.js and confirm the threshold branch guards on `!_diceUnlocked`, so when `_diceUnlocked` is `true` the 500-click threshold resets the counter but skips the `unlockEverything()` call.
 
 ## Scenario 8 — Idempotent when everything already unlocked
 Kind: code
