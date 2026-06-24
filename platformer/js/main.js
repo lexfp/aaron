@@ -1,4 +1,4 @@
-import { loadPlayerData, playerData, markLevelComplete, getMagnetRadius, getStartLives, isStageComplete, getEquippedWeapon } from './state.js';
+import { loadPlayerData, playerData, markLevelComplete, getMagnetRadius, getStartLives, isStageComplete, getEquippedWeapon, grantCompletionSkin } from './state.js';
 import { initInput, consumeJump, consumeEsc, isAttack, clearAll } from './input.js';
 import { player, initPlayer, updatePlayer, drawPlayer, setStageModifier, getStageModifier } from './player.js';
 import {
@@ -113,6 +113,7 @@ function onPlayerDeath() {
 function onLevelComplete() {
   gameActive = false;
   markLevelComplete(currentStage, currentLevel);
+  grantCompletionSkin();
 
   callbacks._lastCoins = coinsThisLevel;
 
