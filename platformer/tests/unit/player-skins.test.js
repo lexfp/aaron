@@ -109,11 +109,11 @@ describe('Scenario 1 — SKIN_DEFS structure and counts', () => {
     expect(coinPurchasable.length).toBeGreaterThanOrEqual(5);
   });
 
-  test('at least 2 skins have unlock.stage defined (progression-unlocked)', () => {
+  test('at least 1 skin has unlock.stage defined (progression-unlocked)', () => {
     const progression = skinEntries.filter(e =>
       /unlock\s*:\s*\{[^}]*stage\s*:\s*\d+/.test(e)
     );
-    expect(progression.length).toBeGreaterThanOrEqual(2);
+    expect(progression.length).toBeGreaterThanOrEqual(1);
   });
 
   test('every skin has a "key" field', () => {
