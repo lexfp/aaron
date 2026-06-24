@@ -73,6 +73,7 @@ export const player = {
   swingT: 0,          // remaining swing-animation time
   swingDur: 0.16,
   weapon: null,       // equipped weapon def (for drawing)
+  _charge: 0,         // seconds the attack input has been held (charge tracking)
   // Computed from upgrades each level
   jumpForce: BASE_JUMP,
   djForce: BASE_DJ,
@@ -102,6 +103,7 @@ export function initPlayer(spawnX, spawnY) {
   player.hurtFlash = 0;
   player.attackCD = 0;
   player.swingT = 0;
+  player._charge = 0;
   player.weapon = getEquippedWeapon();
 
   player.jumpForce = BASE_JUMP * getJumpMult() * _mod.jMul;

@@ -300,7 +300,21 @@ function dropCoins(cx, cy, n) {
   addCoinParticles(cx, cy); // gold burst at the kill spot
 }
 
-function damageEnemy(e, dmg, knockDir, knock) {
+function killEnemy(e) {
+  if (!e.alive) return;
+  e.alive = false;
+  const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
+  addHitParticles(cx, cy, e.color, 12);
+  if (e.boss) {
+    addExplosion(cx, cy, e.color);
+    addExplosion(cx, cy - 20, '#ffd700');
+    dropCoins(cx, cy, Math.round(e.maxHp * 1.5)); // big coin pile for bosses
+  } else {
+    dropCoins(cx, cy, Math.max(1, e.maxHp));      // coins scale with enemy toughness
+  }
+}
+
+function damageEnemy(e, dmg, knockDir, knock, player, weapon) {
   if (!e.alive) return;
   e.hp -= dmg;
   e.hitFlash = 0.13;
@@ -310,17 +324,47 @@ function damageEnemy(e, dmg, knockDir, knock) {
     if (e.behavior === 'hop') e.x += dx;
     else if (e.patrolMax > e.patrolMin) e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + dx));
   }
+
+  // Apply on-hit weapon effects
+  if (weapon && weapon.effect) {
+    if (weapon.effect === 'burn') {
+      e._burn = { t: 2.5, dps: weapon.damage * 0.5 };
+    } else if (weapon.effect === 'freeze') {
+      e._freeze = 1.5;
+    } else if (weapon.effect === 'chain') {
+      // Deal chain damage to the nearest other alive enemy within 140px
+      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+      let nearest = null, nearDist = Infinity;
+      for (const other of enemies) {
+        if (!other.alive || other === e) continue;
+        const ocx = other.x + other.w / 2, ocy = other.y + other.h / 2;
+        const d = Math.hypot(ocx - ecx, ocy - ecy);
+        if (d < 140 && d < nearDist) { nearest = other; nearDist = d; }
+      }
+      if (nearest) {
+        const chainDmg = Math.max(1, Math.floor(weapon.damage * 0.5));
+        nearest.hp -= chainDmg;
+        nearest.hitFlash = 0.13;
+        const ncx = nearest.x + nearest.w / 2, ncy = nearest.y + nearest.h / 2;
+        if (nearest.hp <= 0) {
+          killEnemy(nearest);
+        } else {
+          addHitParticles(ncx, ncy, '#c8aaff', 4);
+        }
+      }
+    } else if (weapon.effect === 'lifesteal' && player) {
+      const heal = Math.min(2, weapon.damage);
+      player.hp += heal;
+      player.hp = Math.min(player.maxHp, player.hp);
+    }
+  }
+
   const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
   if (e.hp <= 0) {
     e.alive = false;
     addHitParticles(cx, cy, e.color, 12);
-    if (e.boss) {
-      addExplosion(cx, cy, e.color);
-      addExplosion(cx, cy - 20, '#ffd700');
-      dropCoins(cx, cy, Math.round(e.maxHp * 1.5)); // big coin pile for bosses
-    } else {
-      dropCoins(cx, cy, Math.max(1, e.maxHp));      // coins scale with enemy toughness
-    }
+    if (e.boss) { addExplosion(cx, cy, e.color); addExplosion(cx, cy - 20, '#ffd700'); dropCoins(cx, cy, Math.round(e.maxHp * 1.5)); }
+    else { dropCoins(cx, cy, Math.max(1, e.maxHp)); }
   } else {
     addHitParticles(cx, cy, '#ffffff', 4);
   }
@@ -328,8 +372,11 @@ function damageEnemy(e, dmg, knockDir, knock) {
 
 // Instant melee swing: damages every enemy inside a hitbox in front of the
 // player. Returns the number of enemies killed.
-export function playerMeleeAttack(player, weapon) {
-  const reach = weapon.reach || 24;
+export function playerMeleeAttack(player, weapon, charged) {
+  const baseReach = weapon.reach || 24;
+  const reach = charged ? Math.ceil(baseReach * 1.3) : baseReach;
+  const dmg = charged ? Math.ceil(weapon.damage * 2) : weapon.damage;
+  const knock = charged ? weapon.knockback * 1.6 : weapon.knockback;
   const dir = player.facing;
   const hx = dir > 0 ? player.x + player.w - 4 : player.x - reach + 4;
   const hw = reach + 8;
@@ -338,27 +385,32 @@ export function playerMeleeAttack(player, weapon) {
   for (const e of enemies) {
     if (!e.alive) continue;
     if (rectsOverlap(hx, hy, hw, hh, e.x, e.y, e.w, e.h)) {
-      damageEnemy(e, weapon.damage, dir, weapon.knockback);
+      damageEnemy(e, dmg, dir, knock, player, weapon);
       if (!e.alive) kills++;
     }
   }
   return kills;
 }
 
-export function spawnProjectile(player, weapon) {
+export function spawnProjectile(player, weapon, charged) {
   const dir = player.facing;
+  const dmg = charged ? Math.ceil(weapon.damage * 2) : weapon.damage;
+  const knock = charged ? weapon.knockback * 1.6 : weapon.knockback;
   projectiles.push({
     x: player.x + player.w / 2 + dir * 16,
     y: player.y + player.h * 0.4,
     vx: dir * (weapon.speed || 500),
     vy: weapon.splash ? -55 : 0, // explosive arrows arc slightly
     grav: weapon.splash ? 340 : 0,
-    dmg: weapon.damage,
+    dmg,
     splash: weapon.splash || 0,
-    knock: weapon.knockback || 200,
+    knock: knock || 200,
     color: weapon.color,
     r: weapon.splash ? 6 : 4,
     life: 2.4, dir,
+    effect: weapon.effect || null,
+    weapon,
+    player,
   });
 }
 
@@ -369,14 +421,14 @@ function detonate(pr) {
       if (!e.alive) continue;
       const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
       if (Math.hypot(cx - pr.x, cy - pr.y) <= pr.splash) {
-        damageEnemy(e, pr.dmg, cx < pr.x ? -1 : 1, pr.knock);
+        damageEnemy(e, pr.dmg, cx < pr.x ? -1 : 1, pr.knock, pr.player, pr.weapon);
       }
     }
   } else {
     for (const e of enemies) {
       if (!e.alive) continue;
       if (rectsOverlap(pr.x - 3, pr.y - 3, 6, 6, e.x, e.y, e.w, e.h)) {
-        damageEnemy(e, pr.dmg, pr.dir, pr.knock);
+        damageEnemy(e, pr.dmg, pr.dir, pr.knock, pr.player, pr.weapon);
         break;
       }
     }
@@ -693,22 +745,47 @@ export function updateEnemies(dt, platforms, player) {
     if (!e.alive) continue;
     e.t += dt;
     if (e.hitFlash > 0) e.hitFlash = Math.max(0, e.hitFlash - dt);
+
+    // Tick burn effect: subtract dps*dt from hp while _burn.t > 0
+    if (e._burn && e._burn.t > 0) {
+      e._burn.t -= dt;
+      e.hp -= e._burn.dps * dt;
+      if (e.hp <= 0) {
+        e.alive = false; // route through the normal death path
+        const bcx = e.x + e.w / 2, bcy = e.y + e.h / 2;
+        addHitParticles(bcx, bcy, e.color, 12);
+        if (e.boss) { addExplosion(bcx, bcy, e.color); addExplosion(bcx, bcy - 20, '#ffd700'); dropCoins(bcx, bcy, Math.round(e.maxHp * 1.5)); }
+        else { dropCoins(bcx, bcy, Math.max(1, e.maxHp)); }
+        continue;
+      }
+      if (e._burn.t <= 0) e._burn = null;
+    }
+
+    // Tick freeze timer: decrement by dt (halves movement while > 0)
+    if (e._freeze > 0) {
+      e._freeze -= dt;
+      if (e._freeze < 0) e._freeze = 0;
+    }
+
+    if (!e.alive) continue;
+
     const bhv = e.behavior || LEGACY_BEHAVIOR[e.type] || 'walk';
     const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+    const freezeMul = (e._freeze && e._freeze > 0) ? 0.5 : 1;
 
     if (bhv === 'fly') {
       // Free-flying: pursues the player when near, otherwise hovers near home.
       const distP = Math.hypot(pcx - ecx, pcy - ecy);
       if (distP < 300 && distP > 1) {
-        const sp = e.chase || 85;
+        const sp = (e.chase || 85) * freezeMul;
         e.x += (pcx - ecx) / distP * sp * dt;
-        e.y += (pcy - ecy) / distP * sp * dt + Math.sin(e.t * 3) * 10 * dt;
+        e.y += (pcy - ecy) / distP * sp * dt + Math.sin(e.t * 3) * 10 * dt * freezeMul;
         e.dir = pcx >= ecx ? 1 : -1;
       } else {
         const hx = e.baseX + Math.sin(e.t * e.sx) * e.ampX;
         const hy = e.baseY + Math.sin(e.t * e.sy + 1.3) * e.ampY;
-        e.x += (hx - e.x) * Math.min(1, dt * 2.5);
-        e.y += (hy - e.y) * Math.min(1, dt * 2.5);
+        e.x += (hx - e.x) * Math.min(1, dt * 2.5 * freezeMul);
+        e.y += (hy - e.y) * Math.min(1, dt * 2.5 * freezeMul);
         e.dir = Math.cos(e.t * e.sx) >= 0 ? 1 : -1;
       }
     } else if (bhv === 'hop') {
@@ -733,18 +810,18 @@ export function updateEnemies(dt, platforms, player) {
         if (near) e.dir = pcx >= ecx ? 1 : -1;
         e.jumpTimer -= dt;
         if (e.jumpTimer <= 0) { e.vy = -(e.jumpForce || 480); e.jumpTimer = e.jumpEvery || 1.4; }
-        e.x += e.dir * e.speed * dt * (near ? 1 : 0.65);
+        e.x += e.dir * e.speed * freezeMul * dt * (near ? 1 : 0.65);
         if (!near) { // patrol the home platform while idle
           if (e.x <= e.patrolMin) { e.x = e.patrolMin; e.dir = 1; }
           else if (e.x >= e.patrolMax) { e.x = e.patrolMax; e.dir = -1; }
         }
       } else {
-        e.x += e.dir * e.speed * dt; // carry momentum through the air
+        e.x += e.dir * e.speed * freezeMul * dt; // carry momentum through the air
       }
     } else if (bhv === 'boss') {
       if (e._sliding) {  // slider boss: high-speed ice dash across arena
         e.dir = e._slideDir;
-        e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + e._slideDir * e._slideV * dt));
+        e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + e._slideDir * e._slideV * freezeMul * dt));
         e._slideT -= dt;
         if (e._slideT <= 0 || e.x <= e.patrolMin + 4 || e.x >= e.patrolMax - 4) {
           e._sliding = false;
@@ -753,7 +830,7 @@ export function updateEnemies(dt, platforms, player) {
       } else if (e.vy !== 0 || e.y < e.baseY) { // airborne mid-leap
         e.vy += E_GRAVITY * dt;
         e.y += e.vy * dt;
-        e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + (e._vx || 0) * dt));
+        e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + (e._vx || 0) * freezeMul * dt));
         if (e.y >= e.baseY) {
           e.y = e.baseY; e.vy = 0; e._vx = 0;
           addLandParticles(ecx, e.y + e.h);
@@ -762,7 +839,7 @@ export function updateEnemies(dt, platforms, player) {
         if (e._cd === undefined) e._cd = 1.1;
         e._cd = Math.max(0, e._cd - dt);
         e.dir = pcx >= ecx ? 1 : -1;
-        e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + e.dir * e.speed * dt));
+        e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + e.dir * e.speed * freezeMul * dt));
         if (e._cd <= 0) {
           e.vy = -e.leapForce;
           e._vx = e.dir * Math.max(120, Math.min(330, Math.abs(pcx - ecx)));
@@ -770,13 +847,13 @@ export function updateEnemies(dt, platforms, player) {
         }
       }
     } else if (bhv === 'walk') {
-      e.x += e.dir * e.speed * dt;
+      e.x += e.dir * e.speed * freezeMul * dt;
       if (e.x <= e.patrolMin) { e.x = e.patrolMin; e.dir = 1; }
       else if (e.x >= e.patrolMax) { e.x = e.patrolMax; e.dir = -1; }
     } else if (bhv === 'charge') {
       e._cd = Math.max(0, (e._cd || 0) - dt);
       if (e._st === 2) {            // dashing
-        e.x += e.dir * e.chargeSpeed * dt;
+        e.x += e.dir * e.chargeSpeed * freezeMul * dt;
         e._stT -= dt;
         if (e.x <= e.patrolMin) { e.x = e.patrolMin; e._st = 0; e._cd = 1.3; }
         else if (e.x >= e.patrolMax) { e.x = e.patrolMax; e._st = 0; e._cd = 1.3; }
@@ -785,7 +862,7 @@ export function updateEnemies(dt, platforms, player) {
         e._stT -= dt;
         if (e._stT <= 0) { e._st = 2; e._stT = 0.9; }
       } else {                      // patrol + look for the player
-        e.x += e.dir * e.speed * dt;
+        e.x += e.dir * e.speed * freezeMul * dt;
         if (e.x <= e.patrolMin) { e.x = e.patrolMin; e.dir = 1; }
         else if (e.x >= e.patrolMax) { e.x = e.patrolMax; e.dir = -1; }
         if (!e._cd && Math.abs(pcy - ecy) < 70 && Math.abs(pcx - ecx) < e.chargeRange) {
@@ -799,8 +876,8 @@ export function updateEnemies(dt, platforms, player) {
         e._stT -= dt;
         if (d < 12 || e._stT <= 0) e._mode = 2;
         else {
-          e.x += dx / d * e.swoopSpeed * dt;
-          e.y += dy / d * e.swoopSpeed * dt;
+          e.x += dx / d * e.swoopSpeed * freezeMul * dt;
+          e.y += dy / d * e.swoopSpeed * freezeMul * dt;
           e.dir = dx >= 0 ? 1 : -1;
         }
       } else if (e._mode === 2) {   // gliding back to the perch
@@ -808,8 +885,8 @@ export function updateEnemies(dt, platforms, player) {
         const d = Math.hypot(dx, dy);
         if (d < 8) { e._mode = 0; e._cd = 1.0; }
         else {
-          e.x += dx / d * e.swoopSpeed * 0.6 * dt;
-          e.y += dy / d * e.swoopSpeed * 0.6 * dt;
+          e.x += dx / d * e.swoopSpeed * 0.6 * freezeMul * dt;
+          e.y += dy / d * e.swoopSpeed * 0.6 * freezeMul * dt;
           e.dir = dx >= 0 ? 1 : -1;
         }
       } else {                      // hovering at the perch
@@ -826,26 +903,26 @@ export function updateEnemies(dt, platforms, player) {
       const tx = near ? pcx : e.baseX, ty = near ? pcy : e.baseY;
       const dx = tx - ecx, dy = ty - ecy;
       const d = Math.hypot(dx, dy) || 1;
-      const sp = Math.min(e.floatSpeed, d * 2);
+      const sp = Math.min(e.floatSpeed, d * 2) * freezeMul;
       e.x += dx / d * sp * dt;
-      e.y += dy / d * sp * dt + Math.sin(e.t * 2.2) * 12 * dt;
+      e.y += dy / d * sp * dt + Math.sin(e.t * 2.2) * 12 * freezeMul * dt;
       e.dir = dx >= 0 ? 1 : -1;
     } else if (bhv === 'orbit') {
       // The anchor itself stalks the player slowly, so orbiters roam too.
       const dax = pcx - e.baseX, day = pcy - e.baseY;
       const da = Math.hypot(dax, day);
       if (da > 1 && da < 320) {
-        e.baseX += dax / da * 28 * dt;
-        e.baseY += day / da * 28 * dt;
+        e.baseX += dax / da * 28 * freezeMul * dt;
+        e.baseY += day / da * 28 * freezeMul * dt;
       }
       const a = e.t * e.orbitSpd + (e.phase || 0);
-      e.x = e.baseX + Math.cos(a) * e.orbitR - e.w / 2;
-      e.y = e.baseY + Math.sin(a) * e.orbitR * 0.7 - e.h / 2;
+      e.x = e.baseX + Math.cos(a) * e.orbitR * freezeMul - e.w / 2;
+      e.y = e.baseY + Math.sin(a) * e.orbitR * 0.7 * freezeMul - e.h / 2;
       e.dir = -Math.sin(a) >= 0 ? 1 : -1;
     } else if (bhv === 'drop') {
       if (e._mode === 1) {          // falling
         e.vy += 2300 * dt;
-        e.y += e.vy * dt;
+        e.y += e.vy * freezeMul * dt;
         for (const pl of platforms) {
           if (pl._crumbleState === 2) continue;
           if (e.x + e.w > pl.x && e.x < pl.x + pl.w &&
@@ -862,13 +939,13 @@ export function updateEnemies(dt, platforms, player) {
       }
     } else if (bhv === 'spider') {
       if (e._mode === 1) {          // dropping down the thread
-        e.y += e.dropSpeed * dt;
+        e.y += e.dropSpeed * freezeMul * dt;
         if (e.y >= e.dropY) { e.y = e.dropY; e._mode = 2; e._stT = 0.65; }
       } else if (e._mode === 2) {   // lingering low
         e._stT -= dt;
         if (e._stT <= 0) e._mode = 3;
       } else if (e._mode === 3) {   // climbing back up
-        e.y -= 120 * dt;
+        e.y -= 120 * freezeMul * dt;
         if (e.y <= e.anchorY) { e.y = e.anchorY; e._mode = 0; e._cd = 0.8; }
       } else {                      // waiting at the anchor
         e.y = e.anchorY + Math.sin(e.t * 1.6) * 4;
@@ -911,7 +988,7 @@ export function updateEnemies(dt, platforms, player) {
       const prevBottom = player._prevY + player.h;
       const stomping = player.vy > 0 && prevBottom <= e.y + 12;
       if (stomping) {
-        damageEnemy(e, STOMP_DAMAGE, player.x < e.x ? 1 : -1, 240);
+        damageEnemy(e, STOMP_DAMAGE, player.x < e.x ? 1 : -1, 240, null, null);
         player.vy = -STOMP_BOUNCE;
         player.y = e.y - player.h;
         player._prevY = player.y;
