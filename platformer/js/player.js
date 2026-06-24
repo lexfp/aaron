@@ -78,6 +78,7 @@ export const player = {
   windPushT: 0,       // bird wind gust: horizontal push for this many seconds
   windPushDir: 0,     // direction of the wind push (+1 or -1)
   dazeT: 0,           // shroom spore: dampens horizontal input
+  _charge: 0,         // seconds the attack input has been held (charge tracking)
   // Computed from upgrades each level
   jumpForce: BASE_JUMP,
   djForce: BASE_DJ,
@@ -107,6 +108,7 @@ export function initPlayer(spawnX, spawnY) {
   player.hurtFlash = 0;
   player.attackCD = 0;
   player.swingT = 0;
+  player._charge = 0;
   player.weapon = getEquippedWeapon();
   player.iceSlipT = 0;
   player.windPushT = 0;

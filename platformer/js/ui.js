@@ -3,6 +3,7 @@ import {
   getLevelCompletedCount, UPGRADE_DEFS, resetAllProgress,
   WEAPON_DEFS, ownsWeapon, buyWeapon, equipWeapon, getEquippedWeapon,
   SKIN_DEFS, ownsSkin, buySkin, equipSkin, getEquippedSkin,
+  WEAPON_UPGRADE_MAX, getWeaponUpgradeCost, upgradeWeapon,
 } from './state.js';
 import { STAGE_THEMES } from './renderer.js';
 import { STAGE_MODIFIERS } from './player.js';
@@ -221,14 +222,36 @@ function renderShop(callbacks) {
     const owned = ownsWeapon(w.key);
     const isEquipped = equippedKey === w.key;
     const canAfford = !owned && playerData.coins >= w.cost;
+    const level = owned ? ((playerData.weaponLevels && playerData.weaponLevels[w.key]) || 0) : 0;
+
+    // For owned weapons, compute the upgraded stats for display.
+    let displayDmg = w.damage;
+    if (owned && level > 0) {
+      let d = w.damage;
+      for (let i = 0; i < level; i++) d *= 1.25;
+      displayDmg = Math.max(w.damage + 1, Math.round(d));
+    }
     const stat = w.type === 'ranged'
-      ? `DMG ${w.damage} · ranged${w.splash ? ' · splash' : ''}`
-      : `DMG ${w.damage} · reach ${w.reach}`;
+      ? `DMG ${displayDmg} · ranged${w.splash ? ' · splash' : ''}`
+      : `DMG ${displayDmg} · reach ${w.reach}`;
 
     let btnHTML;
     if (isEquipped) btnHTML = '<div class="shop-maxed">EQUIPPED</div>';
     else if (owned) btnHTML = `<button class="shop-buy shop-equip" data-key="${w.key}">Equip</button>`;
     else btnHTML = `<button class="shop-buy${canAfford ? '' : ' cant-afford'}" data-key="${w.key}">🪙 ${w.cost}</button>`;
+
+    // Build upgrade controls for owned weapons.
+    let upgradeHTML = '';
+    if (owned) {
+      const nextCost = getWeaponUpgradeCost(w.key);
+      upgradeHTML = `<div class="shop-stars">${'★'.repeat(level)}${'☆'.repeat(WEAPON_UPGRADE_MAX - level)}</div>`;
+      if (level < WEAPON_UPGRADE_MAX) {
+        const canAffordUpgrade = playerData.coins >= nextCost;
+        upgradeHTML += `<button class="shop-buy${canAffordUpgrade ? '' : ' cant-afford'}" data-upgrade-key="${w.key}">🪙 ${nextCost}</button>`;
+      } else {
+        upgradeHTML += '<div class="shop-maxed">MAX</div>';
+      }
+    }
 
     const card = document.createElement('div');
     card.className = 'shop-card' + (isEquipped ? ' equipped' : '');
@@ -238,8 +261,9 @@ function renderShop(callbacks) {
       <div class="shop-desc">${w.desc}</div>
       <div class="shop-wstat">${stat}</div>
       ${btnHTML}
+      ${upgradeHTML}
     `;
-    const wbtn = card.querySelector('button');
+    const wbtn = card.querySelector('button[data-key]');
     if (wbtn) {
       if (owned && !isEquipped) {
         wbtn.addEventListener('click', () => { equipWeapon(w.key); renderShop(callbacks); });
@@ -248,6 +272,12 @@ function renderShop(callbacks) {
           if (buyWeapon(w.key)) { equipWeapon(w.key); renderShop(callbacks); }
         });
       }
+    }
+    const upbtn = card.querySelector('button[data-upgrade-key]');
+    if (upbtn) {
+      upbtn.addEventListener('click', () => {
+        if (upgradeWeapon(w.key)) renderShop(callbacks);
+      });
     }
     grid.appendChild(card);
   }

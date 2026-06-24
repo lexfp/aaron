@@ -9,6 +9,7 @@ const DEFAULT = {
   equippedSkin: 'default',
   stagesUnlocked: 1,
   levelProgress: {},
+  weaponLevels: { fists: 0, sword: 0, hammer: 0, blaster: 0, launcher: 0, knives: 0, spear: 0, icewand: 0, flamestaff: 0, stormrod: 0, excalibur: 0 },
 };
 
 export let playerData = JSON.parse(JSON.stringify(DEFAULT));
@@ -23,6 +24,7 @@ export function loadPlayerData() {
     playerData.weapons = { ...DEFAULT.weapons, ...(saved.weapons || {}) };
     playerData.skins = { ...DEFAULT.skins, ...(saved.skins || {}) };
     playerData.equippedSkin = saved.equippedSkin || 'default';
+    playerData.weaponLevels = { ...DEFAULT.weaponLevels, ...(saved.weaponLevels || {}) };
     if (!playerData.equippedWeapon || !playerData.weapons[playerData.equippedWeapon]) {
       playerData.equippedWeapon = 'fists';
     }
@@ -121,35 +123,79 @@ export function getLevelCompletedCount(stage) {
 // `damage` = HP removed per hit. `reach` = melee hitbox length in front of the
 // player (px). Ranged weapons use `speed` (projectile px/s) and ignore reach.
 // `cooldown` = seconds between attacks. `splash` = explosion radius (ranged).
+// `effect` = on-hit effect: null | 'burn' | 'freeze' | 'chain' | 'lifesteal'.
 export const WEAPON_DEFS = [
   {
     key: 'fists', label: 'Fists', cost: 0, type: 'melee', icon: '👊',
     damage: 1, reach: 22, cooldown: 0.30, knockback: 220, color: '#f0a070',
     desc: 'Your bare hands. Free, but short and weak.',
+    effect: null,
   },
   {
     key: 'sword', label: 'Sword', cost: 120, type: 'melee', icon: '🗡️',
     damage: 3, reach: 46, cooldown: 0.24, knockback: 320, color: '#dfe7f2',
     desc: 'Long reach, fast swing. A big upgrade over fists.',
+    effect: null,
   },
   {
     key: 'hammer', label: 'War Hammer', cost: 320, type: 'melee', icon: '🔨',
     damage: 8, reach: 36, cooldown: 0.55, knockback: 560, color: '#c08a4a',
     desc: 'Slow but devastating — flattens brutes in one blow.',
+    effect: null,
   },
   {
     key: 'blaster', label: 'Blaster', cost: 480, type: 'ranged', icon: '🔫',
     damage: 2, cooldown: 0.30, speed: 600, knockback: 260, color: '#00d2ff', splash: 0,
     desc: 'Fires energy bolts — hit enemies across gaps.',
+    effect: null,
   },
   {
     key: 'launcher', label: 'Boom Bow', cost: 850, type: 'ranged', icon: '🏹',
     damage: 6, cooldown: 0.70, speed: 480, knockback: 520, color: '#ffd24a', splash: 70,
     desc: 'Explosive arrows with splash damage. The finisher.',
+    effect: null,
+  },
+  {
+    key: 'knives', label: 'Throwing Knives', cost: 200, type: 'ranged', icon: '🔪',
+    damage: 2, cooldown: 0.20, speed: 680, knockback: 180, splash: 0, color: '#c0c8d8',
+    desc: 'Fast ranged daggers — quick volleys at short range.',
+    effect: null,
+  },
+  {
+    key: 'spear', label: 'Spear', cost: 560, type: 'melee', icon: '🔱',
+    damage: 6, reach: 62, cooldown: 0.40, knockback: 400, color: '#a0b8c8',
+    desc: 'Long-reach melee thrust — keep enemies at arm\'s length.',
+    effect: null,
+  },
+  {
+    key: 'icewand', label: 'Ice Wand', cost: 620, type: 'ranged', icon: '🌀',
+    damage: 3, cooldown: 0.35, speed: 540, knockback: 220, splash: 0, color: '#7ecff4',
+    desc: 'Shoots ice bolts that freeze enemies in place.',
+    effect: 'freeze',
+  },
+  {
+    key: 'flamestaff', label: 'Flame Staff', cost: 700, type: 'ranged', icon: '🔥',
+    damage: 4, cooldown: 0.38, speed: 520, knockback: 240, splash: 0, color: '#ff6030',
+    desc: 'Scorching bolts that leave enemies burning over time.',
+    effect: 'burn',
+  },
+  {
+    key: 'stormrod', label: 'Storm Rod', cost: 950, type: 'ranged', icon: '⚡',
+    damage: 5, cooldown: 0.45, speed: 580, knockback: 300, splash: 0, color: '#c8aaff',
+    desc: 'Electric bolts that chain to nearby enemies.',
+    effect: 'chain',
+  },
+  {
+    key: 'excalibur', label: 'Excalibur', cost: 1500, type: 'melee', icon: '⚔️',
+    damage: 9, reach: 54, cooldown: 0.32, knockback: 480, color: '#ffd700',
+    desc: 'Legendary blade. Slays foes and steals their life force.',
+    effect: 'lifesteal',
   },
 ];
 
 export const WEAPON_MAP = Object.fromEntries(WEAPON_DEFS.map(w => [w.key, w]));
+
+export const WEAPON_UPGRADE_MAX = 3;
 
 export function ownsWeapon(key) {
   return key === 'fists' || !!playerData.weapons[key];
@@ -172,7 +218,48 @@ export function equipWeapon(key) {
 }
 
 export function getEquippedWeapon() {
-  return WEAPON_MAP[playerData.equippedWeapon] || WEAPON_MAP.fists;
+  const base = WEAPON_MAP[playerData.equippedWeapon] || WEAPON_MAP.fists;
+  const level = (playerData.weaponLevels && playerData.weaponLevels[base.key]) || 0;
+  if (level === 0) return base;
+  // Build an upgraded copy — do NOT mutate WEAPON_DEFS.
+  // Each upgrade level multiplies damage by 1.25 (rounded, min 1 above base).
+  let dmg = base.damage;
+  for (let i = 0; i < level; i++) dmg *= 1.25;
+  const scaledDamage = Math.max(base.damage + 1, Math.round(dmg));
+  // Each upgrade level multiplies cooldown by 0.9.
+  let cd = base.cooldown;
+  for (let i = 0; i < level; i++) cd *= 0.9;
+  // Return a new object with upgraded fields — WEAPON_DEFS entries are never touched.
+  return { ...base, damage: scaledDamage, cooldown: cd };
+}
+
+// Returns the coin cost for the next upgrade level of the given weapon key,
+// or null if the weapon is unowned, already at max, or not found.
+export function getWeaponUpgradeCost(key) {
+  const w = WEAPON_MAP[key];
+  if (!w || !ownsWeapon(key)) return null;
+  const level = (playerData.weaponLevels && playerData.weaponLevels[key]) || 0;
+  if (level >= WEAPON_UPGRADE_MAX) return null;
+  // Cost tiers derived from base weapon cost.
+  if (level === 0) return Math.floor(w.cost * 0.3) + 50;
+  if (level === 1) return Math.floor(w.cost * 0.5) + 100;
+  if (level === 2) return Math.floor(w.cost * 0.8) + 200;
+  return null;
+}
+
+// Deducts coins and increments the weapon's upgrade level.
+// Returns true on success, false if unowned / at max / insufficient coins.
+export function upgradeWeapon(key) {
+  if (!ownsWeapon(key)) return false;
+  const cost = getWeaponUpgradeCost(key);
+  if (cost === null) return false;
+  if (playerData.coins < cost) return false;
+  playerData.coins -= cost;
+  if (!playerData.weaponLevels) playerData.weaponLevels = {};
+  if (!playerData.weaponLevels[key]) playerData.weaponLevels[key] = 0;
+  playerData.weaponLevels[key] += 1;
+  savePlayerData();
+  return true;
 }
 
 // ─── SKINS ────────────────────────────────────────────────────────────────
