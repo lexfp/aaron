@@ -248,7 +248,7 @@ function renderShop(callbacks) {
       upgradeHTML = `<div class="shop-stars">${'★'.repeat(level)}${'☆'.repeat(WEAPON_UPGRADE_MAX - level)}</div>`;
       if (level < WEAPON_UPGRADE_MAX) {
         const canAffordUpgrade = playerData.coins >= nextCost;
-        upgradeHTML += `<button class="shop-buy${canAffordUpgrade ? '' : ' cant-afford'}" data-upgrade-key="${w.key}">🪙 ${nextCost}</button>`;
+        upgradeHTML += `<button class="shop-upgrade${canAffordUpgrade ? '' : ' cant-afford'}" data-upgrade-key="${w.key}">⬆ Upgrade 🪙 ${nextCost}</button>`;
       } else {
         upgradeHTML += '<div class="shop-maxed">MAX</div>';
       }

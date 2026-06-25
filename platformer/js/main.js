@@ -206,7 +206,8 @@ function gameLoop(timestamp) {
     if (weapon.type === 'ranged') spawnProjectile(player, weapon, charged);
     else playerMeleeAttack(player, weapon, charged);
     player.attackCD = weapon.cooldown;
-    player.swingT = player.swingDur;
+    const SWING_DURS = { fists: 0.11, hammer: 0.32, spear: 0.13, excalibur: 0.22 };
+    player.swingT = SWING_DURS[weapon.key] || (weapon.type === 'ranged' ? 0.20 : 0.16);
     player._charge = 0; // reset after attack fires
   }
   updateProjectiles(dt, levelData.platforms);

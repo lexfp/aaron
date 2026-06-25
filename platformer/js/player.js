@@ -413,64 +413,185 @@ export function drawPlayer(ctx, t) {
 // player's translated+facing-flipped context, so +x is always "forward".
 function drawWeaponSwing(ctx, hw, hh, weapon, prog, limbColor) {
   ctx.save();
-  ctx.translate(hw * 0.55, -hh * 0.05); // shoulder pivot
+  ctx.translate(hw * 0.55, -hh * 0.05);
+  const key = weapon.key;
+  const reach = weapon.reach || 26;
+  const arm = limbColor || '#f0a070';
 
   if (weapon.type === 'ranged') {
-    // Hold the weapon level and forward, with a muzzle flash early in the swing.
-    ctx.fillStyle = '#2a2a33';
-    ctx.fillRect(0, -3.5, 18, 7);
-    ctx.fillStyle = weapon.color;
-    ctx.fillRect(15, -2.5, 7, 5);
-    if (prog < 0.55) {
-      ctx.globalAlpha = 1 - prog / 0.55;
-      ctx.fillStyle = weapon.color;
-      ctx.beginPath();
-      ctx.arc(26, 0, 7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
+    switch (key) {
+      case 'blaster': {
+        // Squat energy pistol + expanding cyan blast ring
+        ctx.fillStyle = '#1c1c2e'; ctx.fillRect(0, -4, 20, 8);
+        ctx.fillStyle = weapon.color; ctx.fillRect(16, -3, 8, 6);
+        if (prog < 0.45) {
+          const a = 1 - prog / 0.45;
+          ctx.globalAlpha = a * 0.9;
+          ctx.strokeStyle = weapon.color; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(27, 0, 4 + prog * 18, 0, Math.PI * 2); ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+        break;
+      }
+      case 'launcher': {
+        // Bow limbs + drawstring pull + arrow
+        ctx.strokeStyle = '#5a3a18'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.arc(0, 0, 15, -Math.PI * 0.55, Math.PI * 0.55); ctx.stroke();
+        const pull = prog < 0.35 ? lerp(0, -7, prog / 0.35) : lerp(-7, 0, (prog - 0.35) / 0.65);
+        ctx.strokeStyle = '#c8a060'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(1, -13); ctx.lineTo(pull, 0); ctx.lineTo(1, 13); ctx.stroke();
+        ctx.fillStyle = weapon.color;
+        ctx.fillRect(pull, -2, 20, 4);
+        ctx.beginPath(); ctx.moveTo(21, 0); ctx.lineTo(16, -5); ctx.lineTo(16, 5); ctx.closePath(); ctx.fill();
+        break;
+      }
+      case 'knives': {
+        // Two spinning knives flying forward
+        const spin = prog * Math.PI * 6;
+        for (let i = 0; i < 2; i++) {
+          ctx.save();
+          ctx.translate(8 + i * 14, i * 3 - 1);
+          ctx.rotate(spin + i * Math.PI * 0.7);
+          ctx.fillStyle = weapon.color; ctx.fillRect(-7, -1.5, 14, 3);
+          ctx.fillStyle = '#778'; ctx.fillRect(-7, -1.5, 4, 3);
+          ctx.restore();
+        }
+        break;
+      }
+      case 'icewand': {
+        // Blue staff + diamond crystal tip + expanding frost ring
+        ctx.fillStyle = '#2a4a6a'; ctx.fillRect(0, -3, 22, 6);
+        ctx.fillStyle = weapon.color;
+        ctx.beginPath();
+        ctx.moveTo(22, 0); ctx.lineTo(29, -6); ctx.lineTo(34, 0);
+        ctx.lineTo(29, 6); ctx.closePath(); ctx.fill();
+        if (prog < 0.5) {
+          ctx.globalAlpha = (1 - prog * 2) * 0.7;
+          ctx.strokeStyle = '#aaeeff'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(28, 0, 10 + prog * 22, 0, Math.PI * 2); ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+        break;
+      }
+      case 'flamestaff': {
+        // Dark staff + layered flame blobs
+        ctx.fillStyle = '#3a1808'; ctx.fillRect(0, -3, 20, 6);
+        ctx.fillStyle = '#8a3010'; ctx.fillRect(17, -4, 7, 8);
+        const flicker = Math.sin(prog * 18) * 2.5;
+        const colors = ['#ffdd00', '#ff7020', '#ff2800'];
+        for (let i = 0; i < 3; i++) {
+          ctx.globalAlpha = Math.max(0, (1 - prog * 0.6) * (0.9 - i * 0.22));
+          ctx.fillStyle = colors[i];
+          ctx.beginPath();
+          ctx.arc(24 + i * 4, flicker * (i === 0 ? 0 : i === 1 ? -0.6 : 0.5), 6 - i * 1.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        break;
+      }
+      case 'stormrod': {
+        // Purple rod + forking lightning bolt
+        ctx.fillStyle = '#2a1850'; ctx.fillRect(0, -3, 20, 6);
+        ctx.fillStyle = weapon.color; ctx.fillRect(16, -4, 8, 8);
+        if (prog < 0.6) {
+          ctx.globalAlpha = (1 - prog / 0.6) * 0.95;
+          ctx.strokeStyle = weapon.color; ctx.lineWidth = 2; ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(24, 0); ctx.lineTo(29, -4); ctx.lineTo(33, 2);
+          ctx.lineTo(37, -5); ctx.lineTo(40, 0);
+          ctx.stroke();
+          ctx.lineWidth = 1; ctx.globalAlpha *= 0.5;
+          ctx.beginPath(); ctx.moveTo(33, 2); ctx.lineTo(36, 6); ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+        break;
+      }
+      default: {
+        ctx.fillStyle = '#2a2a33'; ctx.fillRect(0, -3.5, 18, 7);
+        ctx.fillStyle = weapon.color; ctx.fillRect(15, -2.5, 7, 5);
+        if (prog < 0.55) {
+          ctx.globalAlpha = 1 - prog / 0.55;
+          ctx.fillStyle = weapon.color;
+          ctx.beginPath(); ctx.arc(26, 0, 7, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+      }
     }
     ctx.restore();
     return;
   }
 
-  // Melee: arc the arm + weapon from overhead down through forward.
-  const reach = weapon.reach || 26;
-  const ang = lerp(-1.0, 1.05, prog);
+  // ── Melee: each weapon has its own arc range and shape ──
+  let angFrom, angTo, trailColor, trailW;
+  switch (key) {
+    case 'fists':     angFrom = -0.15; angTo =  0.55; trailColor = 'rgba(240,160,112,0.4)'; trailW = 2; break;
+    case 'hammer':    angFrom = -1.45; angTo =  0.7;  trailColor = 'rgba(192,138,74,0.45)'; trailW = 5; break;
+    case 'spear':     angFrom = -0.12; angTo =  0.18; trailColor = 'rgba(160,184,200,0.4)'; trailW = 2; break;
+    case 'excalibur': angFrom = -1.3;  angTo =  1.4;  trailColor = 'rgba(255,215,0,0.55)';  trailW = 3; break;
+    default:          angFrom = -1.0;  angTo =  0.9;  trailColor = 'rgba(255,255,255,0.35)'; trailW = 2.5;
+  }
+  const ang = lerp(angFrom, angTo, prog);
   ctx.rotate(ang);
 
-  // swoosh trail
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.arc(0, 0, reach * 0.85, -0.55, 0.55);
-  ctx.stroke();
+  ctx.strokeStyle = trailColor; ctx.lineWidth = trailW;
+  ctx.beginPath(); ctx.arc(0, 0, reach * 0.85, -0.6, 0.6); ctx.stroke();
 
-  // arm
-  ctx.strokeStyle = limbColor || '#f0a070';
-  ctx.lineWidth = 5;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(reach * 0.45, 0);
-  ctx.stroke();
-
+  ctx.strokeStyle = arm; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(reach * 0.45, 0); ctx.stroke();
   ctx.translate(reach * 0.45, 0);
-  if (weapon.key === 'fists') {
-    ctx.fillStyle = weapon.color;
-    ctx.beginPath();
-    ctx.arc(4, 0, 6.5, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (weapon.key === 'hammer') {
-    ctx.fillStyle = '#5a4632';
-    ctx.fillRect(0, -2.5, reach * 0.45, 5);
-    ctx.fillStyle = weapon.color;
-    ctx.fillRect(reach * 0.45 - 3, -9, 13, 18);
-  } else {
-    // sword (and any other blade)
-    ctx.fillStyle = '#8a8a96';
-    ctx.fillRect(-3, -5, 5, 10); // guard
-    ctx.fillStyle = weapon.color;
-    ctx.fillRect(2, -2.5, reach * 0.75, 5); // blade
+
+  switch (key) {
+    case 'fists': {
+      // Solid fist with knuckle lines
+      ctx.fillStyle = weapon.color;
+      ctx.beginPath(); ctx.arc(5, 0, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath(); ctx.moveTo(1, i * 3); ctx.lineTo(9, i * 3); ctx.stroke();
+      }
+      break;
+    }
+    case 'hammer': {
+      // Long handle + massive rectangular head
+      ctx.fillStyle = '#5a4632'; ctx.fillRect(0, -2.5, reach * 0.42, 5);
+      ctx.fillStyle = weapon.color; ctx.fillRect(reach * 0.38, -12, 16, 24);
+      ctx.fillStyle = '#7a6040';
+      ctx.beginPath(); ctx.arc(reach * 0.38 + 4, -7, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(reach * 0.38 + 4,  7, 2.5, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'spear': {
+      // Long shaft + triangular tip, thrust effect on early prog
+      const thrust = prog < 0.4 ? prog / 0.4 : 1 - (prog - 0.4) / 0.6;
+      ctx.save(); ctx.translate(thrust * 8, 0);
+      ctx.fillStyle = '#7a6a48'; ctx.fillRect(0, -2, reach * 0.7, 4);
+      ctx.fillStyle = weapon.color;
+      ctx.beginPath();
+      ctx.moveTo(reach * 0.7, 0);
+      ctx.lineTo(reach * 0.7 + 16, -3.5);
+      ctx.lineTo(reach * 0.7 + 16,  3.5);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      break;
+    }
+    case 'excalibur': {
+      // Wide golden blade with glow on early swing
+      if (prog < 0.5) {
+        ctx.globalAlpha = (1 - prog * 2) * 0.45;
+        ctx.fillStyle = '#ffd700'; ctx.fillRect(-5, -12, reach * 0.9 + 10, 24);
+        ctx.globalAlpha = 1;
+      }
+      ctx.fillStyle = '#6a6a80'; ctx.fillRect(-4, -7, 6, 14);
+      ctx.fillStyle = weapon.color; ctx.fillRect(2, -3, reach * 0.88, 6);
+      ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(3, -1.5, reach * 0.72, 3);
+      break;
+    }
+    default: {
+      // Sword / generic blade with crossguard + fuller
+      ctx.fillStyle = '#8a8a96'; ctx.fillRect(-3, -5, 5, 10);
+      ctx.fillStyle = weapon.color; ctx.fillRect(2, -2.5, reach * 0.75, 5);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(3, -1, reach * 0.62, 2);
+    }
   }
   ctx.restore();
 }
