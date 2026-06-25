@@ -531,6 +531,7 @@ function wireToyBox(callbacks, onDiceClick) {
     window.addEventListener('resize', recache);
 
     dice.addEventListener('click', () => {
+      if (onDiceClick) onDiceClick();
       if (done) return;
       const now = performance.now();
       streak = (now - prev < gap) ? streak + 1 : 1;
@@ -544,8 +545,6 @@ function wireToyBox(callbacks, onDiceClick) {
         if (!cx) recache();
         burst(cx, cy, 4, false);
       }
-
-      if (onDiceClick) onDiceClick();
     });
   }
 
