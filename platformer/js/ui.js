@@ -4,6 +4,7 @@ import {
   WEAPON_DEFS, ownsWeapon, buyWeapon, equipWeapon, getEquippedWeapon,
   SKIN_DEFS, ownsSkin, buySkin, equipSkin, getEquippedSkin,
   WEAPON_UPGRADE_MAX, getWeaponUpgradeCost, upgradeWeapon,
+  unlockEverything,
 } from './state.js';
 import { STAGE_THEMES } from './renderer.js';
 import { STAGE_MODIFIERS } from './player.js';
@@ -379,8 +380,16 @@ const EMOJI_POOL = ['🪙', '⭐', '✨', '🍄', '💎', '🔥', '🎈', '🎉'
 let menuFxStarted = false;
 
 function setupMenuEffects(callbacks) {
+  let _diceHits = 0;
+  let _diceUnlocked = false;
   startMenuParticles();
-  wireToyBox(callbacks);
+  wireToyBox(callbacks, () => {
+    _diceHits++;
+    if (_diceHits >= 500) {
+      if (!_diceUnlocked) { unlockEverything(); _diceUnlocked = true; }
+      _diceHits = 0;
+    }
+  });
 }
 
 /* ---------- Particle / starfield canvas ---------- */
@@ -506,7 +515,7 @@ function centerOf(el) {
 }
 
 /* ---------- Toy box widgets ---------- */
-function wireToyBox(callbacks) {
+function wireToyBox(callbacks, onDiceClick) {
   const wiggle = (el) => { el.classList.remove('wiggle'); void el.offsetWidth; el.classList.add('wiggle'); };
 
   // Roll-the-dice toy: cycles a random face and pops a little sparkle. Tracks a
@@ -535,6 +544,8 @@ function wireToyBox(callbacks) {
         if (!cx) recache();
         burst(cx, cy, 4, false);
       }
+
+      if (onDiceClick) onDiceClick();
     });
   }
 

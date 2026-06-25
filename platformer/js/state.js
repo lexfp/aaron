@@ -357,6 +357,19 @@ export function isGameComplete() {
   return playerData.stagesUnlocked >= 10;
 }
 
+export function unlockEverything() {
+  for (const w of WEAPON_DEFS) {
+    playerData.weapons[w.key] = true;
+  }
+  playerData.stagesUnlocked = 10;
+  for (let s = 0; s <= 9; s++) {
+    for (let l = 1; l <= 50; l++) {
+      playerData.levelProgress[`${s}-${l}`] = true;
+    }
+  }
+  savePlayerData();
+}
+
 export function grantCompletionSkin() {
   if (!isGameComplete()) return false;
   if (ownsSkin('champion')) return false;
