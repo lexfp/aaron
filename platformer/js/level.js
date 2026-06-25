@@ -142,6 +142,24 @@ function makeBoss(stageIdx, p, arena) {
                   bird: 4.0, shroom: 4.5, drone: 3.8, golem: 5.5, knight: 4.0 };
   e._baseCD = SP_CD[sp] || 4.0;
   e._specialCD = e._baseCD * 0.45; // first special fires sooner so players see it quickly
+
+  // Per-species signature fields
+  e._split = false;            // slime: one-shot split flag
+  e._burrowState = 0;          // crawler: burrow state machine (0=idle,1=telegraph,2=underground)
+  e._burrowT = 0;              // crawler: timer for current burrow phase
+  e._burrowTargetX = 0;        // crawler: player x captured at telegraph start
+  e._burrowed = false;         // crawler: non-collidable while underground
+  e._iceTrailT = 0;            // slider: ice trail deposit timer
+  e.shieldHp = 0;              // drone: active shield HP (0 = no shield)
+  e._shieldT = 0;              // drone: remaining shield duration
+  e._shieldCD = 0;             // drone: cooldown after shield drops
+  e.parryT = 0;                // knight: parry window timer
+  e._parryCD = 0;              // knight: cooldown after parry ends
+  e._windTelegraph = 0;        // bird: wind gust telegraph timer
+  // Per-species signature cooldowns (initial delay before first trigger)
+  const SIG_CD = { crawler: 8.0, scorpion: 7.0, lavablob: 6.0, bird: 6.5,
+                   shroom: 7.5, drone: 6.0, golem: 8.0, knight: 6.0 };
+  e._sigCD = SIG_CD[sp] || 0;
   return e;
 }
 

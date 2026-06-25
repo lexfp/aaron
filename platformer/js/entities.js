@@ -5,6 +5,7 @@ export const particles = [];
 export const enemies = [];
 export const projectiles = [];
 export const enemyShots = []; // bolts fired by 'shoot' species (space turrets)
+export const sigZones = [];  // signature-mechanic lingering zones (ice/poison/fire/dust/crystal/spore)
 
 // Enemy tuning
 const E_GRAVITY = 1600;
@@ -24,6 +25,7 @@ export function initEntities(levelData) {
   enemies.length = 0;
   projectiles.length = 0;
   enemyShots.length = 0;
+  sigZones.length = 0;
 
   for (const c of levelData.coins) {
     coins.push({ x: c.x, y: c.y, collected: false, spinAngle: c.spinAngle || 0 });
@@ -300,8 +302,28 @@ function dropCoins(cx, cy, n) {
   addCoinParticles(cx, cy); // gold burst at the kill spot
 }
 
-function damageEnemy(e, dmg, knockDir, knock) {
+function killEnemy(e) {
+  e.alive = false;
+  const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
+  addHitParticles(cx, cy, e.color, 12);
+  if (e.boss) {
+    addExplosion(cx, cy, e.color);
+    addExplosion(cx, cy - 20, '#ffd700');
+    dropCoins(cx, cy, Math.round(e.maxHp * 1.5)); // big coin pile for bosses
+  } else {
+    dropCoins(cx, cy, Math.max(1, e.maxHp));      // coins scale with enemy toughness
+  }
+}
+
+function damageEnemy(e, dmg, knockDir, knock, player, weapon) {
   if (!e.alive) return;
+  if (e.boss && e.shieldHp > 0) {
+    e.shieldHp = Math.max(0, e.shieldHp - dmg);
+    e.hitFlash = 0.1;
+    addHitParticles(e.x + e.w / 2, e.y + e.h / 2, '#00d2d3', 3);
+    return;
+  }
+  if (e.boss && e.parryT > 0) { return; } // projectile parried
   e.hp -= dmg;
   e.hitFlash = 0.13;
   if (!e.air) {
@@ -310,17 +332,46 @@ function damageEnemy(e, dmg, knockDir, knock) {
     if (e.behavior === 'hop') e.x += dx;
     else if (e.patrolMax > e.patrolMin) e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + dx));
   }
+
+  // Apply on-hit weapon effects
+  if (weapon && weapon.effect) {
+    if (weapon.effect === 'burn') {
+      e._burn = { t: 2.5, dps: weapon.damage * 0.5 };
+    } else if (weapon.effect === 'freeze') {
+      e._freeze = 1.5;
+    } else if (weapon.effect === 'chain') {
+      // Deal chain damage to the nearest other alive enemy within 140px
+      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+      let nearest = null, nearDist = Infinity;
+      for (const other of enemies) {
+        if (!other.alive || other === e) continue;
+        const ocx = other.x + other.w / 2, ocy = other.y + other.h / 2;
+        const d = Math.hypot(ocx - ecx, ocy - ecy);
+        if (d < 140 && d < nearDist) { nearest = other; nearDist = d; }
+      }
+      if (nearest) {
+        const chainDmg = Math.max(1, Math.floor(weapon.damage * 0.5));
+        nearest.hp -= chainDmg;
+        nearest.hitFlash = 0.13;
+        const ncx = nearest.x + nearest.w / 2, ncy = nearest.y + nearest.h / 2;
+        if (nearest.hp <= 0) {
+          killEnemy(nearest);
+        } else {
+          addHitParticles(ncx, ncy, '#c8aaff', 4);
+        }
+      }
+    } else if (weapon.effect === 'lifesteal' && player) {
+      const heal = Math.min(2, weapon.damage);
+      player.hp += heal;
+      player.hp = Math.min(player.maxHp, player.hp);
+    }
+  }
+
   const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
   if (e.hp <= 0) {
     e.alive = false;
-    addHitParticles(cx, cy, e.color, 12);
-    if (e.boss) {
-      addExplosion(cx, cy, e.color);
-      addExplosion(cx, cy - 20, '#ffd700');
-      dropCoins(cx, cy, Math.round(e.maxHp * 1.5)); // big coin pile for bosses
-    } else {
-      dropCoins(cx, cy, Math.max(1, e.maxHp));      // coins scale with enemy toughness
-    }
+    e._deathT = e.boss ? 0.4 : 0.35;
+    killEnemy(e);
   } else {
     addHitParticles(cx, cy, '#ffffff', 4);
   }
@@ -328,37 +379,53 @@ function damageEnemy(e, dmg, knockDir, knock) {
 
 // Instant melee swing: damages every enemy inside a hitbox in front of the
 // player. Returns the number of enemies killed.
-export function playerMeleeAttack(player, weapon) {
-  const reach = weapon.reach || 24;
-  const dir = player.facing;
-  const hx = dir > 0 ? player.x + player.w - 4 : player.x - reach + 4;
-  const hw = reach + 8;
-  const hy = player.y - 4, hh = player.h + 8;
+export function playerMeleeAttack(player, weapon, charged) {
+  const dmg = charged ? Math.ceil(weapon.damage*2) : weapon.damage;
+  const knock = charged ? weapon.knockback*1.6 : weapon.knockback;
+  const reach = charged ? Math.ceil((weapon.reach||24)*1.3) : (weapon.reach||24);
+  const dir = player.facing, hx = dir>0 ? player.x+player.w-4 : player.x-reach+4;
+  const hw = reach+8, hy = player.y-4, hh = player.h+8;
   let kills = 0;
   for (const e of enemies) {
     if (!e.alive) continue;
     if (rectsOverlap(hx, hy, hw, hh, e.x, e.y, e.w, e.h)) {
-      damageEnemy(e, weapon.damage, dir, weapon.knockback);
+      if (e.boss && e.parryT > 0 && player.invuln <= 0) {
+        // Knight counter: melee swing blocked, player knocked back
+        const ecx = e.x + e.w / 2;
+        player.hp = Math.max(0, player.hp - Math.round(e.dmg * 0.6));
+        player.invuln = INVULN_TIME;
+        player.hurtFlash = 0.3;
+        player.vx = (ecx >= player.x + player.w / 2 ? -1 : 1) * 380;
+        player.vy = -290;
+        addHitParticles(ecx, e.y + e.h * 0.5, '#8854d0', 7);
+        continue;
+      }
+      damageEnemy(e, dmg, dir, knock, player, weapon);
       if (!e.alive) kills++;
     }
   }
   return kills;
 }
 
-export function spawnProjectile(player, weapon) {
+export function spawnProjectile(player, weapon, charged) {
   const dir = player.facing;
+  const dmg = charged ? Math.ceil(weapon.damage * 2) : weapon.damage;
+  const knock = charged ? weapon.knockback * 1.6 : weapon.knockback;
   projectiles.push({
     x: player.x + player.w / 2 + dir * 16,
     y: player.y + player.h * 0.4,
     vx: dir * (weapon.speed || 500),
     vy: weapon.splash ? -55 : 0, // explosive arrows arc slightly
     grav: weapon.splash ? 340 : 0,
-    dmg: weapon.damage,
+    dmg,
     splash: weapon.splash || 0,
-    knock: weapon.knockback || 200,
+    knock: knock || 200,
     color: weapon.color,
     r: weapon.splash ? 6 : 4,
     life: 2.4, dir,
+    effect: weapon.effect || null,
+    weapon,
+    player,
   });
 }
 
@@ -369,14 +436,14 @@ function detonate(pr) {
       if (!e.alive) continue;
       const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
       if (Math.hypot(cx - pr.x, cy - pr.y) <= pr.splash) {
-        damageEnemy(e, pr.dmg, cx < pr.x ? -1 : 1, pr.knock);
+        damageEnemy(e, pr.dmg, cx < pr.x ? -1 : 1, pr.knock, pr.player, pr.weapon);
       }
     }
   } else {
     for (const e of enemies) {
       if (!e.alive) continue;
       if (rectsOverlap(pr.x - 3, pr.y - 3, 6, 6, e.x, e.y, e.w, e.h)) {
-        damageEnemy(e, pr.dmg, pr.dir, pr.knock);
+        damageEnemy(e, pr.dmg, pr.dir, pr.knock, pr.player, pr.weapon);
         break;
       }
     }
@@ -693,22 +760,44 @@ export function updateEnemies(dt, platforms, player) {
     if (!e.alive) continue;
     e.t += dt;
     if (e.hitFlash > 0) e.hitFlash = Math.max(0, e.hitFlash - dt);
+
+    // Tick burn effect: subtract dps*dt from hp while _burn.t > 0
+    if (e._burn && e._burn.t > 0) {
+      e._burn.t -= dt;
+      e.hp -= e._burn.dps * dt;
+      if (e.hp <= 0) {
+        e.alive = false;
+        killEnemy(e);
+        continue;
+      }
+      if (e._burn.t <= 0) e._burn = null;
+    }
+
+    // Tick freeze timer: decrement by dt (halves movement while > 0)
+    if (e._freeze > 0) {
+      e._freeze -= dt;
+      if (e._freeze < 0) e._freeze = 0;
+    }
+
+    if (!e.alive) continue;
+
     const bhv = e.behavior || LEGACY_BEHAVIOR[e.type] || 'walk';
     const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+    const freezeMul = (e._freeze && e._freeze > 0) ? 0.5 : 1;
 
     if (bhv === 'fly') {
       // Free-flying: pursues the player when near, otherwise hovers near home.
       const distP = Math.hypot(pcx - ecx, pcy - ecy);
       if (distP < 300 && distP > 1) {
-        const sp = e.chase || 85;
+        const sp = (e.chase || 85) * freezeMul;
         e.x += (pcx - ecx) / distP * sp * dt;
-        e.y += (pcy - ecy) / distP * sp * dt + Math.sin(e.t * 3) * 10 * dt;
+        e.y += (pcy - ecy) / distP * sp * dt + Math.sin(e.t * 3) * 10 * dt * freezeMul;
         e.dir = pcx >= ecx ? 1 : -1;
       } else {
         const hx = e.baseX + Math.sin(e.t * e.sx) * e.ampX;
         const hy = e.baseY + Math.sin(e.t * e.sy + 1.3) * e.ampY;
-        e.x += (hx - e.x) * Math.min(1, dt * 2.5);
-        e.y += (hy - e.y) * Math.min(1, dt * 2.5);
+        e.x += (hx - e.x) * Math.min(1, dt * 2.5 * freezeMul);
+        e.y += (hy - e.y) * Math.min(1, dt * 2.5 * freezeMul);
         e.dir = Math.cos(e.t * e.sx) >= 0 ? 1 : -1;
       }
     } else if (bhv === 'hop') {
@@ -733,18 +822,18 @@ export function updateEnemies(dt, platforms, player) {
         if (near) e.dir = pcx >= ecx ? 1 : -1;
         e.jumpTimer -= dt;
         if (e.jumpTimer <= 0) { e.vy = -(e.jumpForce || 480); e.jumpTimer = e.jumpEvery || 1.4; }
-        e.x += e.dir * e.speed * dt * (near ? 1 : 0.65);
+        e.x += e.dir * e.speed * freezeMul * dt * (near ? 1 : 0.65);
         if (!near) { // patrol the home platform while idle
           if (e.x <= e.patrolMin) { e.x = e.patrolMin; e.dir = 1; }
           else if (e.x >= e.patrolMax) { e.x = e.patrolMax; e.dir = -1; }
         }
       } else {
-        e.x += e.dir * e.speed * dt; // carry momentum through the air
+        e.x += e.dir * e.speed * freezeMul * dt; // carry momentum through the air
       }
     } else if (bhv === 'boss') {
       if (e._sliding) {  // slider boss: high-speed ice dash across arena
         e.dir = e._slideDir;
-        e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + e._slideDir * e._slideV * dt));
+        e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + e._slideDir * e._slideV * freezeMul * dt));
         e._slideT -= dt;
         if (e._slideT <= 0 || e.x <= e.patrolMin + 4 || e.x >= e.patrolMax - 4) {
           e._sliding = false;
@@ -753,7 +842,7 @@ export function updateEnemies(dt, platforms, player) {
       } else if (e.vy !== 0 || e.y < e.baseY) { // airborne mid-leap
         e.vy += E_GRAVITY * dt;
         e.y += e.vy * dt;
-        e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + (e._vx || 0) * dt));
+        e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + (e._vx || 0) * freezeMul * dt));
         if (e.y >= e.baseY) {
           e.y = e.baseY; e.vy = 0; e._vx = 0;
           addLandParticles(ecx, e.y + e.h);
@@ -762,7 +851,7 @@ export function updateEnemies(dt, platforms, player) {
         if (e._cd === undefined) e._cd = 1.1;
         e._cd = Math.max(0, e._cd - dt);
         e.dir = pcx >= ecx ? 1 : -1;
-        e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + e.dir * e.speed * dt));
+        e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + e.dir * e.speed * freezeMul * dt));
         if (e._cd <= 0) {
           e.vy = -e.leapForce;
           e._vx = e.dir * Math.max(120, Math.min(330, Math.abs(pcx - ecx)));
@@ -770,13 +859,13 @@ export function updateEnemies(dt, platforms, player) {
         }
       }
     } else if (bhv === 'walk') {
-      e.x += e.dir * e.speed * dt;
+      e.x += e.dir * e.speed * freezeMul * dt;
       if (e.x <= e.patrolMin) { e.x = e.patrolMin; e.dir = 1; }
       else if (e.x >= e.patrolMax) { e.x = e.patrolMax; e.dir = -1; }
     } else if (bhv === 'charge') {
       e._cd = Math.max(0, (e._cd || 0) - dt);
       if (e._st === 2) {            // dashing
-        e.x += e.dir * e.chargeSpeed * dt;
+        e.x += e.dir * e.chargeSpeed * freezeMul * dt;
         e._stT -= dt;
         if (e.x <= e.patrolMin) { e.x = e.patrolMin; e._st = 0; e._cd = 1.3; }
         else if (e.x >= e.patrolMax) { e.x = e.patrolMax; e._st = 0; e._cd = 1.3; }
@@ -785,7 +874,7 @@ export function updateEnemies(dt, platforms, player) {
         e._stT -= dt;
         if (e._stT <= 0) { e._st = 2; e._stT = 0.9; }
       } else {                      // patrol + look for the player
-        e.x += e.dir * e.speed * dt;
+        e.x += e.dir * e.speed * freezeMul * dt;
         if (e.x <= e.patrolMin) { e.x = e.patrolMin; e.dir = 1; }
         else if (e.x >= e.patrolMax) { e.x = e.patrolMax; e.dir = -1; }
         if (!e._cd && Math.abs(pcy - ecy) < 70 && Math.abs(pcx - ecx) < e.chargeRange) {
@@ -799,8 +888,8 @@ export function updateEnemies(dt, platforms, player) {
         e._stT -= dt;
         if (d < 12 || e._stT <= 0) e._mode = 2;
         else {
-          e.x += dx / d * e.swoopSpeed * dt;
-          e.y += dy / d * e.swoopSpeed * dt;
+          e.x += dx / d * e.swoopSpeed * freezeMul * dt;
+          e.y += dy / d * e.swoopSpeed * freezeMul * dt;
           e.dir = dx >= 0 ? 1 : -1;
         }
       } else if (e._mode === 2) {   // gliding back to the perch
@@ -808,8 +897,8 @@ export function updateEnemies(dt, platforms, player) {
         const d = Math.hypot(dx, dy);
         if (d < 8) { e._mode = 0; e._cd = 1.0; }
         else {
-          e.x += dx / d * e.swoopSpeed * 0.6 * dt;
-          e.y += dy / d * e.swoopSpeed * 0.6 * dt;
+          e.x += dx / d * e.swoopSpeed * 0.6 * freezeMul * dt;
+          e.y += dy / d * e.swoopSpeed * 0.6 * freezeMul * dt;
           e.dir = dx >= 0 ? 1 : -1;
         }
       } else {                      // hovering at the perch
@@ -826,26 +915,26 @@ export function updateEnemies(dt, platforms, player) {
       const tx = near ? pcx : e.baseX, ty = near ? pcy : e.baseY;
       const dx = tx - ecx, dy = ty - ecy;
       const d = Math.hypot(dx, dy) || 1;
-      const sp = Math.min(e.floatSpeed, d * 2);
+      const sp = Math.min(e.floatSpeed, d * 2) * freezeMul;
       e.x += dx / d * sp * dt;
-      e.y += dy / d * sp * dt + Math.sin(e.t * 2.2) * 12 * dt;
+      e.y += dy / d * sp * dt + Math.sin(e.t * 2.2) * 12 * freezeMul * dt;
       e.dir = dx >= 0 ? 1 : -1;
     } else if (bhv === 'orbit') {
       // The anchor itself stalks the player slowly, so orbiters roam too.
       const dax = pcx - e.baseX, day = pcy - e.baseY;
       const da = Math.hypot(dax, day);
       if (da > 1 && da < 320) {
-        e.baseX += dax / da * 28 * dt;
-        e.baseY += day / da * 28 * dt;
+        e.baseX += dax / da * 28 * freezeMul * dt;
+        e.baseY += day / da * 28 * freezeMul * dt;
       }
       const a = e.t * e.orbitSpd + (e.phase || 0);
-      e.x = e.baseX + Math.cos(a) * e.orbitR - e.w / 2;
-      e.y = e.baseY + Math.sin(a) * e.orbitR * 0.7 - e.h / 2;
+      e.x = e.baseX + Math.cos(a) * e.orbitR * freezeMul - e.w / 2;
+      e.y = e.baseY + Math.sin(a) * e.orbitR * 0.7 * freezeMul - e.h / 2;
       e.dir = -Math.sin(a) >= 0 ? 1 : -1;
     } else if (bhv === 'drop') {
       if (e._mode === 1) {          // falling
         e.vy += 2300 * dt;
-        e.y += e.vy * dt;
+        e.y += e.vy * freezeMul * dt;
         for (const pl of platforms) {
           if (pl._crumbleState === 2) continue;
           if (e.x + e.w > pl.x && e.x < pl.x + pl.w &&
@@ -862,13 +951,13 @@ export function updateEnemies(dt, platforms, player) {
       }
     } else if (bhv === 'spider') {
       if (e._mode === 1) {          // dropping down the thread
-        e.y += e.dropSpeed * dt;
+        e.y += e.dropSpeed * freezeMul * dt;
         if (e.y >= e.dropY) { e.y = e.dropY; e._mode = 2; e._stT = 0.65; }
       } else if (e._mode === 2) {   // lingering low
         e._stT -= dt;
         if (e._stT <= 0) e._mode = 3;
       } else if (e._mode === 3) {   // climbing back up
-        e.y -= 120 * dt;
+        e.y -= 120 * freezeMul * dt;
         if (e.y <= e.anchorY) { e.y = e.anchorY; e._mode = 0; e._cd = 0.8; }
       } else {                      // waiting at the anchor
         e.y = e.anchorY + Math.sin(e.t * 1.6) * 4;
@@ -897,6 +986,12 @@ export function updateEnemies(dt, platforms, player) {
         e.swoopSpeed = Math.round((e.swoopSpeed || 300) * 1.3);
         addExplosion(ecx, ecy, e.color);
         addExplosion(ecx, ecy - 24, '#ff4500');
+        // slime split: spawn 2 mini-slimes on first rage entry (one-shot)
+        if (e.species === 'slime' && !e._split) {
+          e._split = true;
+          spawnBossMinion(e);
+          spawnBossMinion(e);
+        }
       }
       if (e._atkFlash > 0) e._atkFlash -= dt;
       e._specialCD -= dt;
@@ -904,14 +999,126 @@ export function updateEnemies(dt, platforms, player) {
         triggerBossSpecial(e, pcx, pcy);
         e._specialCD = e._baseCD * (e._rage ? 0.65 : 1.0);
       }
+
+      // ── Signature mechanics ──────────────────────────────────────────────
+      const floorY = e.baseY !== undefined ? e.baseY + e.h : ecy + e.h * 0.5;
+      if (e.species === 'crawler') {
+        // burrow: telegraph → underground → emerge at player's last known x
+        if (e._burrowState === 1) {
+          e._burrowT = Math.max(0, e._burrowT - dt);
+          if (e._burrowT <= 0) { e._burrowState = 2; e._burrowT = 0.55; e._burrowed = true; e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e._burrowTargetX - e.w / 2)); }
+        } else if (e._burrowState === 2) {
+          e._burrowT = Math.max(0, e._burrowT - dt);
+          if (e._burrowT <= 0) { e._burrowState = 0; e._burrowed = false; addHitParticles(ecx, floorY, '#7f8c8d', 12); e._sigCD = 9.0; }
+        } else {
+          e._sigCD = Math.max(0, (e._sigCD || 7.0) - dt);
+          if (e._sigCD <= 0) {
+            e._burrowState = 1; e._burrowT = 0.45; e._burrowTargetX = pcx;
+            sigZones.push({ kind: 'dust', x: pcx - 18, y: floorY - 24, w: 36, h: 24, life: 1.5, warn: 0.45 });
+          }
+        }
+      } else if (e.species === 'slider') {
+        // iceTrail: deposit trail zones while sliding
+        if (e._sliding) {
+          e._iceTrailT = (e._iceTrailT || 0) + dt;
+          if (e._iceTrailT >= 0.08) {
+            e._iceTrailT = 0;
+            sigZones.push({ kind: 'ice', x: e.x + 4, y: floorY - 10, w: e.w - 8, h: 12, life: 2.5 });
+          }
+        }
+      } else if (e.species === 'scorpion') {
+        // poisonCloud: drop 1-2 zones on floor
+        e._sigCD = Math.max(0, (e._sigCD || 6.0) - dt);
+        if (e._sigCD <= 0) {
+          const n = 1 + (Math.random() > 0.5 ? 1 : 0);
+          for (let k = 0; k < n; k++) {
+            const cx = e.patrolMin + Math.random() * (e.patrolMax - e.patrolMin);
+            sigZones.push({ kind: 'poison', x: cx - 30, y: floorY - 40, w: 60, h: 44, life: 4.5, warn: 0.35, dmg: Math.round(e.dmg * 0.5) });
+          }
+          e._sigCD = 8.0;
+        }
+      } else if (e.species === 'lavablob') {
+        // firePatch: mark 2-3 floor spots, then ignite
+        e._sigCD = Math.max(0, (e._sigCD || 5.0) - dt);
+        if (e._sigCD <= 0) {
+          const n = 2 + (Math.random() > 0.5 ? 1 : 0);
+          const span = e.patrolMax - e.patrolMin;
+          for (let k = 0; k < n; k++) {
+            const cx = e.patrolMin + (k + 1) * span / (n + 1) + (Math.random() - 0.5) * 80;
+            sigZones.push({ kind: 'fire', x: cx - 28, y: floorY - 14, w: 56, h: 14, life: 4.5, warn: 0.55, dmg: Math.round(e.dmg * 0.7) });
+          }
+          e._sigCD = 7.0;
+        }
+      } else if (e.species === 'bird') {
+        // windGust: telegraph lean, then push player
+        if (e._windTelegraph > 0) {
+          e._windTelegraph = Math.max(0, e._windTelegraph - dt);
+          if (e._windTelegraph <= 0) {
+            player.windPushT = 1.1;
+            player.windPushDir = pcx < ecx ? -1 : 1;
+            e._sigCD = 8.0;
+          }
+        } else {
+          e._sigCD = Math.max(0, (e._sigCD || 5.5) - dt);
+          if (e._sigCD <= 0) e._windTelegraph = 0.45;
+        }
+      } else if (e.species === 'shroom') {
+        // sporeDaze: telegraph cloud, then daze on burst
+        e._sigCD = Math.max(0, (e._sigCD || 6.5) - dt);
+        if (e._sigCD <= 0) {
+          const r = 58;
+          sigZones.push({ kind: 'spore', x: ecx - r, y: e.y - 4, w: r * 2, h: e.h + 20, life: 1.4, warn: 0.45, dmg: 0, burstDone: false });
+          e._sigCD = 10.0;
+        }
+      } else if (e.species === 'drone') {
+        // shield: absorbs all damage for up to 5.5s, then cooldown
+        if (e._shieldT > 0) {
+          e._shieldT = Math.max(0, e._shieldT - dt);
+          if (e._shieldT <= 0) { e.shieldHp = 0; e._shieldCD = 9.0; }
+        } else {
+          e._shieldCD = Math.max(0, (e._shieldCD || 0) - dt);
+          e._sigCD = Math.max(0, (e._sigCD || 5.0) - dt);
+          if (e._sigCD <= 0 && e._shieldCD <= 0) {
+            e.shieldHp = Math.max(20, Math.round(e.maxHp * 0.35));
+            e._shieldT = 5.5;
+            e._sigCD = 12.0;
+          }
+        }
+      } else if (e.species === 'golem') {
+        // crystalFall: shadow markers then falling crystals
+        e._sigCD = Math.max(0, (e._sigCD || 7.0) - dt);
+        if (e._sigCD <= 0) {
+          const n = 2 + Math.floor(Math.random() * 3);
+          const span = e.patrolMax - e.patrolMin;
+          const arenaTop = e.baseY !== undefined ? e.baseY - 160 : floorY - 160;
+          for (let k = 0; k < n; k++) {
+            const cx = e.patrolMin + (k + 1) * span / (n + 1) + (Math.random() - 0.5) * 60;
+            sigZones.push({ kind: 'crystal', x: cx - 14, y: floorY - 10, w: 28, h: 10, life: 3.5, warn: 0.6, floorY, spawnY: arenaTop, dmg: Math.round(e.dmg * 0.9), falling: false, vy: 0 });
+          }
+          e._sigCD = 9.0;
+        }
+      } else if (e.species === 'knight') {
+        // parry: raise shield for ≤1.2s, then cooldown
+        if (e.parryT > 0) {
+          e.parryT = Math.max(0, e.parryT - dt);
+          if (e.parryT <= 0) e._parryCD = 8.0;
+        } else {
+          e._parryCD = Math.max(0, (e._parryCD || 0) - dt);
+          e._sigCD = Math.max(0, (e._sigCD || 5.0) - dt);
+          if (e._sigCD <= 0 && e._parryCD <= 0) {
+            e.parryT = 0.85 + Math.random() * 0.3;
+            e._sigCD = 8.0;
+          }
+        }
+      }
     }
 
     if (player.dead) continue;
-    if (rectsOverlap(player.x, player.y, player.w, player.h, e.x, e.y, e.w, e.h)) {
+    if (!e._burrowed && rectsOverlap(player.x, player.y, player.w, player.h, e.x, e.y, e.w, e.h)) {
       const prevBottom = player._prevY + player.h;
       const stomping = player.vy > 0 && prevBottom <= e.y + 12;
       if (stomping) {
-        damageEnemy(e, STOMP_DAMAGE, player.x < e.x ? 1 : -1, 240);
+        damageEnemy(e, STOMP_DAMAGE, player.x < e.x ? 1 : -1, 240, null, null);
         player.vy = -STOMP_BOUNCE;
         player.y = e.y - player.h;
         player._prevY = player.y;
@@ -925,6 +1132,59 @@ export function updateEnemies(dt, platforms, player) {
         if (!guarding) hurtPlayer(e.dmg || CONTACT_DAMAGE[e.type] || 8, eCx);
       }
     }
+  }
+
+  // Signature zone updates: warn→active, per-kind effects, expiry.
+  for (let i = sigZones.length - 1; i >= 0; i--) {
+    const z = sigZones[i];
+    if (z.warn > 0) {
+      z.warn -= dt;
+      z.life -= dt;
+      if (z.warn <= 0 && z.kind === 'spore' && !z.burstDone) {
+        z.burstDone = true;
+        if (!player.dead && rectsOverlap(player.x, player.y, player.w, player.h, z.x, z.y, z.w, z.h)) {
+          player.dazeT = Math.min(1.5, player.dazeT + 1.5);
+        }
+      }
+      if (z.warn <= 0 && z.kind === 'crystal' && !z.falling) {
+        z.falling = true;
+        z.y = z.spawnY;
+        z.w = 18; z.h = 28;
+        z.vy = 0;
+      }
+      if (z.life <= 0) sigZones.splice(i, 1);
+      continue;
+    }
+    if (z.kind === 'crystal' && z.falling) {
+      z.vy = (z.vy || 0) + 900 * dt;
+      z.y += z.vy * dt;
+      if (!player.dead && rectsOverlap(player.x, player.y, player.w, player.h, z.x, z.y, z.w, z.h)) {
+        hurtPlayer(z.dmg, z.x + z.w / 2);
+        addHitParticles(z.x + z.w / 2, z.y + z.h, '#48dbfb', 7);
+        sigZones.splice(i, 1);
+        continue;
+      }
+      if (z.y > z.floorY || z.y > 600) { sigZones.splice(i, 1); continue; }
+      z.life -= dt;
+    } else if (z.kind === 'ice') {
+      z.life -= dt;
+      if (!player.dead && rectsOverlap(player.x, player.y, player.w, player.h, z.x, z.y, z.w, z.h)) {
+        player.iceSlipT = Math.min(2.5, Math.max(player.iceSlipT, 2.0));
+      }
+    } else if (z.kind === 'poison') {
+      z.life -= dt;
+      if (!player.dead && rectsOverlap(player.x, player.y, player.w, player.h, z.x, z.y, z.w, z.h)) {
+        hurtPlayer(z.dmg, z.x + z.w / 2);
+      }
+    } else if (z.kind === 'fire') {
+      z.life -= dt;
+      if (!player.dead && rectsOverlap(player.x, player.y, player.w, player.h, z.x, z.y, z.w, z.h)) {
+        hurtPlayer(z.dmg, z.x + z.w / 2);
+      }
+    } else {
+      z.life -= dt; // dust, spore (post-burst)
+    }
+    if (z.life <= 0) sigZones.splice(i, 1);
   }
 
   // Enemy shots: turret bolts (straight) + boss specials (may arc with vy/grav).
@@ -990,9 +1250,78 @@ export function drawProjectiles(ctx, camX, W) {
   }
 }
 
-export function drawEnemies(ctx, camX, W, t) {
+export function drawEnemies(ctx, camX, W, t, player, dt = 0) {
+  // Signature zones (drawn below enemies)
+  for (const z of sigZones) {
+    const sx = z.x - camX;
+    if (sx + z.w < -40 || sx > W + 40) continue;
+    const alpha = z.warn > 0 ? 0.35 + Math.sin(t * 12) * 0.2 : 0.72;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    if (z.kind === 'ice') {
+      ctx.fillStyle = '#aee3ff';
+      ctx.fillRect(sx, z.y, z.w, z.h);
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillRect(sx + 2, z.y + 1, z.w - 4, 3);
+    } else if (z.kind === 'poison') {
+      const g = ctx.createRadialGradient(sx + z.w / 2, z.y + z.h / 2, 4, sx + z.w / 2, z.y + z.h / 2, z.w / 2);
+      g.addColorStop(0, 'rgba(180,110,20,0.85)'); g.addColorStop(1, 'rgba(100,60,0,0)');
+      ctx.fillStyle = g; ctx.fillRect(sx, z.y, z.w, z.h);
+    } else if (z.kind === 'fire') {
+      const g2 = ctx.createRadialGradient(sx + z.w / 2, z.y + z.h, 2, sx + z.w / 2, z.y + z.h / 2, z.w / 2);
+      g2.addColorStop(0, z.warn > 0 ? 'rgba(255,200,50,0.7)' : 'rgba(255,100,0,0.9)');
+      g2.addColorStop(1, 'rgba(180,40,0,0)');
+      ctx.fillStyle = g2; ctx.fillRect(sx - 4, z.y - 6, z.w + 8, z.h + 8);
+    } else if (z.kind === 'dust') {
+      ctx.fillStyle = 'rgba(160,150,130,0.6)';
+      ctx.fillRect(sx, z.y, z.w, z.h);
+      // pulsing X marker
+      ctx.strokeStyle = 'rgba(255,220,120,0.85)'; ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(sx + 4, z.y + 4); ctx.lineTo(sx + z.w - 4, z.y + z.h - 4);
+      ctx.moveTo(sx + z.w - 4, z.y + 4); ctx.lineTo(sx + 4, z.y + z.h - 4);
+      ctx.stroke();
+    } else if (z.kind === 'spore') {
+      const g3 = ctx.createRadialGradient(sx + z.w / 2, z.y + z.h / 2, 8, sx + z.w / 2, z.y + z.h / 2, z.w / 2);
+      g3.addColorStop(0, 'rgba(200,100,80,0.55)'); g3.addColorStop(1, 'rgba(100,40,30,0)');
+      ctx.fillStyle = g3; ctx.fillRect(sx, z.y, z.w, z.h);
+    } else if (z.kind === 'crystal') {
+      if (z.falling) {
+        // falling crystal shard
+        const g4 = ctx.createLinearGradient(sx, z.y, sx, z.y + z.h);
+        g4.addColorStop(0, '#bff4ff'); g4.addColorStop(1, '#2e9cb8');
+        ctx.fillStyle = g4;
+        ctx.beginPath();
+        ctx.moveTo(sx + z.w / 2, z.y); ctx.lineTo(sx + z.w, z.y + z.h * 0.45);
+        ctx.lineTo(sx + z.w * 0.6, z.y + z.h); ctx.lineTo(sx + z.w * 0.4, z.y + z.h);
+        ctx.lineTo(sx, z.y + z.h * 0.45); ctx.closePath(); ctx.fill();
+      } else {
+        // shadow marker on floor
+        ctx.fillStyle = 'rgba(72,219,251,0.45)';
+        ctx.beginPath(); ctx.ellipse(sx + z.w / 2, z.y + z.h / 2, z.w / 2, z.h / 2, 0, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
   for (const e of enemies) {
-    if (!e.alive) continue;
+    if (!e.alive) {
+      if (e._deathT <= 0) { continue; }
+      e._deathT -= dt;
+      if (e._deathT > 0 && e.x + e.w >= camX - 40 && e.x <= camX + W + 80) {
+        const _cx = e.x + e.w / 2;
+        const dur = e.boss ? 0.4 : 0.35;
+        const frac = Math.max(0, e._deathT / dur);
+        ctx.save();
+        ctx.translate(_cx, e.y + e.h / 2);
+        ctx.globalAlpha = frac;
+        ctx.scale(1.2 - frac * 0.2, frac * 0.9 + 0.1);
+        ctx.fillStyle = e.color || '#aaa';
+        ctx.fillRect(-e.w / 2, -e.h / 2, e.w, e.h);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+      continue;
+    }
     if (e.x + e.w < camX - 40 || e.x > camX + W + 80) continue;
 
     const cx = e.x + e.w / 2;
@@ -1022,9 +1351,9 @@ export function drawEnemies(ctx, camX, W, t) {
       if (e.bossScale > 1) {
         // draw the species at its native proportions, scaled up to boss size
         ctx.scale(e.bossScale, e.bossScale);
-        sd(ctx, { ...e, w: e.w / e.bossScale, h: e.h / e.bossScale }, t);
+        sd(ctx, { ...e, w: e.w / e.bossScale, h: e.h / e.bossScale }, t, player);
       } else {
-        sd(ctx, e, t);
+        sd(ctx, e, t, player);
       }
       ctx.restore();
     } else if (e.type === 'flyer') drawFlyer(ctx, e);
@@ -1032,12 +1361,17 @@ export function drawEnemies(ctx, camX, W, t) {
     else if (e.type === 'brute') drawBrute(ctx, e);
     else drawWalker(ctx, e, t);
 
-    // hit flash
+    // hit scale-pulse then white flash
     if (e.hitFlash > 0) {
-      ctx.globalAlpha = e.hitFlash / 0.13 * 0.8;
+      const pulseFrac = e.hitFlash / 0.13;
+      ctx.save();
+      const ps = 1 + pulseFrac * 0.08;
+      ctx.scale(ps, ps);
+      ctx.globalAlpha = pulseFrac * 0.8;
       ctx.fillStyle = '#fff';
       ctx.fillRect(-e.w / 2, 0, e.w, e.h);
       ctx.globalAlpha = 1;
+      ctx.restore();
     }
     // special attack charge flash (yellow burst when a boss special fires)
     if (e._atkFlash > 0) {
@@ -1048,6 +1382,53 @@ export function drawEnemies(ctx, camX, W, t) {
     }
     ctx.restore();
 
+    // Signature visuals (shield, parry, wind telegraph) — rendered before HP bar so HP bar is topmost
+    if (e.boss) {
+      const bx = e.x - camX;
+      const bcx = bx + e.w / 2;
+      if (e.shieldHp > 0) {
+        // Drone energy shield ring
+        const sr = Math.max(e.w, e.h) * 0.68;
+        const sp = 0.45 + Math.sin(t * 6) * 0.25;
+        ctx.save();
+        ctx.strokeStyle = `rgba(0,210,211,${sp})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(bcx, e.y + e.h / 2, sr, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = `rgba(180,255,255,${sp * 0.55})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(bcx, e.y + e.h / 2, sr * 0.82, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+      if (e.parryT > 0) {
+        // Knight raised-shield pose overlay
+        ctx.save();
+        const pAlpha = 0.6 + Math.sin(t * 8) * 0.2;
+        ctx.globalAlpha = pAlpha;
+        ctx.fillStyle = '#8854d0';
+        ctx.fillRect(bx + e.w * 0.38, e.y + e.h * 0.28, e.w * 0.14, e.h * 0.5);
+        ctx.fillStyle = '#c8d6e5';
+        ctx.fillRect(bx + e.w * 0.44, e.y + e.h * 0.22, e.w * 0.18, e.h * 0.44);
+        ctx.restore();
+      }
+      if (e._windTelegraph > 0) {
+        // Bird lean telegraph: wavy lines radiating outward
+        ctx.save();
+        ctx.globalAlpha = (1 - e._windTelegraph / 0.45) * 0.75;
+        ctx.strokeStyle = '#c0d8ff'; ctx.lineWidth = 2;
+        for (let wi = 0; wi < 4; wi++) {
+          const wy = e.y + e.h * (0.3 + wi * 0.15);
+          ctx.beginPath();
+          ctx.moveTo(bcx - e.w * 0.6, wy);
+          ctx.lineTo(bcx - e.w, wy + Math.sin(t * 12 + wi) * 4);
+          ctx.moveTo(bcx + e.w * 0.6, wy);
+          ctx.lineTo(bcx + e.w, wy + Math.sin(t * 12 + wi) * 4);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+
+    // HP bar / pips (rendered last — on top of all other visuals)
     if (e.boss) {
       // chunky boss HP bar — turns orange in rage, shows 50% rage threshold marker
       const bw = e.w + 14;
@@ -1221,9 +1602,10 @@ function drawSlime(ctx, e, t) {
   ctx.fill();
 }
 
-function drawBee(ctx, e, t) {
+function drawBee(ctx, e, t, player) {
   const w = e.w, h = e.h;
-  const flap = Math.sin(e.t * 26) * 0.6;
+  const chasing = player && Math.hypot(player.x + player.w / 2 - (e.x + e.w / 2), player.y + player.h / 2 - (e.y + e.h / 2)) < 300;
+  const flap = Math.sin(e.t * (chasing ? 38 : 26)) * 0.6;
   ctx.fillStyle = 'rgba(255,255,255,0.75)';
   ctx.save(); ctx.translate(-2, h * 0.25); ctx.rotate(-0.5 - flap);
   ctx.beginPath(); ctx.ellipse(0, -6, 5, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
@@ -1326,6 +1708,7 @@ function drawIcicle(ctx, e, t) {
 function drawScorpion(ctx, e, t) {
   const w = e.w, h = e.h;
   const winding = e._st === 1, dashing = e._st === 2;
+  if (winding) ctx.translate(Math.sin(t * 42) * 1.5, 0);
   ctx.strokeStyle = '#8a5a20'; ctx.lineWidth = 2; // legs
   for (let i = 0; i < 3; i++) {
     const lx = -w * 0.25 + i * w * 0.18;
@@ -1376,7 +1759,9 @@ function drawLavaBlob(ctx, e, t) {
   g.addColorStop(0, 'rgba(255,170,60,0.55)'); g.addColorStop(1, 'rgba(255,80,0,0)');
   ctx.fillStyle = g;
   ctx.fillRect(-w, cy - w, w * 2, w * 2);
-  const wob = Math.sin(e.t * 9) * 0.08;
+  const _vy = e.vy || 0;
+  const air = Math.abs(_vy) > 30;
+  const wob = air ? (_vy < 0 ? 0.12 : -0.06) : Math.sin(e.t * 9) * 0.08;
   ctx.fillStyle = '#ff793f';
   ctx.beginPath(); ctx.ellipse(0, cy, w * 0.46 * (1 + wob), h * 0.42 * (1 - wob), 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#ffd32a';
@@ -1388,9 +1773,10 @@ function drawLavaBlob(ctx, e, t) {
   ctx.fill();
 }
 
-function drawEmber(ctx, e, t) {
+function drawEmber(ctx, e, t, player) {
   const w = e.w, h = e.h;
-  const fl = Math.sin(e.t * 13) * 2;
+  const chasing = player && Math.hypot(player.x + player.w / 2 - (e.x + e.w / 2), player.y + player.h / 2 - (e.y + e.h / 2)) < 300;
+  const fl = Math.sin(e.t * (chasing ? 20 : 13)) * 2;
   ctx.fillStyle = '#ff793f';
   ctx.beginPath();
   ctx.moveTo(0, fl * 0.4);
@@ -1572,6 +1958,7 @@ function drawShard(ctx, e, t) {
 function drawKnight(ctx, e, t) {
   const w = e.w, h = e.h;
   const winding = e._st === 1, dashing = e._st === 2;
+  if (winding) ctx.translate(Math.sin(t * 42) * 1.5, 0);
   ctx.fillStyle = '#23233c';
   ctx.fillRect(-w * 0.3, h - 7, w * 0.22, 7);
   ctx.fillRect(w * 0.08, h - 7, w * 0.22, 7);

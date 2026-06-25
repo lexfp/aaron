@@ -1,4 +1,4 @@
-import { loadPlayerData, playerData, markLevelComplete, getMagnetRadius, getStartLives, isStageComplete } from './state.js';
+import { loadPlayerData, playerData, markLevelComplete, getMagnetRadius, getStartLives, isStageComplete, getEquippedWeapon, grantCompletionSkin } from './state.js';
 import { initInput, consumeJump, consumeEsc, isAttack, clearAll } from './input.js';
 import { player, initPlayer, updatePlayer, drawPlayer, setStageModifier, getStageModifier } from './player.js';
 import {
@@ -19,6 +19,9 @@ import {
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
+// Seconds of continuous attack-input hold required to trigger a charged (heavy) attack.
+const CHARGE_TIME = 0.6;
+
 let currentStage = 1;
 let currentLevel = 1;
 let levelData = null;
@@ -31,6 +34,7 @@ let gameActive = false;
 let paused = false;
 let prevTimestamp = null;
 let deathTimer = 0;
+let _lastDt = 0;
 let _lastHp = 100;
 
 // UI callbacks object
@@ -109,6 +113,7 @@ function onPlayerDeath() {
 function onLevelComplete() {
   gameActive = false;
   markLevelComplete(currentStage, currentLevel);
+  grantCompletionSkin();
 
   callbacks._lastCoins = coinsThisLevel;
 
@@ -154,6 +159,7 @@ function gameLoop(timestamp) {
   if (!prevTimestamp) { prevTimestamp = timestamp; return; }
   const dt = Math.min((timestamp - prevTimestamp) / 1000, 0.033);
   prevTimestamp = timestamp;
+  _lastDt = dt;
 
   // ESC to pause/unpause
   if (consumeEsc()) {
@@ -184,12 +190,24 @@ function gameLoop(timestamp) {
   updateCamera(dt);
 
   // Combat: attack first so a kill removes the enemy before contact is checked.
+  // Track charge: accumulate time the attack key is held while CD is ready.
+  if (isAttack() && !player.dead) {
+    if (player.attackCD <= 0) {
+      player._charge += dt;
+    }
+  } else {
+    player._charge = 0; // reset when attack input released or not pressed
+  }
+
   if (isAttack() && player.attackCD <= 0 && !player.dead) {
-    const weapon = player.weapon;
-    if (weapon.type === 'ranged') spawnProjectile(player, weapon);
-    else playerMeleeAttack(player, weapon);
+    const weapon = getEquippedWeapon();
+    player.weapon = weapon;
+    const charged = player._charge >= CHARGE_TIME;
+    if (weapon.type === 'ranged') spawnProjectile(player, weapon, charged);
+    else playerMeleeAttack(player, weapon, charged);
     player.attackCD = weapon.cooldown;
     player.swingT = player.swingDur;
+    player._charge = 0; // reset after attack fires
   }
   updateProjectiles(dt, levelData.platforms);
   const enemyRes = updateEnemies(dt, levelData.platforms, player);
@@ -235,7 +253,7 @@ function renderFrame() {
   drawPlatforms(ctx, levelData.platforms, currentStage, gameTime);
   drawHazards(ctx, levelData.hazards, currentStage);
   drawEntities(ctx, camX, currentStage, gameTime);
-  drawEnemies(ctx, camX, GW, gameTime);
+  drawEnemies(ctx, camX, GW, gameTime, player, _lastDt);
   drawPlayer(ctx, gameTime);
   drawProjectiles(ctx, camX, GW);
 

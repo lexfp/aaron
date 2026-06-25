@@ -1,7 +1,7 @@
 import { isLeft, isRight } from './input.js';
 import { resolveX, resolveY } from './level.js';
 import { addDJParticles, addLandParticles } from './entities.js';
-import { getJumpMult, getDJMult, getSpeedMult, getEquippedWeapon } from './state.js';
+import { getJumpMult, getDJMult, getSpeedMult, getEquippedWeapon, getEquippedSkin } from './state.js';
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
@@ -73,6 +73,12 @@ export const player = {
   swingT: 0,          // remaining swing-animation time
   swingDur: 0.16,
   weapon: null,       // equipped weapon def (for drawing)
+  // Boss signature effect timers (all decay to 0; reset by initPlayer)
+  iceSlipT: 0,        // slider ice trail: overrides idle friction toward slippery
+  windPushT: 0,       // bird wind gust: horizontal push for this many seconds
+  windPushDir: 0,     // direction of the wind push (+1 or -1)
+  dazeT: 0,           // shroom spore: dampens horizontal input
+  _charge: 0,         // seconds the attack input has been held (charge tracking)
   // Computed from upgrades each level
   jumpForce: BASE_JUMP,
   djForce: BASE_DJ,
@@ -102,7 +108,12 @@ export function initPlayer(spawnX, spawnY) {
   player.hurtFlash = 0;
   player.attackCD = 0;
   player.swingT = 0;
+  player._charge = 0;
   player.weapon = getEquippedWeapon();
+  player.iceSlipT = 0;
+  player.windPushT = 0;
+  player.windPushDir = 0;
+  player.dazeT = 0;
 
   player.jumpForce = BASE_JUMP * getJumpMult() * _mod.jMul;
   player.djForce = BASE_DJ * getDJMult() * _mod.jMul;
@@ -151,17 +162,26 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
   _modT += dt;
 
   // Horizontal movement (idle damping varies by stage: slippery ice vs. mossy grip)
-  const targetVx = isLeft() ? -player.speed : isRight() ? player.speed : 0;
+  const dazeScale = player.dazeT > 0 ? 0.35 : 1.0; // shroom daze dampens input
+  const targetVx = isLeft() ? -player.speed * dazeScale : isRight() ? player.speed * dazeScale : 0;
   if (targetVx !== 0) {
     player.vx = targetVx;
     player.facing = targetVx > 0 ? 1 : -1;
   } else {
-    player.vx *= _mod.fric;
+    const activeFric = player.iceSlipT > 0 ? Math.max(_mod.fric, 0.965) : _mod.fric;
+    player.vx *= activeFric;
     if (Math.abs(player.vx) < 8) player.vx = 0;
   }
 
   // Desert gusts: oscillating sideways push you must lean against.
   if (_mod.wind) player.vx += _mod.wind * Math.sin(_modT * 0.6) * dt;
+
+  // Bird wind gust: horizontal push for capped duration
+  if (player.windPushT > 0) {
+    player.vx += player.windPushDir * 560 * dt; // sustained gust acceleration
+    player.vx = Math.max(-BASE_SPEED, Math.min(BASE_SPEED, player.vx));
+    player.windPushT = Math.max(0, player.windPushT - dt);
+  }
 
   // Gravity (per-stage multiplier; terminal velocity tracks it so low-g feels floaty)
   const grav = GRAVITY * _mod.gMul;
@@ -200,6 +220,9 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
   player.swingT = Math.max(0, player.swingT - dt);
   player.invuln = Math.max(0, player.invuln - dt);
   player.hurtFlash = Math.max(0, player.hurtFlash - dt);
+  player.iceSlipT = Math.max(0, player.iceSlipT - dt);
+  player.windPushT = Math.max(0, player.windPushT - dt);
+  player.dazeT = Math.max(0, player.dazeT - dt);
 
   // Walk distance for leg swing animation
   if (player.onGround && Math.abs(player.vx) > 15) {
@@ -219,6 +242,7 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
 }
 
 export function drawPlayer(ctx, t) {
+  const palette = getEquippedSkin().palette;
   const { x, y, w, h, facing, animState, animTimer, landSquash, djFlash, distanceTraveled } = player;
 
   const centerX = x + w / 2;
@@ -251,37 +275,37 @@ export function drawPlayer(ctx, t) {
 
   // --- Legs ---
   const legSwing = animState === 'walk' ? Math.sin(distanceTraveled * 0.048) * 0.55 : 0;
-  drawLimb(ctx, -hw * 0.38, hh * 0.25, legSwing, '#1a252f', 6, hh * 0.48);
-  drawLimb(ctx, hw * 0.38, hh * 0.25, -legSwing, '#1a252f', 6, hh * 0.48);
+  drawLimb(ctx, -hw * 0.38, hh * 0.25, legSwing, palette.leg, 6, hh * 0.48);
+  drawLimb(ctx, hw * 0.38, hh * 0.25, -legSwing, palette.leg, 6, hh * 0.48);
 
   // --- Body (shirt) ---
-  ctx.fillStyle = '#2980b9';
+  ctx.fillStyle = palette.body;
   roundRect(ctx, -hw * 0.72, -hh * 0.22, w * 0.72, h * 0.52, 5);
   ctx.fill();
   // Shirt detail (stripe)
-  ctx.fillStyle = '#1a6fa8';
+  ctx.fillStyle = palette.bodyStripe;
   ctx.fillRect(-hw * 0.72, hh * 0.06, w * 0.72, 4);
 
   // --- Arms ---
   const armSwing = animState === 'walk' ? -legSwing * 0.85 : 0;
   const armFall = animState === 'fall' ? 0.75 : 0;
-  drawLimb(ctx, hw * 0.72, -hh * 0.1, armFall + armSwing, '#f0a070', 5, hh * 0.38, true);
-  drawLimb(ctx, -hw * 0.72, -hh * 0.1, armFall - armSwing, '#f0a070', 5, hh * 0.38, true);
+  drawLimb(ctx, hw * 0.72, -hh * 0.1, armFall + armSwing, palette.limb, 5, hh * 0.38, true);
+  drawLimb(ctx, -hw * 0.72, -hh * 0.1, armFall - armSwing, palette.limb, 5, hh * 0.38, true);
 
   // --- Head ---
-  ctx.fillStyle = '#f5cba7';
+  ctx.fillStyle = palette.skin;
   ctx.beginPath();
   ctx.arc(0, -hh * 0.42, hw * 0.85, 0, Math.PI * 2);
   ctx.fill();
 
   // Ear
-  ctx.fillStyle = '#e8b898';
+  ctx.fillStyle = palette.skin;
   ctx.beginPath();
   ctx.arc(hw * 0.78, -hh * 0.38, 4, 0, Math.PI * 2);
   ctx.fill();
 
   // Hair
-  ctx.fillStyle = '#5d4037';
+  ctx.fillStyle = palette.hair;
   ctx.beginPath();
   ctx.arc(-hw * 0.08, -hh * 0.78, 7.5, 0, Math.PI * 2);
   ctx.arc(hw * 0.18, -hh * 0.82, 6.5, 0, Math.PI * 2);
@@ -293,6 +317,18 @@ export function drawPlayer(ctx, t) {
   ctx.beginPath();
   ctx.arc(0, -hh * 0.42, hw * 0.8, Math.PI * 1.1, Math.PI * 1.9);
   ctx.stroke();
+
+  // Accessory (visor or cap from active palette)
+  if (palette.accessory_type === 'visor') {
+    ctx.fillStyle = palette.accessory_color;
+    ctx.fillRect(-hw * 0.5, -hh * 0.52, hw * 0.9, hh * 0.14);
+  } else if (palette.accessory_type === 'cap') {
+    ctx.fillStyle = palette.accessory_color;
+    ctx.beginPath();
+    ctx.ellipse(hw * 0.08, -hh * 0.82, hw * 0.75, hh * 0.22, 0, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(-hw * 0.7, -hh * 0.82, hw * 1.4, hh * 0.06);
+  }
 
   // Eyes (right eye is front when facing right)
   const eyeY = -hh * 0.42;
@@ -324,7 +360,7 @@ export function drawPlayer(ctx, t) {
 
   // Weapon swing / attack
   if (player.swingT > 0 && player.weapon) {
-    drawWeaponSwing(ctx, hw, hh, player.weapon, 1 - player.swingT / player.swingDur);
+    drawWeaponSwing(ctx, hw, hh, player.weapon, 1 - player.swingT / player.swingDur, palette.limb);
   }
 
   // Hurt flash — red tint over the body when damaged
@@ -333,6 +369,29 @@ export function drawPlayer(ctx, t) {
     ctx.fillStyle = '#ff2b2b';
     roundRect(ctx, -hw, -hh, w, h, 6);
     ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // Shroom spore daze overlay
+  if (player.dazeT > 0) {
+    const dAlpha = Math.min(0.55, player.dazeT / 1.5) * (0.6 + Math.sin(t * 9) * 0.3);
+    ctx.globalAlpha = dAlpha;
+    ctx.fillStyle = '#e17055';
+    ctx.beginPath(); ctx.arc(0, -hh * 0.1, hw * 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // Bird wind push overlay
+  if (player.windPushT > 0) {
+    const wAlpha = Math.min(0.5, player.windPushT / 1.1) * (0.5 + Math.sin(t * 14) * 0.3);
+    ctx.globalAlpha = wAlpha;
+    ctx.strokeStyle = '#c0d8ff'; ctx.lineWidth = 2;
+    for (let wi = 0; wi < 3; wi++) {
+      ctx.beginPath();
+      ctx.moveTo(player.windPushDir * (hw * 0.4 + wi * 5), -hh * 0.4 + wi * hh * 0.3);
+      ctx.lineTo(player.windPushDir * (hw * 1.1 + wi * 5), -hh * 0.4 + wi * hh * 0.3);
+      ctx.stroke();
+    }
     ctx.globalAlpha = 1;
   }
 
@@ -352,7 +411,7 @@ export function drawPlayer(ctx, t) {
 
 // Draws the equipped weapon mid-swing in front of the player. Called inside the
 // player's translated+facing-flipped context, so +x is always "forward".
-function drawWeaponSwing(ctx, hw, hh, weapon, prog) {
+function drawWeaponSwing(ctx, hw, hh, weapon, prog, limbColor) {
   ctx.save();
   ctx.translate(hw * 0.55, -hh * 0.05); // shoulder pivot
 
@@ -387,7 +446,7 @@ function drawWeaponSwing(ctx, hw, hh, weapon, prog) {
   ctx.stroke();
 
   // arm
-  ctx.strokeStyle = '#f0a070';
+  ctx.strokeStyle = limbColor || '#f0a070';
   ctx.lineWidth = 5;
   ctx.lineCap = 'round';
   ctx.beginPath();
