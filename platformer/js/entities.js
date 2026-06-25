@@ -494,201 +494,237 @@ function bossFireShot(e, vx, vy, color, dmg, grav, life, r) {
 }
 
 // Per-species attack rotations — 3 attacks each, cycled in order.
+// Each stage has completely different, thematic attacks all aimed at the player.
 const BOSS_SPECIALS = {
+  // Stage 0: Meadow — thorn volleys, root geysers, pollen clouds
   slime: [
-    (e, pcx, pcy) => { // Triple arcing blob
-      bossFireShot(e, -100, -550, '#58b94a', e.dmg, 1100, 2.0, 9);
-      bossFireShot(e,    0, -620, '#58b94a', e.dmg, 1100, 2.0, 9);
-      bossFireShot(e,  100, -550, '#58b94a', e.dmg, 1100, 2.0, 9);
-    },
-    (e, pcx, pcy) => { // Blob rain: 5 arcs spread from center
-      for (let i = -2; i <= 2; i++)
-        bossFireShot(e, i * 62, -680, '#58b94a', e.dmg, 1250, 2.5, 8);
-    },
-    (e, pcx, pcy) => { // Rolling wave: 4 fast low shots toward player
-      const dir = pcx >= e.x + e.w / 2 ? 1 : -1;
-      for (let i = 0; i < 4; i++)
-        bossFireShot(e, dir * (200 + i * 75), 35 - i * 12, '#58b94a', e.dmg, 180, 1.8, 7);
-    },
-  ],
-  crawler: [
-    (e, pcx, pcy) => { // Shockwave: 2 side shots + lobbed rock
-      const dir = pcx >= e.x + e.w / 2 ? 1 : -1;
-      bossFireShot(e, -360, 0, '#7f8c8d', e.dmg, 0, 2.0, 8);
-      bossFireShot(e,  360, 0, '#7f8c8d', e.dmg, 0, 2.0, 8);
-      bossFireShot(e, dir * 270, -85, '#9b9ba8', e.dmg, 230, 2.0, 9);
-      addHitParticles(e.x + e.w / 2, e.y + e.h * 0.5, '#aaa', 10);
-    },
-    (e, pcx, pcy) => { // Rock barrage: 4 high arcs that rain down
-      for (let i = -1; i <= 2; i++)
-        bossFireShot(e, i * 90, -650, '#9b9ba8', e.dmg, 1050, 2.5, 9);
-    },
-    (e, pcx, pcy) => { // Carapace roll: fast horizontal charge
-      const dir = pcx >= e.x + e.w / 2 ? 1 : -1;
-      e._sliding = true; e._slideDir = dir; e._slideT = 0.55; e._slideV = 480;
-      addHitParticles(e.x + e.w / 2, e.y + e.h / 2, '#7f8c8d', 7);
-    },
-  ],
-  slider: [
-    (e, pcx, pcy) => { // Ice dash
-      const dir = pcx >= e.x + e.w / 2 ? 1 : -1;
-      e._sliding = true; e._slideDir = dir; e._slideT = 0.6; e._slideV = 600;
-    },
-    (e, pcx, pcy) => { // Frost fan: 3-way forward spread
-      const dir = pcx >= e.x + e.w / 2 ? 1 : -1;
-      for (let i = -1; i <= 1; i++)
-        bossFireShot(e, dir * 380, i * 90, '#82ccdd', e.dmg, 0, 2.0, 8);
-    },
-    (e, pcx, pcy) => { // Blizzard: 5 arcs that rain down as hail
-      for (let i = -2; i <= 2; i++)
-        bossFireShot(e, i * 72, -700, '#aee3ff', e.dmg, 1100, 2.6, 7);
-    },
-  ],
-  scorpion: [
-    (e, pcx, pcy) => { // 5-way venom fan
-      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
-      const ang = Math.atan2(pcy - ecy, pcx - ecx);
-      for (let i = -2; i <= 2; i++) {
-        const a = ang + i * 0.3;
-        bossFireShot(e, Math.cos(a) * 390, Math.sin(a) * 390, '#cc8e35', e.dmg, 0, 2.2, 8);
-      }
-    },
-    (e, pcx, pcy) => { // Quick sting: 1 very fast aimed shot
-      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
-      const ang = Math.atan2(pcy - ecy, pcx - ecx);
-      bossFireShot(e, Math.cos(ang) * 660, Math.sin(ang) * 660, '#f9ca24', Math.round(e.dmg * 1.4), 0, 1.5, 10);
-    },
-    (e, pcx, pcy) => { // Venom rain: 3 arcs centered on player's x
-      for (let i = -1; i <= 1; i++)
-        bossFireShot(e, i * 55, -620, '#cc8e35', e.dmg, 1000, 2.4, 8);
-    },
-  ],
-  lavablob: [
-    (e, pcx, pcy) => { // 6-way radial magma slam + explosion
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        bossFireShot(e, Math.cos(a) * 320, Math.sin(a) * 320 - 50, '#ff793f', e.dmg, 290, 1.8, 10);
-      }
-      addExplosion(e.x + e.w / 2, e.y + e.h * 0.45, '#ff793f');
-    },
-    (e, pcx, pcy) => { // Eruption: 8-way upward fountain
-      for (let i = 0; i < 8; i++) {
-        const a = Math.PI + (i / 7) * Math.PI;
-        bossFireShot(e, Math.cos(a) * 280, Math.sin(a) * 380, '#ffd32a', e.dmg, 700, 2.2, 9);
-      }
-    },
-    (e, pcx, pcy) => { // Magma stream: 4 rapid aimed shots
-      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
-      const ang = Math.atan2(pcy - ecy, pcx - ecx);
-      for (let i = 0; i < 4; i++)
-        bossFireShot(e, Math.cos(ang) * (270 + i * 45), Math.sin(ang) * (270 + i * 45), '#ff793f', e.dmg, 0, 2.0, 8);
-    },
-  ],
-  bird: [
-    (e, pcx, pcy) => { // 3 feather darts aimed at player
+    (e, pcx, pcy) => { // Thorn volley: 3 sharp thorns aimed directly at player
       const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
       const ang = Math.atan2(pcy - ecy, pcx - ecx);
       for (let i = -1; i <= 1; i++) {
-        const a = ang + i * 0.24;
-        bossFireShot(e, Math.cos(a) * 370, Math.sin(a) * 370, '#f0e6d3', Math.round(e.dmg * 0.85), 0, 2.0, 7);
+        const a = ang + i * 0.15;
+        bossFireShot(e, Math.cos(a) * 480, Math.sin(a) * 480, '#2ecc71', e.dmg, 0, 1.8, 7);
       }
     },
-    (e, pcx, pcy) => { // Gale: 5 fast shots at staggered heights
-      const dir = pcx >= e.x + e.w / 2 ? 1 : -1;
-      for (let i = -2; i <= 2; i++)
-        bossFireShot(e, dir * (400 + Math.abs(i) * 28), i * 58, '#eef2fa', e.dmg, 0, 1.6, 6);
+    (e, pcx, pcy) => { // Root eruption: roots arc high and crash down at player's x
+      const ecx = e.x + e.w / 2;
+      for (let i = -1; i <= 1; i++)
+        bossFireShot(e, (pcx - ecx) * 0.9 + i * 55, -710, '#27ae60', e.dmg, 1400, 2.1, 10);
     },
-    (e, pcx, pcy) => { // Wing buffet: 4-shot downward fan
+    (e, pcx, pcy) => { // Pollen cloud: 7 slow drifting shots in wide spread toward player
+      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+      const ang = Math.atan2(pcy - ecy, pcx - ecx);
+      for (let i = -3; i <= 3; i++) {
+        const a = ang + i * 0.28;
+        bossFireShot(e, Math.cos(a) * 185, Math.sin(a) * 185, '#a8e063', e.dmg, 0, 2.9, 12);
+      }
+    },
+  ],
+  // Stage 1: Cave — stalactite drops, cave-wall rocks, ground tremors
+  crawler: [
+    (e, pcx, pcy) => { // Stalactite drop: 3 heavy stones fall from ceiling onto player
+      const ecx = e.x + e.w / 2;
+      for (let i = -1; i <= 1; i++)
+        bossFireShot(e, (pcx - ecx) * 0.85 + i * 60, -700, '#9b9ba8', e.dmg, 1350, 2.2, 10);
+    },
+    (e, pcx, pcy) => { // Cave collapse: wall of rocks hurled at player in staggered wave
+      const dir = pcx >= e.x + e.w / 2 ? 1 : -1;
+      for (let i = 0; i < 5; i++)
+        bossFireShot(e, dir * (260 + i * 55), -120 + i * 28, '#7f8c8d', e.dmg, 420, 2.0, 9);
+    },
+    (e, pcx, pcy) => { // Cave quake: twin shockwaves roll across the floor + debris burst
+      bossFireShot(e, -520, 70, '#95a5a6', e.dmg, 0, 1.6, 12);
+      bossFireShot(e,  520, 70, '#95a5a6', e.dmg, 0, 1.6, 12);
+      addHitParticles(e.x + e.w / 2, e.y + e.h * 0.9, '#aaa', 14);
+    },
+  ],
+  // Stage 2: Icy Peaks — icicle lances, blizzard cones, glacier crashes
+  slider: [
+    (e, pcx, pcy) => { // Icicle lance: 4 sharp icicles fired horizontally at player
+      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+      const dir = pcx >= ecx ? 1 : -1;
+      for (let i = -1; i <= 2; i++)
+        bossFireShot(e, dir * 460, (pcy - ecy) * 0.9 + i * 22, '#aee3ff', e.dmg, 0, 1.8, 8);
+    },
+    (e, pcx, pcy) => { // Blizzard cone: 5 slow freezing shots in wide arc toward player
+      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+      const ang = Math.atan2(pcy - ecy, pcx - ecx);
+      for (let i = -2; i <= 2; i++) {
+        const a = ang + i * 0.32;
+        bossFireShot(e, Math.cos(a) * 195, Math.sin(a) * 195, '#dff9fb', e.dmg, 0, 2.7, 10);
+      }
+    },
+    (e, pcx, pcy) => { // Glacier crash: spinning dash + 2 massive ice boulders at player
+      const dir = pcx >= e.x + e.w / 2 ? 1 : -1;
+      e._sliding = true; e._slideDir = dir; e._slideT = 0.65; e._slideV = 580;
+      bossFireShot(e, dir * 230, -310, '#74b9ff', Math.round(e.dmg * 1.4), 660, 2.6, 16);
+      bossFireShot(e, dir * 370, -430, '#74b9ff', Math.round(e.dmg * 1.4), 660, 2.6, 16);
+    },
+  ],
+  // Stage 3: Desert — sand geysers, venom spits, scorpion-rain barrages
+  scorpion: [
+    (e, pcx, pcy) => { // Sand geyser: 3 arcing columns of sand erupt at player's position
+      const ecx = e.x + e.w / 2;
+      for (let i = -1; i <= 1; i++)
+        bossFireShot(e, (pcx - ecx) * 0.82 + i * 48, -720, '#f39c12', e.dmg, 1280, 2.2, 11);
+    },
+    (e, pcx, pcy) => { // Venom spit: 3 fast precise poison bolts aimed straight at player
+      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+      const ang = Math.atan2(pcy - ecy, pcx - ecx);
+      for (let i = -1; i <= 1; i++) {
+        const a = ang + i * 0.09;
+        bossFireShot(e, Math.cos(a) * 580, Math.sin(a) * 580, '#e67e22', e.dmg, 0, 1.6, 8);
+      }
+    },
+    (e, pcx, pcy) => { // Scorpion rain: 5 lobbed venom shots arcing onto player
+      const ecx = e.x + e.w / 2;
+      for (let i = -2; i <= 2; i++)
+        bossFireShot(e, (pcx - ecx) * 0.72 + i * 52, -600, '#cc8e35', e.dmg, 1120, 2.4, 9);
+    },
+  ],
+  // Stage 4: Lava — lava columns, magma eruptions, surging magma waves
+  lavablob: [
+    (e, pcx, pcy) => { // Lava column: 3 superheated pillars erupt at player's feet
+      const ecx = e.x + e.w / 2;
+      for (let i = -1; i <= 1; i++)
+        bossFireShot(e, (pcx - ecx) * 0.88 + i * 40, -660, '#ff6b35', Math.round(e.dmg * 1.1), 1250, 2.1, 13);
+    },
+    (e, pcx, pcy) => { // Magma surge: fast wave of molten rock aimed at player + explosion
+      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+      const ang = Math.atan2(pcy - ecy, pcx - ecx);
+      for (let i = -1; i <= 1; i++) {
+        const a = ang + i * 0.18;
+        bossFireShot(e, Math.cos(a) * 400, Math.sin(a) * 400, '#ff793f', e.dmg, 0, 1.9, 10);
+      }
+      addExplosion(ecx, e.y + e.h * 0.4, '#ff793f');
+    },
+    (e, pcx, pcy) => { // Eruption shower: 6 magma blobs arc high and rain around player
+      const ecx = e.x + e.w / 2;
+      for (let i = 0; i < 6; i++) {
+        const off = (i - 2.5) * 56;
+        bossFireShot(e, (pcx - ecx) * 0.6 + off, -730, '#ffd32a', e.dmg, 1380, 2.5, 9);
+      }
+    },
+  ],
+  // Stage 5: Sky — lightning bolts, wind bursts, thunderstorm barrages
+  bird: [
+    (e, pcx, pcy) => { // Lightning bolt: single blinding bolt fired straight at player
+      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+      const ang = Math.atan2(pcy - ecy, pcx - ecx);
+      bossFireShot(e, Math.cos(ang) * 900, Math.sin(ang) * 900, '#fffde7', Math.round(e.dmg * 1.6), 0, 1.1, 8);
+      addHitParticles(ecx, ecy, '#fff176', 9);
+    },
+    (e, pcx, pcy) => { // Wind burst: 4 gust shots swept horizontally at player
+      const dir = pcx >= e.x + e.w / 2 ? 1 : -1;
+      for (let i = -1; i <= 2; i++)
+        bossFireShot(e, dir * (370 + i * 42), i * 36 - 16, '#c8e6fa', e.dmg, 0, 1.8, 7);
+    },
+    (e, pcx, pcy) => { // Thunderstorm: 3 lightning bolts rain from above onto player
+      const ecx = e.x + e.w / 2;
+      for (let i = -1; i <= 1; i++)
+        bossFireShot(e, (pcx - ecx) * 0.8 + i * 44, -760, '#fff9c4', Math.round(e.dmg * 1.2), 1550, 1.8, 9);
+    },
+  ],
+  // Stage 6: Forest — vine whips, spore explosions, mushroom mortars
+  shroom: [
+    (e, pcx, pcy) => { // Vine whip: 3 fast tendrils lash at player in a flat arc
+      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+      const ang = Math.atan2(pcy - ecy, pcx - ecx);
+      for (let i = -1; i <= 1; i++) {
+        const a = ang + i * 0.14;
+        bossFireShot(e, Math.cos(a) * 510, Math.sin(a) * 510, '#6ab04c', e.dmg, 0, 1.5, 8);
+      }
+    },
+    (e, pcx, pcy) => { // Spore explosion: 8-way burst of slow toxic spores + center bloom
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        bossFireShot(e, Math.cos(a) * 160, Math.sin(a) * 160, '#e17055', e.dmg, 0, 3.2, 13);
+      }
+      addExplosion(e.x + e.w / 2, e.y + e.h / 2, '#e17055');
+    },
+    (e, pcx, pcy) => { // Mushroom mortar: 3 large spore bombs lobbed high at player
+      const ecx = e.x + e.w / 2;
+      for (let i = -1; i <= 1; i++)
+        bossFireShot(e, (pcx - ecx) * 0.76 + i * 62, -590, '#8e5a3a', e.dmg, 1020, 2.9, 15);
+    },
+  ],
+  // Stage 7: Space — precision laser barrages, gravity field orbs, targeting beams
+  drone: [
+    (e, pcx, pcy) => { // Laser barrage: 5 rapid tight shots locked onto player
+      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+      const ang = Math.atan2(pcy - ecy, pcx - ecx);
+      for (let i = -2; i <= 2; i++) {
+        const a = ang + i * 0.07;
+        bossFireShot(e, Math.cos(a) * 630, Math.sin(a) * 630, '#00cec9', e.dmg, 0, 1.4, 6);
+      }
+    },
+    (e, pcx, pcy) => { // Gravity field: 6 slow orbs radiate outward and linger (no gravity)
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        bossFireShot(e, Math.cos(a) * 135, Math.sin(a) * 135, '#00d2d3', e.dmg, 0, 4.2, 11);
+      }
+    },
+    (e, pcx, pcy) => { // Targeting beam: 3 high-speed beams converge on player + EMP flash
+      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+      const ang = Math.atan2(pcy - ecy, pcx - ecx);
+      for (let i = -1; i <= 1; i++) {
+        const a = ang + i * 0.11;
+        bossFireShot(e, Math.cos(a) * 710, Math.sin(a) * 710, '#bff4ff', Math.round(e.dmg * 1.2), 0, 1.3, 7);
+      }
+      addHitParticles(ecx, ecy, '#00d2d3', 10);
+    },
+  ],
+  // Stage 8: Crystal — crystal lances, shard explosions, crystal rain
+  golem: [
+    (e, pcx, pcy) => { // Crystal lance: 4 razor shards fired in tight cone at player
       const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
       const ang = Math.atan2(pcy - ecy, pcx - ecx);
       for (let i = -1; i <= 2; i++) {
-        const a = ang + (i - 0.5) * 0.36;
-        bossFireShot(e, Math.cos(a) * 310, Math.sin(a) * 310, '#c0d8ff', e.dmg, 120, 2.0, 8);
+        const a = ang + (i - 0.5) * 0.14;
+        bossFireShot(e, Math.cos(a) * 440, Math.sin(a) * 440, '#48dbfb', e.dmg, 0, 1.7, 8);
       }
     },
-  ],
-  shroom: [
-    (e, pcx, pcy) => { // Arcing spore bomb lobbed at player
-      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
-      const dx = pcx - ecx, dy = pcy - ecy;
-      const dist = Math.max(80, Math.hypot(dx, dy));
-      bossFireShot(e, (dx / dist) * 200, -430, '#e17055', e.dmg, 720, 3.2, 14);
-    },
-    (e, pcx, pcy) => { // Spore ring: 6 shots in circle
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        bossFireShot(e, Math.cos(a) * 240, Math.sin(a) * 240, '#e17055', e.dmg, 0, 1.8, 9);
-      }
-    },
-    (e, pcx, pcy) => { // Mycelium burst: 3 large slow arcing shots
-      const dir = pcx >= e.x + e.w / 2 ? 1 : -1;
-      bossFireShot(e, dir * 280, -120, '#8e5a3a', e.dmg, 500, 2.5, 13);
-      bossFireShot(e, dir * 200, -210, '#8e5a3a', e.dmg, 500, 2.5, 13);
-      bossFireShot(e, dir * 160, -50,  '#e17055', e.dmg, 0,   1.6, 8);
-    },
-  ],
-  drone: [
-    (e, pcx, pcy) => { // 5-beam laser spread downward
-      for (let i = -2; i <= 2; i++)
-        bossFireShot(e, i * 72, 440, '#00d2d3', e.dmg, 0, 1.6, 7);
-    },
-    (e, pcx, pcy) => { // Lock-on: 3 fast aimed shots
-      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
-      const ang = Math.atan2(pcy - ecy, pcx - ecx);
-      for (let i = -1; i <= 1; i++) {
-        const a = ang + i * 0.12;
-        bossFireShot(e, Math.cos(a) * 520, Math.sin(a) * 520, '#bff4ff', e.dmg, 0, 1.5, 7);
-      }
-    },
-    (e, pcx, pcy) => { // Mine field: 3 slow falling orbs spread across arena
-      for (let i = -1; i <= 1; i++)
-        bossFireShot(e, i * 130, 85, '#00d2d3', e.dmg, 200, 3.0, 11);
-    },
-  ],
-  golem: [
-    (e, pcx, pcy) => { // 8-way crystal burst + explosion
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2;
-        bossFireShot(e, Math.cos(a) * 300, Math.sin(a) * 300, '#48dbfb', e.dmg, 0, 1.8, 9);
+    (e, pcx, pcy) => { // Shard explosion: 10-way burst from boss + crystal shockwave
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2;
+        bossFireShot(e, Math.cos(a) * 295, Math.sin(a) * 295, '#00ffe5', e.dmg, 0, 1.9, 8);
       }
       addExplosion(e.x + e.w / 2, e.y + e.h / 2, '#48dbfb');
     },
-    (e, pcx, pcy) => { // Crystal lance: 5 shots in narrow forward cone
-      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
-      const ang = Math.atan2(pcy - ecy, pcx - ecx);
-      for (let i = -2; i <= 2; i++) {
-        const a = ang + i * 0.12;
-        bossFireShot(e, Math.cos(a) * 440, Math.sin(a) * 440, '#bff4ff', e.dmg, 0, 1.6, 7);
-      }
-    },
-    (e, pcx, pcy) => { // Tectonic: 2 massive slow arcing shots
-      const dir = pcx >= e.x + e.w / 2 ? 1 : -1;
-      bossFireShot(e, dir * 200, -380, '#2e9cb8', Math.round(e.dmg * 1.5), 600, 2.8, 16);
-      bossFireShot(e, dir * 320, -280, '#2e9cb8', Math.round(e.dmg * 1.5), 600, 2.8, 16);
+    (e, pcx, pcy) => { // Crystal rain: 4 giant shards plunge from above at player's position
+      const ecx = e.x + e.w / 2;
+      for (let i = -1; i <= 2; i++)
+        bossFireShot(e, (pcx - ecx) * 0.85 + (i - 0.5) * 54, -730, '#bff4ff', Math.round(e.dmg * 1.1), 1450, 2.0, 10);
     },
   ],
+  // Stage 9: Dark Fortress — shadow slashes, curse volleys, dark eruptions
   knight: [
-    (e, pcx, pcy) => { // Blade flurry: 3 slashes + lunging leap
-      const dir = pcx >= e.x + e.w / 2 ? 1 : -1;
-      bossFireShot(e, dir * 490, -20, '#8854d0', e.dmg, 0, 1.4, 8);
-      bossFireShot(e, dir * 430, -55, '#8854d0', e.dmg, 60, 1.4, 8);
-      bossFireShot(e, dir * 460,  15, '#8854d0', e.dmg, 0, 1.4, 8);
-      if (e.vy === 0) { e.vy = -480; e._vx = dir * 260; }
-    },
-    (e, pcx, pcy) => { // Dark sweep: 5 shots in wide fan
+    (e, pcx, pcy) => { // Shadow slash: 3 shadow blades aimed at player + leaping lunge
       const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
       const ang = Math.atan2(pcy - ecy, pcx - ecx);
-      for (let i = -2; i <= 2; i++) {
-        const a = ang + i * 0.35;
-        bossFireShot(e, Math.cos(a) * 360, Math.sin(a) * 360, '#a29bfe', e.dmg, 0, 1.8, 8);
+      for (let i = -1; i <= 1; i++) {
+        const a = ang + i * 0.2;
+        bossFireShot(e, Math.cos(a) * 530, Math.sin(a) * 530, '#8854d0', e.dmg, 0, 1.5, 9);
+      }
+      const dir = pcx >= ecx ? 1 : -1;
+      if (e.vy === 0) { e.vy = -470; e._vx = dir * 270; }
+    },
+    (e, pcx, pcy) => { // Curse volley: 4 slow tracking dark bolts aimed at player
+      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+      const ang = Math.atan2(pcy - ecy, pcx - ecx);
+      for (let i = -1; i <= 2; i++) {
+        const a = ang + (i - 0.5) * 0.22;
+        bossFireShot(e, Math.cos(a) * 295, Math.sin(a) * 295, '#6c5ce7', Math.round(e.dmg * 1.2), 0, 2.3, 11);
       }
     },
-    (e, pcx, pcy) => { // Armor pierce: 3 fast shots + charging dash
+    (e, pcx, pcy) => { // Dark eruption: 8-way shadow burst + charging shadow dash
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        bossFireShot(e, Math.cos(a) * 350, Math.sin(a) * 350, '#a29bfe', e.dmg, 0, 1.9, 8);
+      }
+      addExplosion(e.x + e.w / 2, e.y + e.h / 2, '#8854d0');
       const dir = pcx >= e.x + e.w / 2 ? 1 : -1;
-      bossFireShot(e, dir * 560,   0, '#dfe6e9', Math.round(e.dmg * 1.2), 0, 1.4, 9);
-      bossFireShot(e, dir * 520, -30, '#dfe6e9', Math.round(e.dmg * 1.2), 0, 1.4, 9);
-      bossFireShot(e, dir * 540,  25, '#dfe6e9', Math.round(e.dmg * 1.2), 0, 1.4, 9);
-      e._sliding = true; e._slideDir = dir; e._slideT = 0.35; e._slideV = 450;
+      e._sliding = true; e._slideDir = dir; e._slideT = 0.45; e._slideV = 510;
     },
   ],
 };
@@ -998,6 +1034,11 @@ export function updateEnemies(dt, platforms, player) {
       if (e._specialCD <= 0) {
         triggerBossSpecial(e, pcx, pcy);
         e._specialCD = e._baseCD * (e._rage ? 0.65 : 1.0);
+      }
+      e._minionCD = Math.max(0, (e._minionCD !== undefined ? e._minionCD : 14.0) - dt);
+      if (e._minionCD <= 0) {
+        spawnBossMinion(e);
+        e._minionCD = e._rage ? 10.0 : 14.0;
       }
 
       // ── Signature mechanics ──────────────────────────────────────────────
