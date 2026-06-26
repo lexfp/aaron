@@ -785,6 +785,27 @@ button:focus-visible, a:focus-visible {
 }
 .shop-buy.cant-afford:hover { transform: none; box-shadow: none; }
 
+.shop-upgrade {
+  margin-top: 4px;
+  padding: 7px 14px;
+  background: linear-gradient(135deg, #0984e3, #74b9ff);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.shop-upgrade:hover { box-shadow: 0 3px 12px rgba(9,132,227,0.45); transform: translateY(-1px); }
+.shop-upgrade.cant-afford {
+  background: var(--bg);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  cursor: not-allowed;
+}
+.shop-upgrade.cant-afford:hover { transform: none; box-shadow: none; }
+
 #btn-shop-close {
   display: block;
   width: 100%;
