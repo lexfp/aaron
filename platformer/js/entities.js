@@ -490,7 +490,7 @@ export function updateProjectiles(dt, platforms) {
 function bossFireShot(e, vx, vy, color, dmg, grav, life, r) {
   const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
   enemyShots.push({ x: ecx, y: ecy, vx, vy: vy || 0, dmg, grav: grav || 0,
-                    life: life || 2.2, r: r || 7, color, boss: true });
+                    life: life || 2.2, r: r || 7, color, boss: true, species: e.species });
 }
 
 // Per-species attack rotations — 3 attacks each, cycled in order.
@@ -512,7 +512,7 @@ const BOSS_SPECIALS = {
       const floorY = e.baseY + e.h;
       for (let i = -1; i <= 1; i++) {
         const sx = pcx + i * 52;
-        enemyShots.push({ x: sx, y: floorY, vx: 0, vy: -640, dmg: e.dmg, grav: 900, life: 1.9, r: 11, color: '#27ae60', boss: true });
+        enemyShots.push({ x: sx, y: floorY, vx: 0, vy: -640, dmg: e.dmg, grav: 900, life: 1.9, r: 11, color: '#27ae60', boss: true, species: e.species });
       }
       addHitParticles(pcx, floorY, '#58b94a', 10);
     },
@@ -532,7 +532,7 @@ const BOSS_SPECIALS = {
       const ceilY = e.baseY - 340;
       for (let i = -1; i <= 2; i++) {
         const sx = pcx + (i - 0.5) * 58;
-        enemyShots.push({ x: sx, y: ceilY, vx: 0, vy: 0, dmg: e.dmg, grav: 1500, life: 2.0, r: 10, color: '#9b9ba8', boss: true });
+        enemyShots.push({ x: sx, y: ceilY, vx: 0, vy: 0, dmg: e.dmg, grav: 1500, life: 2.0, r: 10, color: '#9b9ba8', boss: true, species: e.species });
       }
     },
     (e, pcx, pcy) => { // Boulder roll: 2 massive rocks hurled along the floor toward player
@@ -540,15 +540,15 @@ const BOSS_SPECIALS = {
       const dir = pcx >= e.x + e.w / 2 ? 1 : -1;
       for (let i = 0; i < 2; i++) {
         const ecx = e.x + e.w / 2;
-        enemyShots.push({ x: ecx, y: floorY - i * 30, vx: dir * (420 + i * 80), vy: 0, dmg: Math.round(e.dmg * 1.3), grav: 0, life: 1.8, r: 14, color: '#7f8c8d', boss: true });
+        enemyShots.push({ x: ecx, y: floorY - i * 30, vx: dir * (420 + i * 80), vy: 0, dmg: Math.round(e.dmg * 1.3), grav: 0, life: 1.8, r: 14, color: '#7f8c8d', boss: true, species: e.species });
       }
       addHitParticles(e.x + e.w / 2, floorY, '#95a5a6', 10);
     },
     (e, pcx, pcy) => { // Cave quake: twin shockwaves roll from boss along floor in both directions
       const floorY = e.baseY + e.h * 0.6;
       const ecx = e.x + e.w / 2;
-      enemyShots.push({ x: ecx, y: floorY, vx: -550, vy: 0, dmg: e.dmg, grav: 0, life: 1.7, r: 13, color: '#95a5a6', boss: true });
-      enemyShots.push({ x: ecx, y: floorY, vx:  550, vy: 0, dmg: e.dmg, grav: 0, life: 1.7, r: 13, color: '#95a5a6', boss: true });
+      enemyShots.push({ x: ecx, y: floorY, vx: -550, vy: 0, dmg: e.dmg, grav: 0, life: 1.7, r: 13, color: '#95a5a6', boss: true, species: e.species });
+      enemyShots.push({ x: ecx, y: floorY, vx:  550, vy: 0, dmg: e.dmg, grav: 0, life: 1.7, r: 13, color: '#95a5a6', boss: true, species: e.species });
       addHitParticles(ecx, e.y + e.h, '#aaa', 16);
     },
   ],
@@ -567,7 +567,7 @@ const BOSS_SPECIALS = {
       const arenaL = e.patrolMin, arenaW = e.patrolMax - e.patrolMin;
       for (let i = 0; i < 8; i++) {
         const sx = arenaL + (i / 7) * arenaW;
-        enemyShots.push({ x: sx, y: ceilY, vx: (i % 2 === 0 ? 1 : -1) * 28, vy: 0, dmg: e.dmg, grav: 920, life: 2.6, r: 7, color: '#dff9fb', boss: true });
+        enemyShots.push({ x: sx, y: ceilY, vx: (i % 2 === 0 ? 1 : -1) * 28, vy: 0, dmg: e.dmg, grav: 920, life: 2.6, r: 7, color: '#dff9fb', boss: true, species: e.species });
       }
     },
     (e, pcx, pcy) => { // Glacier crash: boss charges + 2 giant ice boulders aimed at player
@@ -584,7 +584,7 @@ const BOSS_SPECIALS = {
       const floorY = e.baseY + e.h;
       for (let i = -1; i <= 1; i++) {
         const sx = pcx + i * 50;
-        enemyShots.push({ x: sx, y: floorY, vx: 0, vy: -700, dmg: e.dmg, grav: 1100, life: 2.0, r: 10, color: '#f39c12', boss: true });
+        enemyShots.push({ x: sx, y: floorY, vx: 0, vy: -700, dmg: e.dmg, grav: 1100, life: 2.0, r: 10, color: '#f39c12', boss: true, species: e.species });
       }
       addHitParticles(pcx, floorY, '#e67e22', 10);
     },
@@ -610,7 +610,7 @@ const BOSS_SPECIALS = {
       const floorY = e.baseY + e.h;
       for (let i = -1; i <= 1; i++) {
         const sx = pcx + i * 44;
-        enemyShots.push({ x: sx, y: floorY, vx: 0, vy: -780, dmg: Math.round(e.dmg * 1.2), grav: 1200, life: 2.0, r: 13, color: '#ff6b35', boss: true });
+        enemyShots.push({ x: sx, y: floorY, vx: 0, vy: -780, dmg: Math.round(e.dmg * 1.2), grav: 1200, life: 2.0, r: 13, color: '#ff6b35', boss: true, species: e.species });
       }
       addHitParticles(pcx, floorY, '#ffd32a', 12);
     },
@@ -638,22 +638,22 @@ const BOSS_SPECIALS = {
       // 3 bolts: direct + slight left/right to punish dodging
       for (let i = -1; i <= 1; i++) {
         const sx = pcx + i * 38;
-        enemyShots.push({ x: sx, y: ceilY, vx: 0, vy: 1200, dmg: Math.round(e.dmg * 1.4), grav: 0, life: 0.65, r: 8, color: '#fffde7', boss: true });
+        enemyShots.push({ x: sx, y: ceilY, vx: 0, vy: 1200, dmg: Math.round(e.dmg * 1.4), grav: 0, life: 0.65, r: 8, color: '#fffde7', boss: true, species: e.species });
       }
       addHitParticles(pcx, e.baseY - 300, '#fff176', 8);
     },
     (e, pcx, pcy) => { // Wind wall: shots blast FROM BOTH WALLS of the arena converging on player
       const wallL = e.patrolMin - 10, wallR = e.patrolMax + 10;
       for (let i = -1; i <= 1; i++) {
-        enemyShots.push({ x: wallL, y: pcy + i * 38, vx:  520, vy: 0, dmg: e.dmg, grav: 0, life: 1.8, r: 8, color: '#c8e6fa', boss: true });
-        enemyShots.push({ x: wallR, y: pcy + i * 38, vx: -520, vy: 0, dmg: e.dmg, grav: 0, life: 1.8, r: 8, color: '#c8e6fa', boss: true });
+        enemyShots.push({ x: wallL, y: pcy + i * 38, vx:  520, vy: 0, dmg: e.dmg, grav: 0, life: 1.8, r: 8, color: '#c8e6fa', boss: true, species: e.species });
+        enemyShots.push({ x: wallR, y: pcy + i * 38, vx: -520, vy: 0, dmg: e.dmg, grav: 0, life: 1.8, r: 8, color: '#c8e6fa', boss: true, species: e.species });
       }
     },
     (e, pcx, pcy) => { // Thunderstorm: 5 lightning bolts rain from above spread around player
       const ceilY = e.baseY - 350;
       for (let i = -2; i <= 2; i++) {
         const sx = pcx + i * 55;
-        enemyShots.push({ x: sx, y: ceilY, vx: 0, vy: 1100, dmg: Math.round(e.dmg * 1.2), grav: 0, life: 0.7, r: 8, color: '#fff9c4', boss: true });
+        enemyShots.push({ x: sx, y: ceilY, vx: 0, vy: 1100, dmg: Math.round(e.dmg * 1.2), grav: 0, life: 0.7, r: 8, color: '#fff9c4', boss: true, species: e.species });
       }
     },
   ],
@@ -679,7 +679,7 @@ const BOSS_SPECIALS = {
       const floorY = e.baseY + e.h;
       for (let i = -1; i <= 2; i++) {
         const sx = pcx + (i - 0.5) * 60;
-        enemyShots.push({ x: sx, y: floorY, vx: 0, vy: -580, dmg: e.dmg, grav: 800, life: 2.1, r: 12, color: '#8e5a3a', boss: true });
+        enemyShots.push({ x: sx, y: floorY, vx: 0, vy: -580, dmg: e.dmg, grav: 800, life: 2.1, r: 12, color: '#8e5a3a', boss: true, species: e.species });
       }
       addHitParticles(pcx, floorY, '#e17055', 10);
     },
@@ -699,7 +699,7 @@ const BOSS_SPECIALS = {
       const ceilY = e.baseY - 360;
       for (let i = -1; i <= 2; i++) {
         const sx = pcx + (i - 0.5) * 60;
-        enemyShots.push({ x: sx, y: ceilY, vx: 0, vy: 0, dmg: Math.round(e.dmg * 1.2), grav: 1100, life: 2.0, r: 9, color: '#bff4ff', boss: true });
+        enemyShots.push({ x: sx, y: ceilY, vx: 0, vy: 0, dmg: Math.round(e.dmg * 1.2), grav: 1100, life: 2.0, r: 9, color: '#bff4ff', boss: true, species: e.species });
       }
     },
     (e, pcx, pcy) => { // Ion sphere: 8 slow orbs radiate outward and linger with no gravity
@@ -718,7 +718,7 @@ const BOSS_SPECIALS = {
       const arenaL = e.patrolMin, arenaW = e.patrolMax - e.patrolMin;
       for (let i = 0; i < 5; i++) {
         const sx = arenaL + (i + 0.5) * (arenaW / 5);
-        enemyShots.push({ x: sx, y: floorY, vx: 0, vy: -720, dmg: Math.round(e.dmg * 1.1), grav: 1050, life: 2.0, r: 10, color: '#48dbfb', boss: true });
+        enemyShots.push({ x: sx, y: floorY, vx: 0, vy: -720, dmg: Math.round(e.dmg * 1.1), grav: 1050, life: 2.0, r: 10, color: '#48dbfb', boss: true, species: e.species });
       }
     },
     (e, pcx, pcy) => { // Shard nova: 10-way burst from boss + crystal explosion
@@ -753,7 +753,7 @@ const BOSS_SPECIALS = {
     (e, pcx, pcy) => { // Shadow portal: dark bolts materialize FROM NEAR THE PLAYER and fire outward
       for (let i = 0; i < 6; i++) {
         const a = (i / 6) * Math.PI * 2;
-        enemyShots.push({ x: pcx, y: pcy - 16, vx: Math.cos(a) * 310, vy: Math.sin(a) * 310, dmg: e.dmg, grav: 0, life: 1.8, r: 9, color: '#6c5ce7', boss: true });
+        enemyShots.push({ x: pcx, y: pcy - 16, vx: Math.cos(a) * 310, vy: Math.sin(a) * 310, dmg: e.dmg, grav: 0, life: 1.8, r: 9, color: '#6c5ce7', boss: true, species: e.species });
       }
       addHitParticles(pcx, pcy, '#8854d0', 14);
     },
@@ -921,6 +921,7 @@ export function updateEnemies(dt, platforms, player) {
         e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + (e._vx || 0) * freezeMul * dt));
         if (e.y >= e.baseY) {
           e.y = e.baseY; e.vy = 0; e._vx = 0;
+          e._landShockT = 0.45;
           addLandParticles(ecx, e.y + e.h);
         }
       } else {
@@ -1080,6 +1081,7 @@ export function updateEnemies(dt, platforms, player) {
         spawnBossMinion(e);
         e._minionCD = e._rage ? 10.0 : 14.0;
       }
+      if (e._landShockT > 0) e._landShockT = Math.max(0, e._landShockT - dt);
 
       // ── Signature mechanics ──────────────────────────────────────────────
       const floorY = e.baseY !== undefined ? e.baseY + e.h : ecy + e.h * 0.5;
@@ -1199,7 +1201,16 @@ export function updateEnemies(dt, platforms, player) {
       const prevBottom = player._prevY + player.h;
       const stomping = player.vy > 0 && prevBottom <= e.y + 12;
       if (stomping) {
-        damageEnemy(e, STOMP_DAMAGE, player.x < e.x ? 1 : -1, 240, null, null);
+        let stompDmg = STOMP_DAMAGE;
+        if (e.boss) {
+          if (e._rage) {
+            stompDmg = 0;
+            hurtPlayer(Math.round(e.dmg * 0.55), e.x + e.w / 2); // thorns: enraged boss punishes stompers
+          } else {
+            stompDmg = 1; // bosses resist stomps even in normal phase
+          }
+        }
+        damageEnemy(e, stompDmg, player.x < e.x ? 1 : -1, 240, null, null);
         player.vy = -STOMP_BOUNCE;
         player.y = e.y - player.h;
         player._prevY = player.y;
@@ -1461,6 +1472,65 @@ export function drawEnemies(ctx, camX, W, t, player, dt = 0) {
       ctx.fillRect(-e.w / 2, 0, e.w, e.h);
       ctx.globalAlpha = 1;
     }
+
+    // ── Boss close-range attack animations ──────────────────────────────────
+    if (e.boss) {
+      // Dash trail: ghost copies fade behind during a slide attack
+      if (e._sliding && e._slideDir !== undefined) {
+        const alpha = Math.min(1, (e._slideT || 0) * 3.5) * 0.5;
+        for (let ti = 1; ti <= 3; ti++) {
+          const ox = -e._slideDir * ti * e.w * 0.3;
+          ctx.globalAlpha = alpha * (1 - ti * 0.28);
+          ctx.fillStyle = e.color || '#fff';
+          ctx.fillRect(-e.w / 2 + ox, 0, e.w, e.h);
+        }
+        ctx.globalAlpha = 1;
+        // Directional speed glow in the dash direction
+        const gxA = e._slideDir > 0 ? -e.w * 0.5 : e.w * 0.5;
+        const gxB = e._slideDir > 0 ? e.w * 1.2 : -e.w * 1.2;
+        const dashGlow = ctx.createLinearGradient(gxA, 0, gxB, 0);
+        dashGlow.addColorStop(0, 'rgba(255,255,255,0)');
+        dashGlow.addColorStop(1, `${e.color || '#ffffff'}88`);
+        ctx.globalAlpha = alpha * 0.65;
+        ctx.fillStyle = dashGlow;
+        ctx.fillRect(-e.w, 0, e.w * 2.5, e.h);
+        ctx.globalAlpha = 1;
+      }
+      // Leap speed lines: directional streaks during an aerial lunge
+      if (e.vy < -60 && e._vx) {
+        const lFade = Math.min(1, Math.abs(e.vy) / 360) * 0.55;
+        ctx.save();
+        ctx.strokeStyle = e.color || '#fff';
+        ctx.lineWidth = 2;
+        for (let li = 0; li < 5; li++) {
+          const lx = ((li + 0.5) / 5 - 0.5) * e.w * 0.65;
+          const ly = e.h * (0.2 + (li % 3) * 0.25);
+          ctx.globalAlpha = lFade * (1 - li * 0.15);
+          ctx.beginPath();
+          ctx.moveTo(lx, ly);
+          ctx.lineTo(lx - e._vx * 0.045, ly - e.vy * 0.022);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+      // Landing shockwave: expanding ellipse ring on ground impact
+      if (e._landShockT > 0) {
+        const frac = e._landShockT / 0.45;
+        const shockR = (1 - frac) * e.w * 2.2;
+        ctx.save();
+        ctx.globalAlpha = frac * 0.8;
+        ctx.strokeStyle = e.color || '#fff';
+        ctx.lineWidth = 4 * frac;
+        ctx.beginPath();
+        ctx.ellipse(0, e.h, shockR, shockR * 0.28, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+    }
+
     ctx.restore();
 
     // Signature visuals (shield, parry, wind telegraph) — rendered before HP bar so HP bar is topmost
@@ -1538,19 +1608,199 @@ export function drawEnemies(ctx, camX, W, t, player, dt = 0) {
     }
   }
 
-  // Enemy shots: boss specials (glowing orbs) and turret bolts
+  // Enemy shots: boss specials and turret bolts
   for (const s of enemyShots) {
     if (s.x < camX - 30 || s.x > camX + W + 30) continue;
     if (s.boss) {
       const r = s.r || 7;
-      const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r * 1.9);
-      g.addColorStop(0, '#ffffff');
-      g.addColorStop(0.3, s.color || '#ff4444');
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(s.x, s.y, r * 1.9, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(s.x, s.y, r * 0.32, 0, Math.PI * 2); ctx.fill();
+      const speed = Math.hypot(s.vx || 0, s.vy || 0);
+      const ang = speed > 5 ? Math.atan2(s.vy, s.vx) : 0;
+      const sp = s.species;
+      ctx.save();
+      ctx.translate(s.x, s.y);
+
+      if (sp === 'slider' || sp === 'golem') {
+        // ── Ice/Crystal: sharp elongated diamond rotated to velocity ──
+        ctx.rotate(ang);
+        const len = r * 2.2, half = r * 0.65;
+        const cg = ctx.createLinearGradient(-len, 0, len, 0);
+        cg.addColorStop(0, 'rgba(255,255,255,0.9)');
+        cg.addColorStop(0.5, s.color || '#48dbfb');
+        cg.addColorStop(1, 'rgba(255,255,255,0.9)');
+        ctx.fillStyle = cg;
+        ctx.beginPath();
+        ctx.moveTo(-len, 0); ctx.lineTo(0, -half);
+        ctx.lineTo(len, 0); ctx.lineTo(0, half);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.65)';
+        ctx.beginPath();
+        ctx.moveTo(-len * 0.5, 0); ctx.lineTo(0, -half * 0.35);
+        ctx.lineTo(len * 0.5, 0); ctx.lineTo(0, half * 0.35);
+        ctx.closePath(); ctx.fill();
+
+      } else if (sp === 'drone') {
+        // ── Space: thin laser beam with glowing core ──
+        ctx.rotate(ang);
+        const bLen = Math.max(r * 2.2, 26);
+        const bg = ctx.createLinearGradient(-bLen, 0, bLen, 0);
+        bg.addColorStop(0, 'rgba(0,210,211,0)');
+        bg.addColorStop(0.5, '#bff4ff');
+        bg.addColorStop(1, 'rgba(0,210,211,0)');
+        ctx.fillStyle = bg;
+        ctx.fillRect(-bLen, -r * 0.38, bLen * 2, r * 0.76);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(-bLen * 0.35, -r * 0.14, bLen * 0.7, r * 0.28);
+        // outer glow halo
+        const hg = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 1.4);
+        hg.addColorStop(0, `${s.color || '#00d2d3'}55`);
+        hg.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = hg;
+        ctx.beginPath(); ctx.arc(0, 0, r * 1.4, 0, Math.PI * 2); ctx.fill();
+
+      } else if (sp === 'bird') {
+        // ── Sky: lightning bolt — zigzag shape with bright glow ──
+        const step = r * 0.9;
+        ctx.rotate(ang);
+        ctx.strokeStyle = s.color || '#fffde7';
+        ctx.lineWidth = r * 0.55;
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-r * 1.8, -step * 0.35);
+        ctx.lineTo(-step * 0.3, -step * 0.35);
+        ctx.lineTo(-step * 0.7, step * 0.35);
+        ctx.lineTo(r * 1.8, step * 0.35);
+        ctx.stroke();
+        ctx.lineWidth = r * 0.2;
+        ctx.strokeStyle = '#fff';
+        ctx.stroke(); // bright inner core
+        const lg = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 1.6);
+        lg.addColorStop(0, `${s.color || '#fffde7'}55`);
+        lg.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = lg;
+        ctx.beginPath(); ctx.arc(0, 0, r * 1.6, 0, Math.PI * 2); ctx.fill();
+
+      } else if (sp === 'knight') {
+        // ── Dark Fortress: curved shadow blade ──
+        ctx.rotate(ang);
+        ctx.strokeStyle = s.color || '#8854d0';
+        ctx.lineWidth = r * 0.6;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-r * 1.6, -r * 0.5);
+        ctx.quadraticCurveTo(0, r * 0.7, r * 1.6, -r * 0.5);
+        ctx.stroke();
+        ctx.lineWidth = r * 0.2;
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.stroke(); // highlight edge
+        const sg = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 1.8);
+        sg.addColorStop(0, `${s.color || '#8854d0'}55`);
+        sg.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0, 0, r * 1.8, 0, Math.PI * 2); ctx.fill();
+
+      } else if (sp === 'crawler') {
+        // ── Cave: triangular stalactite OR chunky rock based on direction ──
+        const isVertical = Math.abs(s.vy || 0) > Math.abs(s.vx || 0) * 1.5;
+        if (isVertical) {
+          // Stalactite: downward triangle pointing in travel direction
+          const falling = (s.vy || 0) >= 0;
+          ctx.fillStyle = s.color || '#9b9ba8';
+          ctx.beginPath();
+          ctx.moveTo(-r * 0.75, falling ? -r * 1.4 : r * 1.4);
+          ctx.lineTo( r * 0.75, falling ? -r * 1.4 : r * 1.4);
+          ctx.lineTo(0, falling ? r : -r);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.28)';
+          ctx.beginPath();
+          ctx.moveTo(-r * 0.3, falling ? -r * 1.2 : r * 1.2);
+          ctx.lineTo(r * 0.15, falling ? -r * 1.2 : r * 1.2);
+          ctx.lineTo(-r * 0.05, falling ? r * 0.3 : -r * 0.3);
+          ctx.closePath(); ctx.fill();
+        } else {
+          // Boulder / shockwave: wide squashed ellipse with cracks
+          ctx.rotate(ang);
+          ctx.fillStyle = s.color || '#95a5a6';
+          ctx.beginPath(); ctx.ellipse(0, 0, r * 1.85, r * 0.72, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(-r * 0.6, -r * 0.25); ctx.lineTo(r * 0.1, r * 0.28);
+          ctx.moveTo(r * 0.35, -r * 0.35); ctx.lineTo(r * 0.6, r * 0.18);
+          ctx.stroke();
+          const rg = ctx.createRadialGradient(0, 0, r * 0.5, 0, 0, r * 2);
+          rg.addColorStop(0, `${s.color || '#95a5a6'}44`);
+          rg.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = rg; ctx.beginPath(); ctx.ellipse(0, 0, r * 2, r * 2, 0, 0, Math.PI * 2); ctx.fill();
+        }
+
+      } else if (sp === 'lavablob') {
+        // ── Lava: dripping molten teardrop ──
+        ctx.fillStyle = s.color || '#ff793f';
+        ctx.beginPath(); ctx.arc(0, 0, r * 0.9, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.42, r * 0.55);
+        ctx.quadraticCurveTo(0, r * 1.85, r * 0.42, r * 0.55);
+        ctx.fill();
+        const mg = ctx.createRadialGradient(-r * 0.22, -r * 0.22, 0, 0, 0, r * 1.3);
+        mg.addColorStop(0, '#fff59d');
+        mg.addColorStop(0.45, s.color || '#ff793f');
+        mg.addColorStop(1, 'rgba(255,60,0,0)');
+        ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(0, 0, r * 1.3, 0, Math.PI * 2); ctx.fill();
+
+      } else if (sp === 'slime') {
+        // ── Meadow: wobbly organic blob (thorns/pollen/roots) ──
+        ctx.fillStyle = s.color || '#2ecc71';
+        ctx.beginPath();
+        const br = r * 1.05;
+        ctx.moveTo(br, 0);
+        ctx.bezierCurveTo(br, -br * 0.85, -br * 0.35, -br * 1.1, -br * 0.2, -br * 0.55);
+        ctx.bezierCurveTo(0, -br * 0.15, -br * 0.85, br * 0.4, -br, 0);
+        ctx.bezierCurveTo(-br, br * 0.7, br * 0.3, br * 1.1, br * 0.55, br * 0.5);
+        ctx.bezierCurveTo(br * 0.92, 0, br, 0, br, 0);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.38)';
+        ctx.beginPath(); ctx.arc(-r * 0.18, -r * 0.22, r * 0.34, 0, Math.PI * 2); ctx.fill();
+
+      } else if (sp === 'shroom') {
+        // ── Forest: soft spore with bumpy outline ──
+        const fg = ctx.createRadialGradient(0, 0, r * 0.25, 0, 0, r * 1.65);
+        fg.addColorStop(0, '#fff');
+        fg.addColorStop(0.4, s.color || '#e17055');
+        fg.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(0, 0, r * 1.65, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = `${s.color || '#e17055'}cc`; ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let bi = 0; bi < 6; bi++) {
+          const ba = (bi / 6) * Math.PI * 2;
+          const bump = r * (bi % 2 === 0 ? 1.1 : 0.8);
+          if (bi === 0) ctx.moveTo(Math.cos(ba) * bump, Math.sin(ba) * bump);
+          else ctx.lineTo(Math.cos(ba) * bump, Math.sin(ba) * bump);
+        }
+        ctx.closePath(); ctx.stroke();
+
+      } else if (sp === 'scorpion') {
+        // ── Desert: venom drop — teardrop pointed in travel direction ──
+        ctx.rotate(ang - Math.PI / 2);
+        ctx.fillStyle = s.color || '#cc8e35';
+        ctx.beginPath(); ctx.arc(0, -r * 0.38, r * 0.82, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.5, r * 0.22);
+        ctx.quadraticCurveTo(0, r * 1.55, r * 0.5, r * 0.22);
+        ctx.fill();
+        const vg = ctx.createRadialGradient(0, -r * 0.25, 0, 0, r * 0.3, r * 1.2);
+        vg.addColorStop(0, 'rgba(255,255,80,0.45)');
+        vg.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = vg; ctx.beginPath(); ctx.arc(0, 0, r * 1.2, 0, Math.PI * 2); ctx.fill();
+
+      } else {
+        // ── Default: glowing orb (fallback) ──
+        const dg = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 1.9);
+        dg.addColorStop(0, '#ffffff');
+        dg.addColorStop(0.3, s.color || '#ff4444');
+        dg.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = dg; ctx.beginPath(); ctx.arc(0, 0, r * 1.9, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, r * 0.32, 0, Math.PI * 2); ctx.fill();
+      }
+
+      ctx.restore();
     } else {
       // turret bolt
       const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 9);

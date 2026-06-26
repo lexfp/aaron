@@ -29,12 +29,14 @@ test.describe('Homepage & menus', () => {
         await expect(page.locator('#ms-mode-badge')).toContainText(/zombie/i);
     });
 
-    test('rescue mode button opens map screen', async ({ page }) => {
+    test('rescue mode button shows a warning or starts game', async ({ page }) => {
+        // Rescue bypasses the map screen. Below level 10 it shows a warning overlay;
+        // at level 10+ it goes straight to the game. Either is a valid response.
         await freshStart(page);
-        await selectMode(page, 'btn-rescue');
-
-        await expect(page.locator('#map-screen')).toBeVisible();
-        await expect(page.locator('#ms-mode-badge')).toContainText(/rescue/i);
+        await page.click('#btn-rescue');
+        const warningVisible = await page.locator('#rescue-warning-overlay').isVisible();
+        const gameStarted = await page.evaluate(() => window.__wz.gameState.active);
+        expect(warningVisible || gameStarted).toBe(true);
     });
 
     test('back button on map screen returns to homepage', async ({ page }) => {

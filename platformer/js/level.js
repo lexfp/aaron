@@ -120,7 +120,8 @@ function makeBoss(stageIdx, p, arena) {
   const flying = sp === 'bird' || sp === 'drone';
   const e = {
     ...base, boss: true, bossScale: scale, w, h,
-    hp: 24 + Math.round(p * 36), dmg: Math.max(14, (base.dmg || 8) + 8),
+    hp: (80 + stageIdx * 16) + Math.round(p * (50 + stageIdx * 8)),
+    dmg: Math.max(18, (base.dmg || 8) + 12 + stageIdx * 2),
     x: Math.round(arena.x + arena.w * 0.6), dir: -1, phase: 0,
     patrolMin: arena.x + 6, patrolMax: arena.x + arena.w - 6 - w,
   };
@@ -129,19 +130,20 @@ function makeBoss(stageIdx, p, arena) {
     e.baseX = Math.round(arena.x + arena.w / 2);
     e.baseY = Math.max(TOP + 50, arena.y - 215);
     e.y = e.baseY;
-    e.swoopRange = 560; e.swoopSpeed = 300 + p * 90;
+    e.swoopRange = 600; e.swoopSpeed = 380 + p * 110;
   } else {
     e.behavior = 'boss'; e.air = false;
     e.y = arena.y - h;
     e.baseY = arena.y - h;
-    e.speed = 60 + p * 60;
-    e.leapForce = 660; e.leapEvery = Math.max(1.3, 2.3 - p);
+    e.speed = (80 + stageIdx * 10) + p * (55 + stageIdx * 6);
+    e.leapForce = 720 + stageIdx * 20;
+    e.leapEvery = Math.max(0.8, 2.2 - p * 0.5 - stageIdx * 0.06);
   }
-  // Per-species special attack cooldowns
-  const SP_CD = { slime: 4.0, crawler: 5.0, slider: 3.5, scorpion: 4.2, lavablob: 3.0,
-                  bird: 4.0, shroom: 4.5, drone: 3.8, golem: 5.5, knight: 4.0 };
-  e._baseCD = SP_CD[sp] || 4.0;
-  e._specialCD = e._baseCD * 0.45; // first special fires sooner so players see it quickly
+  // Per-species special attack cooldowns (stage-appropriate pacing)
+  const SP_CD = { slime: 3.0, crawler: 3.8, slider: 2.6, scorpion: 3.2, lavablob: 2.2,
+                  bird: 3.0, shroom: 3.4, drone: 2.8, golem: 4.0, knight: 2.4 };
+  e._baseCD = SP_CD[sp] || 3.0;
+  e._specialCD = e._baseCD * 0.35; // first special fires sooner so players see it quickly
 
   // Per-species signature fields
   e._split = false;            // slime: one-shot split flag
@@ -157,8 +159,8 @@ function makeBoss(stageIdx, p, arena) {
   e._parryCD = 0;              // knight: cooldown after parry ends
   e._windTelegraph = 0;        // bird: wind gust telegraph timer
   // Per-species signature cooldowns (initial delay before first trigger)
-  const SIG_CD = { crawler: 8.0, scorpion: 7.0, lavablob: 6.0, bird: 6.5,
-                   shroom: 7.5, drone: 6.0, golem: 8.0, knight: 6.0 };
+  const SIG_CD = { crawler: 6.0, scorpion: 5.0, lavablob: 4.5, bird: 5.0,
+                   shroom: 5.5, drone: 4.5, golem: 6.0, knight: 4.5 };
   e._sigCD = SIG_CD[sp] || 0;
   return e;
 }

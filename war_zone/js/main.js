@@ -1808,3 +1808,4 @@ updateHomeStats();
 initTutorial();
 initAchievementsUI();
 animate();
+window.__wzReady = true;

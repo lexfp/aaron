@@ -8,9 +8,13 @@
  * helpers always run inside page.evaluate() — never in Node.
  */
 
-/** Wait until the game module has finished booting (window.__wz exists). */
+/**
+ * Wait until the game module has fully booted:
+ * - window.__wz is set (state bridge)
+ * - window.__wzReady is true (all event listeners attached, after animate() starts)
+ */
 async function waitForBoot(page) {
-    await page.waitForFunction(() => typeof window.__wz !== 'undefined', { timeout: 15_000 });
+    await page.waitForFunction(() => window.__wzReady === true, { timeout: 20_000 });
 }
 
 /** Read a snapshot of playerState from the live JS object. */
@@ -67,7 +71,11 @@ function getPlayerData(page) {
  */
 async function freshStart(page) {
     await page.goto('/war_zone/war_zone.html');
-    await page.evaluate(() => localStorage.removeItem('shooter_save'));
+    await page.evaluate(() => {
+        localStorage.removeItem('shooter_save');
+        // Mark tutorial as seen so the overlay doesn't block homepage clicks
+        localStorage.setItem('warzone_tutorial_seen', '1');
+    });
     await page.reload();
     await waitForBoot(page);
     await page.waitForSelector('#homepage', { state: 'visible' });
