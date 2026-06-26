@@ -962,6 +962,9 @@ function startGame(mode, mapId) {
 window.startGame = startGame;
 window._openAchievements = openAchievementsScreen;
 
+// Test bridge — live references for Playwright assertions
+window.__wz = { playerState, playerData, gameState };
+
 window._toggleThirdPerson = function () {
     thirdPerson = !thirdPerson;
     tpBody.visible = thirdPerson;

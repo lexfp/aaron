@@ -10,6 +10,7 @@
     "serve": "node -e \"import('http').then(({createServer}) => import('fs').then(({readFileSync,statSync,existsSync}) => import('path').then(({join,extname}) => { const mime={'.html':'text/html','.js':'application/javascript','.css':'text/css','.png':'image/png','.json':'application/json'}; createServer((req,res)=>{let p=join(process.cwd(),decodeURIComponent(req.url.split('?')[0])); if(existsSync(p)&&statSync(p).isDirectory()) p=join(p,'platformer.html'); if(!existsSync(p)){res.writeHead(404);return res.end('not found');} res.writeHead(200,{'Content-Type':mime[extname(p)]||'application/octet-stream'}); res.end(readFileSync(p));}).listen(8123,()=>console.log('http://localhost:8123/platformer.html'));})))\""
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0"
   },
@@ -19,7 +20,12 @@
       "<rootDir>/tests/unit/**/*.test.js"
     ],
     "transform": {},
-    "moduleFileExtensions": ["js", "mjs"],
-    "setupFiles": ["<rootDir>/tests/jest.setup.js"]
+    "moduleFileExtensions": [
+      "js",
+      "mjs"
+    ],
+    "setupFiles": [
+      "<rootDir>/tests/jest.setup.js"
+    ]
   }
 }
