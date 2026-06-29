@@ -2,9 +2,9 @@ const held = new Set();
 let _jumpJustPressed = false;
 let _escJustPressed = false;
 let _mouseDown = false;
-// Q=heal, E=bomb, R=nova, T=shield, Y=lightning, U=timestop, I=quake — consumed on press
+// Q=heal, E=bomb, R=nova, T=shield, G=lightning, Z=timestop, C=quake — consumed on press
 const _specials = [false, false, false, false, false, false, false];
-const SPECIAL_CODES = ['KeyQ', 'KeyE', 'KeyR', 'KeyT', 'KeyY', 'KeyU', 'KeyI'];
+const SPECIAL_CODES = ['KeyQ', 'KeyE', 'KeyR', 'KeyT', 'KeyG', 'KeyZ', 'KeyC'];
 
 const ATTACK_KEYS = new Set(['KeyJ', 'KeyX', 'KeyK', 'KeyF', 'Enter']);
 
