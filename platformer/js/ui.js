@@ -5,7 +5,8 @@ import {
   SKIN_DEFS, ownsSkin, buySkin, equipSkin, getEquippedSkin,
   WEAPON_UPGRADE_MAX, getWeaponUpgradeCost, upgradeWeapon,
   unlockEverything,
-  SPECIAL_DEFS, ownsSpecial, buySpecial,
+  SPECIAL_DEFS, SPECIAL_MAP, ownsSpecial, buySpecial,
+  SLOT_KEYS, getEquippedSpecials, setEquippedSpecial,
 } from './state.js';
 import { STAGE_THEMES } from './renderer.js';
 import { STAGE_MODIFIERS } from './player.js';
@@ -149,30 +150,34 @@ export function updateHUD(stageIdx, levelIdx, coinsThisLevel, totalCoins, lives,
   }
 }
 
-// Updates the special-attacks HUD strip. specialCDs is {heal, bomb, nova} → seconds remaining.
+// Updates the special-attacks HUD strip — shows the 5 equipped slots.
 export function updateSpecialsHUD(specialCDs) {
   const strip = document.getElementById('hud-specials');
   if (!strip) return;
 
-  // Show strip only if the player owns at least one special
-  const anyOwned = SPECIAL_DEFS.some(d => ownsSpecial(d.key));
-  strip.style.display = anyOwned ? 'flex' : 'none';
-  if (!anyOwned) return;
+  const slots = getEquippedSpecials();
+  const anyActive = slots.some(k => k && ownsSpecial(k));
+  strip.style.display = anyActive ? 'flex' : 'none';
+  if (!anyActive) return;
 
   strip.innerHTML = '';
-  for (const def of SPECIAL_DEFS) {
-    if (!ownsSpecial(def.key)) continue;
-    const cd = specialCDs?.[def.key] ?? 0;
+  for (let i = 0; i < 5; i++) {
+    const sKey = slots[i];
+    if (!sKey || !ownsSpecial(sKey)) continue;
+    const def = SPECIAL_MAP[sKey];
+    if (!def) continue;
+    const cd = specialCDs?.[sKey] ?? 0;
     const maxCD = def.cooldown;
     const ready = cd <= 0;
     const pct = ready ? 1 : 1 - cd / maxCD;
+    const slotKey = SLOT_KEYS[i];
 
     const pill = document.createElement('div');
     pill.className = 'special-pill' + (ready ? ' ready' : '');
-    pill.title = `${def.label} [${def.hotkey}]${ready ? '' : ` — ${Math.ceil(cd)}s`}`;
+    pill.title = `${def.label} [${slotKey}]${ready ? '' : ` — ${Math.ceil(cd)}s`}`;
     pill.innerHTML = `
       <span class="sp-icon">${def.icon}</span>
-      <span class="sp-key">${def.hotkey}</span>
+      <span class="sp-key">${slotKey}</span>
       <div class="sp-bar"><div class="sp-fill" style="width:${Math.round(pct * 100)}%"></div></div>
       <span class="sp-label">${ready ? 'READY' : Math.ceil(cd) + 's'}</span>
     `;
@@ -238,6 +243,8 @@ export function showShop(stageIdx, levelIdx, callbacks) {
 
   document.getElementById('btn-shop-close').onclick = () => afterClose();
 }
+
+let _selectedLoadoutSlot = -1;
 
 function renderShop(callbacks) {
   document.getElementById('shop-coin-count').textContent = playerData.coins;
@@ -358,13 +365,130 @@ function renderShop(callbacks) {
   spTitle.textContent = '⚡ Special Attacks';
   grid.appendChild(spTitle);
 
+  // Loadout panel — only shown when at least one special is owned
+  if (SPECIAL_DEFS.some(d => ownsSpecial(d.key))) {
+    const loadoutEl = document.createElement('div');
+    loadoutEl.className = 'loadout-section';
+
+    const ltitle = document.createElement('div');
+    ltitle.className = 'loadout-title';
+    ltitle.textContent = '🎯 Active Loadout — 5 key slots';
+    loadoutEl.appendChild(ltitle);
+
+    const slots = getEquippedSpecials();
+    const equippedSet = new Set(slots.filter(Boolean));
+
+    // 5 slot cards
+    const slotsRow = document.createElement('div');
+    slotsRow.className = 'loadout-slots';
+    for (let i = 0; i < 5; i++) {
+      const sKey = slots[i];
+      const def = sKey ? SPECIAL_MAP[sKey] : null;
+      const isSelected = _selectedLoadoutSlot === i;
+
+      const slotEl = document.createElement('div');
+      slotEl.className = `loadout-slot${isSelected ? ' selected' : ''}${def ? ' filled' : ''}`;
+
+      const keyBadge = document.createElement('div');
+      keyBadge.className = 'loadout-slot-key';
+      keyBadge.textContent = SLOT_KEYS[i];
+      slotEl.appendChild(keyBadge);
+
+      if (def) {
+        const iconEl = document.createElement('div');
+        iconEl.className = 'loadout-slot-icon';
+        iconEl.textContent = def.icon;
+        slotEl.appendChild(iconEl);
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'loadout-slot-name';
+        nameEl.textContent = def.label;
+        slotEl.appendChild(nameEl);
+
+        const clearBtn = document.createElement('button');
+        clearBtn.className = 'loadout-clear';
+        clearBtn.textContent = '✕';
+        clearBtn.title = 'Remove from slot';
+        clearBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          setEquippedSpecial(i, null);
+          renderShop(callbacks);
+        });
+        slotEl.appendChild(clearBtn);
+      } else {
+        const emptyEl = document.createElement('div');
+        emptyEl.className = 'loadout-slot-empty';
+        emptyEl.textContent = isSelected ? 'pick below' : '— empty —';
+        slotEl.appendChild(emptyEl);
+      }
+
+      slotEl.addEventListener('click', () => {
+        _selectedLoadoutSlot = (_selectedLoadoutSlot === i) ? -1 : i;
+        renderShop(callbacks);
+      });
+      slotsRow.appendChild(slotEl);
+    }
+    loadoutEl.appendChild(slotsRow);
+
+    // Hint text
+    const hint = document.createElement('div');
+    hint.className = 'loadout-hint';
+    if (_selectedLoadoutSlot >= 0) {
+      hint.textContent = `Slot ${SLOT_KEYS[_selectedLoadoutSlot]} selected — pick a special below to assign it`;
+    } else {
+      hint.textContent = 'Click a slot to select it, then click a special to assign';
+    }
+    loadoutEl.appendChild(hint);
+
+    // Owned special pills
+    const anyOwned = SPECIAL_DEFS.filter(d => ownsSpecial(d.key));
+    if (anyOwned.length > 0) {
+      const poolRow = document.createElement('div');
+      poolRow.className = 'loadout-pool';
+
+      for (const def of anyOwned) {
+        const inThisSlot = _selectedLoadoutSlot >= 0 && slots[_selectedLoadoutSlot] === def.key;
+        const slotIdx = slots.findIndex(k => k === def.key);
+        const slotLabel = slotIdx >= 0 ? ` [${SLOT_KEYS[slotIdx]}]` : '';
+
+        const pill = document.createElement('div');
+        pill.className = 'loadout-pill' + (inThisSlot ? ' current' : '');
+        pill.title = inThisSlot ? 'Already in this slot' : (slotIdx >= 0 ? `Currently in slot ${SLOT_KEYS[slotIdx]}` : 'Unassigned');
+        pill.innerHTML = `${def.icon} <span>${def.label}</span>${slotLabel ? `<em>${slotLabel}</em>` : ''}`;
+
+        if (!inThisSlot) {
+          pill.addEventListener('click', () => {
+            if (_selectedLoadoutSlot >= 0) {
+              setEquippedSpecial(_selectedLoadoutSlot, def.key);
+              _selectedLoadoutSlot = -1;
+            } else {
+              const firstEmpty = slots.findIndex(k => !k);
+              if (firstEmpty >= 0) setEquippedSpecial(firstEmpty, def.key);
+            }
+            renderShop(callbacks);
+          });
+        }
+        poolRow.appendChild(pill);
+      }
+      loadoutEl.appendChild(poolRow);
+    }
+
+    grid.appendChild(loadoutEl);
+  }
+
+  // Buy cards for unowned specials
+  const buyTitle = document.createElement('div');
+  buyTitle.className = 'loadout-buy-label';
+  buyTitle.textContent = 'Purchase Specials';
+  grid.appendChild(buyTitle);
+
   for (const def of SPECIAL_DEFS) {
     const owned = ownsSpecial(def.key);
     const canAfford = !owned && playerData.coins >= def.cost;
 
     let btnHTML;
     if (owned) {
-      btnHTML = `<div class="shop-maxed special-owned">OWNED · ${def.hotkey}</div>`;
+      btnHTML = `<div class="shop-maxed special-owned">OWNED</div>`;
     } else {
       btnHTML = `<button class="shop-buy special-buy${canAfford ? '' : ' cant-afford'}" data-sp-key="${def.key}">🪙 ${def.cost.toLocaleString()}</button>`;
     }
@@ -375,13 +499,19 @@ function renderShop(callbacks) {
       <div class="shop-icon">${def.icon}</div>
       <div class="shop-name">${def.label}</div>
       <div class="shop-desc">${def.desc}</div>
-      <div class="shop-wstat">Cooldown: ${def.cooldown}s · Key: ${def.hotkey}</div>
+      <div class="shop-wstat">Cooldown: ${def.cooldown}s</div>
       ${btnHTML}
     `;
     const spbtn = card.querySelector('button[data-sp-key]');
     if (spbtn && canAfford) {
       spbtn.addEventListener('click', () => {
-        if (buySpecial(def.key)) renderShop(callbacks);
+        if (buySpecial(def.key)) {
+          // Auto-equip to first empty slot
+          const slots2 = getEquippedSpecials();
+          const empty = slots2.findIndex(k => !k);
+          if (empty >= 0) setEquippedSpecial(empty, def.key);
+          renderShop(callbacks);
+        }
       });
     }
     grid.appendChild(card);

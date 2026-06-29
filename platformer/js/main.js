@@ -1,4 +1,4 @@
-import { loadPlayerData, playerData, markLevelComplete, getMagnetRadius, getStartLives, isStageComplete, getEquippedWeapon, grantCompletionSkin, SPECIAL_DEFS, ownsSpecial } from './state.js';
+import { loadPlayerData, playerData, markLevelComplete, getMagnetRadius, getStartLives, isStageComplete, getEquippedWeapon, grantCompletionSkin, SPECIAL_DEFS, SPECIAL_MAP, ownsSpecial, getEquippedSpecials } from './state.js';
 import { initInput, consumeJump, consumeEsc, isAttack, clearAll, consumeSpecial } from './input.js';
 import { player, initPlayer, updatePlayer, drawPlayer, setStageModifier, getStageModifier } from './player.js';
 import {
@@ -222,23 +222,25 @@ function gameLoop(timestamp) {
   }
   updateProjectiles(dt, levelData.platforms);
 
-  // Special attacks: tick cooldowns, then fire on Q/E/R press
+  // Special attacks: tick cooldowns for equipped slots, fire on Q/E/R/T/G
   let specialHUDDirty = false;
-  for (let i = 0; i < SPECIAL_DEFS.length; i++) {
-    const def = SPECIAL_DEFS[i];
-    if (player.specialCDs[def.key] > 0) {
-      player.specialCDs[def.key] = Math.max(0, player.specialCDs[def.key] - dt);
+  const equippedSlots = getEquippedSpecials();
+  for (let i = 0; i < 5; i++) {
+    const sKey = equippedSlots[i];
+    const def = sKey ? SPECIAL_MAP[sKey] : null;
+    if (def && player.specialCDs[sKey] > 0) {
+      player.specialCDs[sKey] = Math.max(0, player.specialCDs[sKey] - dt);
       specialHUDDirty = true;
     }
-    if (consumeSpecial(i) && ownsSpecial(def.key) && player.specialCDs[def.key] <= 0 && !player.dead) {
-      if (def.key === 'heal') useHeal(player);
-      else if (def.key === 'bomb') useBomb(player);
-      else if (def.key === 'nova') useNova(player);
-      else if (def.key === 'shield') useShield(player);
-      else if (def.key === 'lightning') useChainLightning(player);
-      else if (def.key === 'timestop') useTimeStop(player);
-      else if (def.key === 'quake') useQuake(player);
-      player.specialCDs[def.key] = def.cooldown;
+    if (consumeSpecial(i) && def && ownsSpecial(sKey) && (player.specialCDs[sKey] || 0) <= 0 && !player.dead) {
+      if (sKey === 'heal') useHeal(player);
+      else if (sKey === 'bomb') useBomb(player);
+      else if (sKey === 'nova') useNova(player);
+      else if (sKey === 'shield') useShield(player);
+      else if (sKey === 'lightning') useChainLightning(player);
+      else if (sKey === 'timestop') useTimeStop(player);
+      else if (sKey === 'quake') useQuake(player);
+      player.specialCDs[sKey] = def.cooldown;
       specialHUDDirty = true;
     }
   }

@@ -11,6 +11,7 @@ const DEFAULT = {
   levelProgress: {},
   weaponLevels: { fists: 0, sword: 0, hammer: 0, blaster: 0, launcher: 0, knives: 0, spear: 0, icewand: 0, flamestaff: 0, stormrod: 0, excalibur: 0 },
   specials: {},
+  equippedSpecials: ['heal', 'bomb', 'nova', null, null],
 };
 
 export let playerData = JSON.parse(JSON.stringify(DEFAULT));
@@ -27,6 +28,9 @@ export function loadPlayerData() {
     playerData.equippedSkin = saved.equippedSkin || 'default';
     playerData.weaponLevels = { ...DEFAULT.weaponLevels, ...(saved.weaponLevels || {}) };
     playerData.specials = { ...DEFAULT.specials, ...(saved.specials || {}) };
+    playerData.equippedSpecials = Array.isArray(saved.equippedSpecials)
+      ? [...saved.equippedSpecials.slice(0, 5), null, null, null, null, null].slice(0, 5)
+      : [...DEFAULT.equippedSpecials];
     if (!playerData.equippedWeapon || !playerData.weapons[playerData.equippedWeapon]) {
       playerData.equippedWeapon = 'fists';
     }
@@ -367,6 +371,7 @@ export function unlockEverything() {
     if (!playerData.specials) playerData.specials = {};
     playerData.specials[s.key] = true;
   }
+  playerData.equippedSpecials = SPECIAL_DEFS.slice(0, 5).map(s => s.key);
   for (const s of SKIN_DEFS) {
     playerData.skins[s.key] = true;
   }
@@ -390,7 +395,7 @@ export const SPECIAL_DEFS = [
     label: 'Heal Surge',
     cost: 2000,
     icon: '💊',
-    desc: 'Instantly restore 45 HP. Lifesaver in dire moments. (press Q)',
+    desc: 'Instantly restore 45 HP. Lifesaver in dire moments.',
     cooldown: 40,
     hotkey: 'Q',
   },
@@ -399,7 +404,7 @@ export const SPECIAL_DEFS = [
     label: 'Mega Bomb',
     cost: 3500,
     icon: '💣',
-    desc: '2-second fuse, 250 px blast radius, 70 damage. Bypasses boss shields. (press E)',
+    desc: '2-second fuse, 250 px blast radius, 70 damage. Bypasses boss shields.',
     cooldown: 25,
     hotkey: 'E',
   },
@@ -408,7 +413,7 @@ export const SPECIAL_DEFS = [
     label: 'Nova Strike',
     cost: 5000,
     icon: '🌀',
-    desc: 'Screen-wide energy burst — 35 dmg to every enemy, 2× vs bosses. (press R)',
+    desc: 'Screen-wide energy burst — 35 dmg to every enemy, 2× vs bosses.',
     cooldown: 30,
     hotkey: 'R',
   },
@@ -417,7 +422,7 @@ export const SPECIAL_DEFS = [
     label: 'Shield Surge',
     cost: 2500,
     icon: '🛡️',
-    desc: 'Become fully invulnerable for 3 seconds — nothing can touch you. (press T)',
+    desc: 'Become fully invulnerable for 3 seconds — nothing can touch you.',
     cooldown: 35,
     hotkey: 'T',
   },
@@ -426,7 +431,7 @@ export const SPECIAL_DEFS = [
     label: 'Chain Lightning',
     cost: 4000,
     icon: '⚡',
-    desc: 'Blasts nearest enemy for 60 dmg, chains to 3 more for 35/20/10. Bypasses shields. (press G)',
+    desc: 'Blasts nearest enemy for 60 dmg, chains to 3 more for 35/20/10. Bypasses shields.',
     cooldown: 20,
     hotkey: 'G',
   },
@@ -435,7 +440,7 @@ export const SPECIAL_DEFS = [
     label: 'Time Stop',
     cost: 5500,
     icon: '⏱️',
-    desc: 'Freezes every enemy solid for 3 seconds — attack freely. Boss frozen for 1.5 s. (press Z)',
+    desc: 'Freezes every enemy solid for 3 seconds — attack freely. Boss frozen for 1.5 s.',
     cooldown: 50,
     hotkey: 'Z',
   },
@@ -444,13 +449,34 @@ export const SPECIAL_DEFS = [
     label: 'Quake Slam',
     cost: 3000,
     icon: '🌋',
-    desc: 'Ground shockwave — 45 dmg to all enemies (90 vs bosses), launches you upward. (press C)',
+    desc: 'Ground shockwave — 45 dmg to all enemies (90 vs bosses), launches you upward.',
     cooldown: 28,
     hotkey: 'C',
   },
 ];
 
 export const SPECIAL_MAP = Object.fromEntries(SPECIAL_DEFS.map(s => [s.key, s]));
+
+export const SLOT_KEYS = ['Q', 'E', 'R', 'T', 'G'];
+
+export function getEquippedSpecials() {
+  if (!Array.isArray(playerData.equippedSpecials)) {
+    playerData.equippedSpecials = Array(5).fill(null);
+  }
+  return playerData.equippedSpecials;
+}
+
+export function setEquippedSpecial(slotIdx, specialKey) {
+  if (slotIdx < 0 || slotIdx >= 5) return;
+  if (!Array.isArray(playerData.equippedSpecials)) {
+    playerData.equippedSpecials = Array(5).fill(null);
+  }
+  for (let i = 0; i < 5; i++) {
+    if (playerData.equippedSpecials[i] === specialKey) playerData.equippedSpecials[i] = null;
+  }
+  playerData.equippedSpecials[slotIdx] = specialKey || null;
+  savePlayerData();
+}
 
 export function ownsSpecial(key) {
   return !!playerData.specials?.[key];
