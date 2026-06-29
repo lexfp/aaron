@@ -244,323 +244,247 @@ export function showShop(stageIdx, levelIdx, callbacks) {
   document.getElementById('btn-shop-close').onclick = () => afterClose();
 }
 
+let _activeShopTab = 'weapons';
 let _selectedLoadoutSlot = -1;
+
+function _buildLoadoutPanel(callbacks) {
+  const slots = getEquippedSpecials();
+  const wrap = document.createElement('div');
+  wrap.className = 'loadout-section';
+
+  const title = document.createElement('div');
+  title.className = 'loadout-title';
+  title.textContent = '🎯 Active Loadout';
+  wrap.appendChild(title);
+
+  // 5 slot cards
+  const slotsRow = document.createElement('div');
+  slotsRow.className = 'loadout-slots';
+  for (let i = 0; i < 5; i++) {
+    const sKey = slots[i];
+    const def = sKey ? SPECIAL_MAP[sKey] : null;
+    const isSelected = _selectedLoadoutSlot === i;
+
+    const slotEl = document.createElement('div');
+    slotEl.className = `loadout-slot${isSelected ? ' selected' : ''}${def ? ' filled' : ''}`;
+
+    const keyBadge = document.createElement('div');
+    keyBadge.className = 'loadout-slot-key';
+    keyBadge.textContent = SLOT_KEYS[i];
+    slotEl.appendChild(keyBadge);
+
+    if (def) {
+      const iconEl = document.createElement('div');
+      iconEl.className = 'loadout-slot-icon';
+      iconEl.textContent = def.icon;
+      slotEl.appendChild(iconEl);
+      const nameEl = document.createElement('div');
+      nameEl.className = 'loadout-slot-name';
+      nameEl.textContent = def.label;
+      slotEl.appendChild(nameEl);
+      const clearBtn = document.createElement('button');
+      clearBtn.className = 'loadout-clear';
+      clearBtn.textContent = '✕';
+      clearBtn.title = 'Remove';
+      clearBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        setEquippedSpecial(i, null);
+        renderShop(callbacks);
+      });
+      slotEl.appendChild(clearBtn);
+    } else {
+      const emptyEl = document.createElement('div');
+      emptyEl.className = 'loadout-slot-empty';
+      emptyEl.textContent = isSelected ? 'pick below ↓' : '— empty —';
+      slotEl.appendChild(emptyEl);
+    }
+
+    slotEl.addEventListener('click', () => {
+      _selectedLoadoutSlot = (_selectedLoadoutSlot === i) ? -1 : i;
+      renderShop(callbacks);
+    });
+    slotsRow.appendChild(slotEl);
+  }
+  wrap.appendChild(slotsRow);
+
+  const hint = document.createElement('div');
+  hint.className = 'loadout-hint';
+  hint.textContent = _selectedLoadoutSlot >= 0
+    ? `Slot ${SLOT_KEYS[_selectedLoadoutSlot]} selected — click a special below to assign it`
+    : 'Click a slot to select it, then click a special to assign';
+  wrap.appendChild(hint);
+
+  const ownedDefs = SPECIAL_DEFS.filter(d => ownsSpecial(d.key));
+  if (ownedDefs.length > 0) {
+    const poolLabel = document.createElement('div');
+    poolLabel.className = 'loadout-pool-label';
+    poolLabel.textContent = 'Owned specials';
+    wrap.appendChild(poolLabel);
+
+    const poolRow = document.createElement('div');
+    poolRow.className = 'loadout-pool';
+    for (const def of ownedDefs) {
+      const slotIdx = slots.findIndex(k => k === def.key);
+      const inThisSlot = _selectedLoadoutSlot >= 0 && slots[_selectedLoadoutSlot] === def.key;
+      const slotLabel = slotIdx >= 0 ? `[${SLOT_KEYS[slotIdx]}]` : '';
+      const pill = document.createElement('div');
+      pill.className = 'loadout-pill' + (inThisSlot ? ' current' : '');
+      pill.title = inThisSlot ? 'Already in selected slot' : slotIdx >= 0 ? `In slot ${SLOT_KEYS[slotIdx]}` : 'Unassigned';
+      pill.innerHTML = `${def.icon} <strong>${def.label}</strong>${slotLabel ? ` <em>${slotLabel}</em>` : ''}`;
+      if (!inThisSlot) {
+        pill.addEventListener('click', () => {
+          if (_selectedLoadoutSlot >= 0) {
+            setEquippedSpecial(_selectedLoadoutSlot, def.key);
+            _selectedLoadoutSlot = -1;
+          } else {
+            const s2 = getEquippedSpecials();
+            const empty = s2.findIndex(k => !k);
+            if (empty >= 0) setEquippedSpecial(empty, def.key);
+          }
+          renderShop(callbacks);
+        });
+      }
+      poolRow.appendChild(pill);
+    }
+    wrap.appendChild(poolRow);
+  }
+  return wrap;
+}
 
 function renderShop(callbacks) {
   document.getElementById('shop-coin-count').textContent = playerData.coins;
   const grid = document.getElementById('shop-grid');
   grid.innerHTML = '';
 
-  // ── Weapons section ──
-  const wTitle = document.createElement('div');
-  wTitle.className = 'shop-section-title';
-  wTitle.textContent = '⚔️ Weapons';
-  grid.appendChild(wTitle);
-
-  const equippedKey = getEquippedWeapon().key;
-  for (const w of WEAPON_DEFS) {
-    const owned = ownsWeapon(w.key);
-    const isEquipped = equippedKey === w.key;
-    const canAfford = !owned && playerData.coins >= w.cost;
-    const level = owned ? ((playerData.weaponLevels && playerData.weaponLevels[w.key]) || 0) : 0;
-
-    // For owned weapons, compute the upgraded stats for display.
-    let displayDmg = w.damage;
-    if (owned && level > 0) {
-      let d = w.damage;
-      for (let i = 0; i < level; i++) d *= 1.25;
-      displayDmg = Math.max(w.damage + 1, Math.round(d));
-    }
-    const stat = w.type === 'ranged'
-      ? `DMG ${displayDmg} · ranged${w.splash ? ' · splash' : ''}`
-      : `DMG ${displayDmg} · reach ${w.reach}`;
-
-    let btnHTML;
-    if (isEquipped) btnHTML = '<div class="shop-maxed">EQUIPPED</div>';
-    else if (owned) btnHTML = `<button class="shop-buy shop-equip" data-key="${w.key}">Equip</button>`;
-    else btnHTML = `<button class="shop-buy${canAfford ? '' : ' cant-afford'}" data-key="${w.key}">🪙 ${w.cost}</button>`;
-
-    // Build upgrade controls for owned weapons.
-    let upgradeHTML = '';
-    if (owned) {
-      const nextCost = getWeaponUpgradeCost(w.key);
-      upgradeHTML = `<div class="shop-stars">${'★'.repeat(level)}${'☆'.repeat(WEAPON_UPGRADE_MAX - level)}</div>`;
-      if (level < WEAPON_UPGRADE_MAX) {
-        const canAffordUpgrade = playerData.coins >= nextCost;
-        upgradeHTML += `<button class="shop-upgrade${canAffordUpgrade ? '' : ' cant-afford'}" data-upgrade-key="${w.key}">⬆ Upgrade 🪙 ${nextCost}</button>`;
-      } else {
-        upgradeHTML += '<div class="shop-maxed">MAX</div>';
-      }
-    }
-
-    const card = document.createElement('div');
-    card.className = 'shop-card' + (isEquipped ? ' equipped' : '');
-    card.innerHTML = `
-      <div class="shop-icon">${w.icon}</div>
-      <div class="shop-name">${w.label}</div>
-      <div class="shop-desc">${w.desc}</div>
-      <div class="shop-wstat">${stat}</div>
-      ${btnHTML}
-      ${upgradeHTML}
-    `;
-    const wbtn = card.querySelector('button[data-key]');
-    if (wbtn) {
-      if (owned && !isEquipped) {
-        wbtn.addEventListener('click', () => { equipWeapon(w.key); renderShop(callbacks); });
-      } else if (!owned && canAfford) {
-        wbtn.addEventListener('click', () => {
-          if (buyWeapon(w.key)) { equipWeapon(w.key); renderShop(callbacks); }
-        });
-      }
-    }
-    const upbtn = card.querySelector('button[data-upgrade-key]');
-    if (upbtn) {
-      upbtn.addEventListener('click', () => {
-        if (upgradeWeapon(w.key)) renderShop(callbacks);
-      });
-    }
-    grid.appendChild(card);
+  // ── Tab bar ──
+  const tabBar = document.createElement('div');
+  tabBar.className = 'shop-tabs';
+  for (const [id, label] of [['weapons','⚔️ Weapons'],['upgrades','✨ Upgrades'],['specials','⚡ Specials'],['skins','🎨 Skins']]) {
+    const btn = document.createElement('button');
+    btn.className = 'shop-tab' + (_activeShopTab === id ? ' active' : '');
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      _activeShopTab = id;
+      _selectedLoadoutSlot = -1;
+      renderShop(callbacks);
+    });
+    tabBar.appendChild(btn);
   }
+  grid.appendChild(tabBar);
 
-  // ── Upgrades section ──
-  const uTitle = document.createElement('div');
-  uTitle.className = 'shop-section-title';
-  uTitle.textContent = '✨ Upgrades';
-  grid.appendChild(uTitle);
+  // ── Tab content ──
+  const content = document.createElement('div');
+  content.className = 'shop-tab-content';
+  grid.appendChild(content);
 
-  for (const def of UPGRADE_DEFS) {
-    const currentLevel = playerData.upgrades[def.key];
-    const maxed = currentLevel >= def.max;
-    const cost = maxed ? null : def.costs[currentLevel];
-    const canAfford = !maxed && playerData.coins >= cost;
-
-    const card = document.createElement('div');
-    card.className = 'shop-card' + (maxed ? ' maxed' : '');
-    card.innerHTML = `
-      <div class="shop-icon">${def.icon}</div>
-      <div class="shop-name">${def.label}</div>
-      <div class="shop-desc">${def.desc}</div>
-      <div class="shop-stars">${'★'.repeat(currentLevel)}${'☆'.repeat(def.max - currentLevel)}</div>
-      ${maxed
-        ? '<div class="shop-maxed">MAX</div>'
-        : `<button class="shop-buy${canAfford ? '' : ' cant-afford'}" data-key="${def.key}">
-            ${def.icon} ${cost} coins
-           </button>`}
-    `;
-    const btn = card.querySelector('.shop-buy');
-    if (btn && canAfford) {
-      btn.addEventListener('click', () => {
-        playerData.coins -= cost;
-        playerData.upgrades[def.key]++;
-        savePlayerData();
-        renderShop(callbacks);
-      });
-    }
-    grid.appendChild(card);
-  }
-
-  // ── Special Attacks section ──
-  const spTitle = document.createElement('div');
-  spTitle.className = 'shop-section-title';
-  spTitle.textContent = '⚡ Special Attacks';
-  grid.appendChild(spTitle);
-
-  // Loadout panel — only shown when at least one special is owned
-  if (SPECIAL_DEFS.some(d => ownsSpecial(d.key))) {
-    const loadoutEl = document.createElement('div');
-    loadoutEl.className = 'loadout-section';
-
-    const ltitle = document.createElement('div');
-    ltitle.className = 'loadout-title';
-    ltitle.textContent = '🎯 Active Loadout — 5 key slots';
-    loadoutEl.appendChild(ltitle);
-
-    const slots = getEquippedSpecials();
-    const equippedSet = new Set(slots.filter(Boolean));
-
-    // 5 slot cards
-    const slotsRow = document.createElement('div');
-    slotsRow.className = 'loadout-slots';
-    for (let i = 0; i < 5; i++) {
-      const sKey = slots[i];
-      const def = sKey ? SPECIAL_MAP[sKey] : null;
-      const isSelected = _selectedLoadoutSlot === i;
-
-      const slotEl = document.createElement('div');
-      slotEl.className = `loadout-slot${isSelected ? ' selected' : ''}${def ? ' filled' : ''}`;
-
-      const keyBadge = document.createElement('div');
-      keyBadge.className = 'loadout-slot-key';
-      keyBadge.textContent = SLOT_KEYS[i];
-      slotEl.appendChild(keyBadge);
-
-      if (def) {
-        const iconEl = document.createElement('div');
-        iconEl.className = 'loadout-slot-icon';
-        iconEl.textContent = def.icon;
-        slotEl.appendChild(iconEl);
-
-        const nameEl = document.createElement('div');
-        nameEl.className = 'loadout-slot-name';
-        nameEl.textContent = def.label;
-        slotEl.appendChild(nameEl);
-
-        const clearBtn = document.createElement('button');
-        clearBtn.className = 'loadout-clear';
-        clearBtn.textContent = '✕';
-        clearBtn.title = 'Remove from slot';
-        clearBtn.addEventListener('click', e => {
-          e.stopPropagation();
-          setEquippedSpecial(i, null);
-          renderShop(callbacks);
-        });
-        slotEl.appendChild(clearBtn);
-      } else {
-        const emptyEl = document.createElement('div');
-        emptyEl.className = 'loadout-slot-empty';
-        emptyEl.textContent = isSelected ? 'pick below' : '— empty —';
-        slotEl.appendChild(emptyEl);
+  if (_activeShopTab === 'weapons') {
+    const equippedKey = getEquippedWeapon().key;
+    for (const w of WEAPON_DEFS) {
+      const owned = ownsWeapon(w.key);
+      const isEquipped = equippedKey === w.key;
+      const canAfford = !owned && playerData.coins >= w.cost;
+      const level = owned ? ((playerData.weaponLevels && playerData.weaponLevels[w.key]) || 0) : 0;
+      let displayDmg = w.damage;
+      if (owned && level > 0) {
+        let d = w.damage;
+        for (let i = 0; i < level; i++) d *= 1.25;
+        displayDmg = Math.max(w.damage + 1, Math.round(d));
       }
-
-      slotEl.addEventListener('click', () => {
-        _selectedLoadoutSlot = (_selectedLoadoutSlot === i) ? -1 : i;
-        renderShop(callbacks);
-      });
-      slotsRow.appendChild(slotEl);
+      const stat = w.type === 'ranged'
+        ? `DMG ${displayDmg} · ranged${w.splash ? ' · splash' : ''}`
+        : `DMG ${displayDmg} · reach ${w.reach}`;
+      let btnHTML;
+      if (isEquipped) btnHTML = '<div class="shop-maxed">EQUIPPED</div>';
+      else if (owned) btnHTML = `<button class="shop-buy shop-equip" data-key="${w.key}">Equip</button>`;
+      else btnHTML = `<button class="shop-buy${canAfford ? '' : ' cant-afford'}" data-key="${w.key}">🪙 ${w.cost}</button>`;
+      let upgradeHTML = '';
+      if (owned) {
+        const nextCost = getWeaponUpgradeCost(w.key);
+        upgradeHTML = `<div class="shop-stars">${'★'.repeat(level)}${'☆'.repeat(WEAPON_UPGRADE_MAX - level)}</div>`;
+        upgradeHTML += level < WEAPON_UPGRADE_MAX
+          ? `<button class="shop-upgrade${playerData.coins >= nextCost ? '' : ' cant-afford'}" data-upgrade-key="${w.key}">⬆ Upgrade 🪙 ${nextCost}</button>`
+          : '<div class="shop-maxed">MAX</div>';
+      }
+      const card = document.createElement('div');
+      card.className = 'shop-card' + (isEquipped ? ' equipped' : '');
+      card.innerHTML = `<div class="shop-icon">${w.icon}</div><div class="shop-name">${w.label}</div><div class="shop-desc">${w.desc}</div><div class="shop-wstat">${stat}</div>${btnHTML}${upgradeHTML}`;
+      const wbtn = card.querySelector('button[data-key]');
+      if (wbtn) {
+        if (owned && !isEquipped) wbtn.addEventListener('click', () => { equipWeapon(w.key); renderShop(callbacks); });
+        else if (!owned && canAfford) wbtn.addEventListener('click', () => { if (buyWeapon(w.key)) { equipWeapon(w.key); renderShop(callbacks); } });
+      }
+      const upbtn = card.querySelector('button[data-upgrade-key]');
+      if (upbtn) upbtn.addEventListener('click', () => { if (upgradeWeapon(w.key)) renderShop(callbacks); });
+      content.appendChild(card);
     }
-    loadoutEl.appendChild(slotsRow);
 
-    // Hint text
-    const hint = document.createElement('div');
-    hint.className = 'loadout-hint';
-    if (_selectedLoadoutSlot >= 0) {
-      hint.textContent = `Slot ${SLOT_KEYS[_selectedLoadoutSlot]} selected — pick a special below to assign it`;
-    } else {
-      hint.textContent = 'Click a slot to select it, then click a special to assign';
+  } else if (_activeShopTab === 'upgrades') {
+    for (const def of UPGRADE_DEFS) {
+      const currentLevel = playerData.upgrades[def.key];
+      const maxed = currentLevel >= def.max;
+      const cost = maxed ? null : def.costs[currentLevel];
+      const canAfford = !maxed && playerData.coins >= cost;
+      const card = document.createElement('div');
+      card.className = 'shop-card' + (maxed ? ' maxed' : '');
+      card.innerHTML = `<div class="shop-icon">${def.icon}</div><div class="shop-name">${def.label}</div><div class="shop-desc">${def.desc}</div><div class="shop-stars">${'★'.repeat(currentLevel)}${'☆'.repeat(def.max - currentLevel)}</div>${maxed ? '<div class="shop-maxed">MAX</div>' : `<button class="shop-buy${canAfford ? '' : ' cant-afford'}" data-key="${def.key}">${def.icon} ${cost} coins</button>`}`;
+      const btn = card.querySelector('.shop-buy');
+      if (btn && canAfford) btn.addEventListener('click', () => { playerData.coins -= cost; playerData.upgrades[def.key]++; savePlayerData(); renderShop(callbacks); });
+      content.appendChild(card);
     }
-    loadoutEl.appendChild(hint);
 
-    // Owned special pills
-    const anyOwned = SPECIAL_DEFS.filter(d => ownsSpecial(d.key));
-    if (anyOwned.length > 0) {
-      const poolRow = document.createElement('div');
-      poolRow.className = 'loadout-pool';
-
-      for (const def of anyOwned) {
-        const inThisSlot = _selectedLoadoutSlot >= 0 && slots[_selectedLoadoutSlot] === def.key;
-        const slotIdx = slots.findIndex(k => k === def.key);
-        const slotLabel = slotIdx >= 0 ? ` [${SLOT_KEYS[slotIdx]}]` : '';
-
-        const pill = document.createElement('div');
-        pill.className = 'loadout-pill' + (inThisSlot ? ' current' : '');
-        pill.title = inThisSlot ? 'Already in this slot' : (slotIdx >= 0 ? `Currently in slot ${SLOT_KEYS[slotIdx]}` : 'Unassigned');
-        pill.innerHTML = `${def.icon} <span>${def.label}</span>${slotLabel ? `<em>${slotLabel}</em>` : ''}`;
-
-        if (!inThisSlot) {
-          pill.addEventListener('click', () => {
-            if (_selectedLoadoutSlot >= 0) {
-              setEquippedSpecial(_selectedLoadoutSlot, def.key);
-              _selectedLoadoutSlot = -1;
-            } else {
-              const firstEmpty = slots.findIndex(k => !k);
-              if (firstEmpty >= 0) setEquippedSpecial(firstEmpty, def.key);
-            }
+  } else if (_activeShopTab === 'specials') {
+    if (SPECIAL_DEFS.some(d => ownsSpecial(d.key))) {
+      content.appendChild(_buildLoadoutPanel(callbacks));
+    }
+    const divider = document.createElement('div');
+    divider.className = 'tab-divider';
+    divider.textContent = 'Purchase Specials';
+    content.appendChild(divider);
+    for (const def of SPECIAL_DEFS) {
+      const owned = ownsSpecial(def.key);
+      const canAfford = !owned && playerData.coins >= def.cost;
+      const btnHTML = owned
+        ? `<div class="shop-maxed special-owned">OWNED</div>`
+        : `<button class="shop-buy special-buy${canAfford ? '' : ' cant-afford'}" data-sp-key="${def.key}">🪙 ${def.cost.toLocaleString()}</button>`;
+      const card = document.createElement('div');
+      card.className = 'shop-card special-card' + (owned ? ' owned' : '');
+      card.innerHTML = `<div class="shop-icon">${def.icon}</div><div class="shop-name">${def.label}</div><div class="shop-desc">${def.desc}</div><div class="shop-wstat">Cooldown: ${def.cooldown}s</div>${btnHTML}`;
+      const spbtn = card.querySelector('button[data-sp-key]');
+      if (spbtn && canAfford) {
+        spbtn.addEventListener('click', () => {
+          if (buySpecial(def.key)) {
+            const s2 = getEquippedSpecials();
+            const empty = s2.findIndex(k => !k);
+            if (empty >= 0) setEquippedSpecial(empty, def.key);
             renderShop(callbacks);
-          });
-        }
-        poolRow.appendChild(pill);
-      }
-      loadoutEl.appendChild(poolRow);
-    }
-
-    grid.appendChild(loadoutEl);
-  }
-
-  // Buy cards for unowned specials
-  const buyTitle = document.createElement('div');
-  buyTitle.className = 'loadout-buy-label';
-  buyTitle.textContent = 'Purchase Specials';
-  grid.appendChild(buyTitle);
-
-  for (const def of SPECIAL_DEFS) {
-    const owned = ownsSpecial(def.key);
-    const canAfford = !owned && playerData.coins >= def.cost;
-
-    let btnHTML;
-    if (owned) {
-      btnHTML = `<div class="shop-maxed special-owned">OWNED</div>`;
-    } else {
-      btnHTML = `<button class="shop-buy special-buy${canAfford ? '' : ' cant-afford'}" data-sp-key="${def.key}">🪙 ${def.cost.toLocaleString()}</button>`;
-    }
-
-    const card = document.createElement('div');
-    card.className = 'shop-card special-card' + (owned ? ' owned' : '');
-    card.innerHTML = `
-      <div class="shop-icon">${def.icon}</div>
-      <div class="shop-name">${def.label}</div>
-      <div class="shop-desc">${def.desc}</div>
-      <div class="shop-wstat">Cooldown: ${def.cooldown}s</div>
-      ${btnHTML}
-    `;
-    const spbtn = card.querySelector('button[data-sp-key]');
-    if (spbtn && canAfford) {
-      spbtn.addEventListener('click', () => {
-        if (buySpecial(def.key)) {
-          // Auto-equip to first empty slot
-          const slots2 = getEquippedSpecials();
-          const empty = slots2.findIndex(k => !k);
-          if (empty >= 0) setEquippedSpecial(empty, def.key);
-          renderShop(callbacks);
-        }
-      });
-    }
-    grid.appendChild(card);
-  }
-
-  // ── Skins section ──
-  const sTitle = document.createElement('div');
-  sTitle.className = 'shop-section-title';
-  sTitle.textContent = '🎨 Skins';
-  grid.appendChild(sTitle);
-
-  const equippedSkinKey = getEquippedSkin().key;
-  for (const s of SKIN_DEFS) {
-    const owned = ownsSkin(s.key);
-    const isEquipped = equippedSkinKey === s.key;
-    const isProgression = !!s.unlock;
-    const canAfford = !owned && !isProgression && playerData.coins >= s.cost;
-
-    let btnHTML;
-    if (isEquipped) {
-      btnHTML = '<div class="shop-maxed">EQUIPPED</div>';
-    } else if (owned) {
-      btnHTML = `<button class="shop-buy shop-equip" data-key="${s.key}">Equip</button>`;
-    } else if (isProgression) {
-      btnHTML = `<div class="shop-maxed">Stage ${s.unlock.stage}</div>`;
-    } else {
-      btnHTML = `<button class="shop-buy${canAfford ? '' : ' cant-afford'}" data-key="${s.key}">🪙 ${s.cost}</button>`;
-    }
-
-    const card = document.createElement('div');
-    card.className = 'shop-card' + (isEquipped ? ' equipped' : '');
-    card.innerHTML = `
-      <div class="shop-swatch" style="background:${s.palette.body};border-bottom:3px solid ${s.palette.bodyStripe}"></div>
-      <div class="shop-icon">${s.icon}</div>
-      <div class="shop-name">${s.label}</div>
-      <div class="shop-desc">${s.desc}</div>
-      ${btnHTML}
-    `;
-    const sbtn = card.querySelector('button');
-    if (sbtn) {
-      if (owned && !isEquipped) {
-        sbtn.addEventListener('click', () => { equipSkin(s.key); renderShop(callbacks); });
-      } else if (!owned && canAfford) {
-        sbtn.addEventListener('click', () => {
-          if (buySkin(s.key)) { equipSkin(s.key); renderShop(callbacks); }
+          }
         });
       }
+      content.appendChild(card);
     }
-    grid.appendChild(card);
+
+  } else if (_activeShopTab === 'skins') {
+    const equippedSkinKey = getEquippedSkin().key;
+    for (const s of SKIN_DEFS) {
+      const owned = ownsSkin(s.key);
+      const isEquipped = equippedSkinKey === s.key;
+      const isProgression = !!s.unlock;
+      const canAfford = !owned && !isProgression && playerData.coins >= s.cost;
+      let btnHTML;
+      if (isEquipped) btnHTML = '<div class="shop-maxed">EQUIPPED</div>';
+      else if (owned) btnHTML = `<button class="shop-buy shop-equip" data-key="${s.key}">Equip</button>`;
+      else if (isProgression) btnHTML = `<div class="shop-maxed">Stage ${s.unlock.stage}</div>`;
+      else btnHTML = `<button class="shop-buy${canAfford ? '' : ' cant-afford'}" data-key="${s.key}">🪙 ${s.cost}</button>`;
+      const card = document.createElement('div');
+      card.className = 'shop-card' + (isEquipped ? ' equipped' : '');
+      card.innerHTML = `<div class="shop-swatch" style="background:${s.palette.body};border-bottom:3px solid ${s.palette.bodyStripe}"></div><div class="shop-icon">${s.icon}</div><div class="shop-name">${s.label}</div><div class="shop-desc">${s.desc}</div>${btnHTML}`;
+      const sbtn = card.querySelector('button');
+      if (sbtn) {
+        if (owned && !isEquipped) sbtn.addEventListener('click', () => { equipSkin(s.key); renderShop(callbacks); });
+        else if (!owned && canAfford) sbtn.addEventListener('click', () => { if (buySkin(s.key)) { equipSkin(s.key); renderShop(callbacks); } });
+      }
+      content.appendChild(card);
+    }
   }
 }
 
