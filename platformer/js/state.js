@@ -10,6 +10,7 @@ const DEFAULT = {
   stagesUnlocked: 1,
   levelProgress: {},
   weaponLevels: { fists: 0, sword: 0, hammer: 0, blaster: 0, launcher: 0, knives: 0, spear: 0, icewand: 0, flamestaff: 0, stormrod: 0, excalibur: 0 },
+  specials: {},
 };
 
 export let playerData = JSON.parse(JSON.stringify(DEFAULT));
@@ -25,6 +26,7 @@ export function loadPlayerData() {
     playerData.skins = { ...DEFAULT.skins, ...(saved.skins || {}) };
     playerData.equippedSkin = saved.equippedSkin || 'default';
     playerData.weaponLevels = { ...DEFAULT.weaponLevels, ...(saved.weaponLevels || {}) };
+    playerData.specials = { ...DEFAULT.specials, ...(saved.specials || {}) };
     if (!playerData.equippedWeapon || !playerData.weapons[playerData.equippedWeapon]) {
       playerData.equippedWeapon = 'fists';
     }
@@ -293,7 +295,7 @@ export const SKIN_DEFS = [
   {
     key: 'ghost', label: 'Ghost', icon: '👻', cost: 350, unlock: null,
     desc: 'Hauntingly translucent.',
-    palette: { body: '#e8eaf6', bodyStripe: '#c5cae9', limb: '#e3e8f0', leg: '#9fa8da', skin: '#f5f5f5', hair: '#b0bec5' },
+    palette: { body: '#e8eaf6', bodyStripe: '#c5cae9', limb: '#e3e8f0', leg: '#9fa8da', skin: '#f5f5f5', hair: '#b0bec5', alpha: 0.72 },
   },
   {
     key: 'desert', label: 'Desert Fox', icon: '🦊', cost: 400, unlock: null,
@@ -361,6 +363,13 @@ export function unlockEverything() {
   for (const w of WEAPON_DEFS) {
     playerData.weapons[w.key] = true;
   }
+  for (const s of SPECIAL_DEFS) {
+    if (!playerData.specials) playerData.specials = {};
+    playerData.specials[s.key] = true;
+  }
+  for (const s of SKIN_DEFS) {
+    playerData.skins[s.key] = true;
+  }
   playerData.stagesUnlocked = 10;
   for (let s = 0; s <= 9; s++) {
     for (let l = 1; l <= 50; l++) {
@@ -370,6 +379,92 @@ export function unlockEverything() {
   savePlayerData();
 }
 
+
+// ─── SPECIAL ATTACKS ──────────────────────────────────────────────────────
+// One-time purchases (very expensive). Each has a cooldown in seconds.
+// Heals restore HP; bombs deal massive AoE damage; nova hits all enemies at once.
+// All three are especially effective against bosses (bypass shields, deal bonus dmg).
+export const SPECIAL_DEFS = [
+  {
+    key: 'heal',
+    label: 'Heal Surge',
+    cost: 2000,
+    icon: '💊',
+    desc: 'Instantly restore 45 HP. Lifesaver in dire moments. (press Q)',
+    cooldown: 40,
+    hotkey: 'Q',
+  },
+  {
+    key: 'bomb',
+    label: 'Mega Bomb',
+    cost: 3500,
+    icon: '💣',
+    desc: '2-second fuse, 250 px blast radius, 70 damage. Bypasses boss shields. (press E)',
+    cooldown: 25,
+    hotkey: 'E',
+  },
+  {
+    key: 'nova',
+    label: 'Nova Strike',
+    cost: 5000,
+    icon: '🌀',
+    desc: 'Screen-wide energy burst — 35 dmg to every enemy, 2× vs bosses. (press R)',
+    cooldown: 30,
+    hotkey: 'R',
+  },
+  {
+    key: 'shield',
+    label: 'Shield Surge',
+    cost: 2500,
+    icon: '🛡️',
+    desc: 'Become fully invulnerable for 3 seconds — nothing can touch you. (press T)',
+    cooldown: 35,
+    hotkey: 'T',
+  },
+  {
+    key: 'lightning',
+    label: 'Chain Lightning',
+    cost: 4000,
+    icon: '⚡',
+    desc: 'Blasts nearest enemy for 60 dmg, chains to 3 more for 35/20/10. Bypasses shields. (press Y)',
+    cooldown: 20,
+    hotkey: 'Y',
+  },
+  {
+    key: 'timestop',
+    label: 'Time Stop',
+    cost: 5500,
+    icon: '⏱️',
+    desc: 'Freezes every enemy solid for 3 seconds — attack freely. Boss frozen for 1.5 s. (press U)',
+    cooldown: 50,
+    hotkey: 'U',
+  },
+  {
+    key: 'quake',
+    label: 'Quake Slam',
+    cost: 3000,
+    icon: '🌋',
+    desc: 'Ground shockwave — 45 dmg to all enemies (90 vs bosses), launches you upward. (press I)',
+    cooldown: 28,
+    hotkey: 'I',
+  },
+];
+
+export const SPECIAL_MAP = Object.fromEntries(SPECIAL_DEFS.map(s => [s.key, s]));
+
+export function ownsSpecial(key) {
+  return !!playerData.specials?.[key];
+}
+
+export function buySpecial(key) {
+  const s = SPECIAL_MAP[key];
+  if (!s || ownsSpecial(key) || playerData.coins < s.cost) return false;
+  playerData.coins -= s.cost;
+  if (!playerData.specials) playerData.specials = {};
+  playerData.specials[key] = true;
+  savePlayerData();
+  return true;
+}
 
 export function grantCompletionSkin() {
   if (!isGameComplete()) return false;

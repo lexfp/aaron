@@ -114,6 +114,71 @@ button:focus-visible, a:focus-visible {
 }
 #hud-hp-text { color: var(--text-dim); font-size: 11px; min-width: 46px; text-align: right; }
 
+/* ── Special attacks HUD strip ── */
+#hud-specials {
+  position: absolute;
+  bottom: 10px; left: 50%; transform: translateX(-50%);
+  width: 800px; max-width: 100vw;
+  padding: 0 16px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.special-pill {
+  background: rgba(0,0,0,0.72);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-dim, #aaa);
+  opacity: 0.72;
+  transition: opacity 0.2s, border-color 0.2s;
+  min-width: 96px;
+}
+.special-pill.ready {
+  border-color: rgba(200,170,255,0.55);
+  opacity: 1;
+  color: #d0c4ff;
+}
+.sp-icon { font-size: 16px; line-height: 1; }
+.sp-key {
+  background: rgba(255,255,255,0.12);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+}
+.sp-bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.12);
+  overflow: hidden;
+}
+.sp-fill {
+  height: 100%;
+  background: #c8aaff;
+  border-radius: 3px;
+  transition: width 0.18s linear;
+}
+.special-pill.ready .sp-fill { background: #a29bfe; }
+.sp-label { font-size: 10px; min-width: 34px; text-align: right; }
+
+/* ── Special attacks shop cards ── */
+.special-card { border-color: rgba(162,155,254,0.3); }
+.special-card.owned { border-color: rgba(162,155,254,0.6); }
+.special-buy { background: linear-gradient(135deg, #6c5ce7, #a29bfe) !important; color: #fff !important; }
+.special-owned { color: #a29bfe; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; }
+
 /* ===== SHARED SCREEN STYLES ===== */
 
 .screen {

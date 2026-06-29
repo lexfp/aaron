@@ -2,6 +2,9 @@ const held = new Set();
 let _jumpJustPressed = false;
 let _escJustPressed = false;
 let _mouseDown = false;
+// Q=heal, E=bomb, R=nova, T=shield, Y=lightning, U=timestop, I=quake — consumed on press
+const _specials = [false, false, false, false, false, false, false];
+const SPECIAL_CODES = ['KeyQ', 'KeyE', 'KeyR', 'KeyT', 'KeyY', 'KeyU', 'KeyI'];
 
 const ATTACK_KEYS = new Set(['KeyJ', 'KeyX', 'KeyK', 'KeyF', 'Enter']);
 
@@ -15,6 +18,8 @@ export function initInput() {
     if (e.code === 'Escape') {
       _escJustPressed = true;
     }
+    const si = SPECIAL_CODES.indexOf(e.code);
+    if (si !== -1) _specials[si] = true;
   });
   window.addEventListener('keyup', e => {
     held.delete(e.code);
@@ -52,9 +57,17 @@ export function isAttack() {
   return false;
 }
 
+// Returns true once then resets — consume on the frame the key is pressed.
+export function consumeSpecial(idx) {
+  const v = _specials[idx];
+  _specials[idx] = false;
+  return v;
+}
+
 export function clearAll() {
   held.clear();
   _jumpJustPressed = false;
   _escJustPressed = false;
   _mouseDown = false;
+  for (let i = 0; i < _specials.length; i++) _specials[i] = false;
 }

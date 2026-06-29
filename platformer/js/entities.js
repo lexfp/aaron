@@ -26,6 +26,7 @@ export function initEntities(levelData) {
   projectiles.length = 0;
   enemyShots.length = 0;
   sigZones.length = 0;
+  playerBombs.length = 0;
 
   for (const c of levelData.coins) {
     coins.push({ x: c.x, y: c.y, collected: false, spinAngle: c.spinAngle || 0 });
@@ -290,7 +291,8 @@ function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
 
 function dropCoins(cx, cy, n) {
   for (let i = 0; i < n; i++) {
-    const angle = (i / Math.max(1, n)) * Math.PI * 2;
+    // Upper semicircle only — sin is always ≤ 0, so coins scatter left/right/up, never into the platform below.
+    const angle = -Math.PI + (i / Math.max(1, n)) * Math.PI;
     const r = 10 + (i % 3) * 12;
     coins.push({
       x: Math.round(cx + Math.cos(angle) * r) - 8,
@@ -853,6 +855,13 @@ export function updateEnemies(dt, platforms, player) {
     if (e._freeze > 0) {
       e._freeze -= dt;
       if (e._freeze < 0) e._freeze = 0;
+    }
+
+    // Time Stop: full AI freeze — skip all logic while _frozenT > 0
+    if ((e._frozenT || 0) > 0) {
+      e._frozenT -= dt;
+      if (e._frozenT < 0) e._frozenT = 0;
+      continue;
     }
 
     if (!e.alive) continue;
@@ -1469,6 +1478,13 @@ export function drawEnemies(ctx, camX, W, t, player, dt = 0) {
     if (e._atkFlash > 0) {
       ctx.globalAlpha = (e._atkFlash / 0.45) * 0.72;
       ctx.fillStyle = '#ffe066';
+      ctx.fillRect(-e.w / 2, 0, e.w, e.h);
+      ctx.globalAlpha = 1;
+    }
+    // Time Stop frozen tint — blue-white crystalline overlay
+    if ((e._frozenT || 0) > 0) {
+      ctx.globalAlpha = 0.42 + Math.sin(t * 7) * 0.1;
+      ctx.fillStyle = '#80d4ff';
       ctx.fillRect(-e.w / 2, 0, e.w, e.h);
       ctx.globalAlpha = 1;
     }
@@ -2350,4 +2366,300 @@ function roundRectE(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+// ─── PLAYER SPECIAL ATTACKS ──────────────────────────────────────────────────
+// Purchased from the shop for large sums. Each has its own cooldown (managed by
+// main.js on player.specialCDs). All three are especially potent against bosses.
+
+export const playerBombs = [];
+
+// Q — Heal Surge: restores 45 HP immediately.
+export function useHeal(player) {
+  player.hp = Math.min(player.maxHp, player.hp + 45);
+  const cx = player.x + player.w / 2, cy = player.y + player.h / 2;
+  for (let i = 0; i < 18; i++) {
+    const ang = (i / 18) * Math.PI * 2;
+    const spd = 55 + Math.random() * 110;
+    particles.push({
+      x: cx, y: cy,
+      vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 50,
+      life: 0.75, maxLife: 0.75,
+      color: i % 2 ? '#2ecc71' : '#a8ff78', size: 4,
+      gravity: 220,
+    });
+  }
+}
+
+// E — Mega Bomb: drops a fused bomb that explodes for 70 dmg / 250 px radius.
+// Boss shields are stripped before the blast hits.
+export function useBomb(player) {
+  playerBombs.push({
+    x: player.x + player.w / 2,
+    y: player.y,
+    vx: player.facing * 80,
+    vy: -240,
+    fuse: 2.0,
+    fuseMax: 2.0,
+    damage: 70,
+    radius: 250,
+  });
+}
+
+// Lightning bolt visual — jagged particle chain between two world points.
+function addLightningBolt(x1, y1, x2, y2) {
+  const steps = 9;
+  let px = x1, py = y1;
+  for (let i = 1; i <= steps; i++) {
+    const frac = i / steps;
+    const nx = x1 + (x2 - x1) * frac + (i < steps ? (Math.random() - 0.5) * 34 : 0);
+    const ny = y1 + (y2 - y1) * frac + (i < steps ? (Math.random() - 0.5) * 34 : 0);
+    particles.push({
+      x: (px + nx) / 2, y: (py + ny) / 2,
+      vx: (Math.random() - 0.5) * 28, vy: (Math.random() - 0.5) * 28,
+      life: 0.28, maxLife: 0.28,
+      color: i % 2 ? '#ffff80' : '#80d4ff', size: 2 + Math.random() * 2.5, gravity: 0,
+    });
+    px = nx; py = ny;
+  }
+}
+
+// R — Nova Strike: immediate screen-wide energy burst. Hits every alive enemy for
+// 35 damage (70 vs bosses). Boss shields are stripped first.
+export function useNova(player) {
+  const cx = player.x + player.w / 2, cy = player.y + player.h / 2;
+  // Big central flash
+  addExplosion(cx, cy, '#c8aaff');
+  addExplosion(cx, cy, '#ffffff');
+  for (let i = 0; i < 32; i++) {
+    const ang = (i / 32) * Math.PI * 2;
+    const spd = 140 + Math.random() * 320;
+    particles.push({
+      x: cx, y: cy,
+      vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+      life: 0.9, maxLife: 0.9,
+      color: i % 3 === 0 ? '#ffd700' : i % 3 === 1 ? '#c8aaff' : '#ffffff',
+      size: 5 + Math.random() * 3,
+      gravity: 80,
+    });
+  }
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    // Strip boss shield so the nova always lands
+    if (e.boss && e.shieldHp > 0) e.shieldHp = 0;
+    const dmg = e.boss ? 70 : 35;
+    const ecx = e.x + e.w / 2;
+    const knockDir = ecx < cx ? -1 : 1;
+    damageEnemy(e, dmg, knockDir, 700, player, null);
+    addExplosion(ecx, e.y + e.h / 2, '#c8aaff');
+  }
+}
+
+// Updates fused bombs — physics, fuse countdown, and detonation.
+export function updatePlayerBombs(dt, platforms) {
+  for (let i = playerBombs.length - 1; i >= 0; i--) {
+    const b = playerBombs[i];
+    b.vy += 1600 * dt;
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+
+    // Land on platforms (slight bounce)
+    for (const p of platforms) {
+      if (p._crumbleState === 2) continue;
+      const onGround = p.type === 'ground'
+        ? (b.x > p.x && b.x < p.x + p.w && b.y > p.y)
+        : (b.vy > 0 && b.y > p.y - 12 && b.y < p.y + 16 && b.x > p.x && b.x < p.x + p.w);
+      if (onGround) {
+        b.y = p.type === 'ground' ? p.y - 1 : p.y - 1;
+        b.vy = b.vy > 60 ? -b.vy * 0.25 : 0;
+        b.vx *= 0.7;
+      }
+    }
+
+    b.fuse -= dt;
+    if (b.fuse <= 0) {
+      // Detonate
+      addExplosion(b.x, b.y, '#ff9f43');
+      addExplosion(b.x, b.y - 24, '#ffd700');
+      // Extra blast particles
+      for (let j = 0; j < 28; j++) {
+        const ang = (j / 28) * Math.PI * 2;
+        const spd = 110 + Math.random() * 240;
+        particles.push({
+          x: b.x, y: b.y,
+          vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+          life: 0.65, maxLife: 0.65,
+          color: j % 2 ? '#ff9f43' : '#ffd700', size: 5, gravity: 140,
+        });
+      }
+      for (const e of enemies) {
+        if (!e.alive) continue;
+        const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+        const dist = Math.hypot(ecx - b.x, ecy - b.y);
+        if (dist <= b.radius) {
+          if (e.boss && e.shieldHp > 0) e.shieldHp = 0;
+          const falloff = 1 - dist / b.radius;
+          const dmg = Math.ceil(b.damage * (0.4 + 0.6 * falloff));
+          const knockDir = ecx < b.x ? -1 : 1;
+          damageEnemy(e, dmg, knockDir, 800, null, null);
+        }
+      }
+      playerBombs.splice(i, 1);
+    }
+  }
+}
+
+// Draws fused bombs with a pulsing glow and countdown timer.
+export function drawPlayerBombs(ctx, camX, GW) {
+  for (const b of playerBombs) {
+    if (b.x < camX - 60 || b.x > camX + GW + 60) continue;
+    const progress = b.fuse / b.fuseMax; // 1→0 as fuse burns
+
+    ctx.save();
+    ctx.translate(b.x, b.y);
+
+    // Outer danger glow — transitions orange → red as fuse shortens
+    const glowR = progress > 0.5 ? 255 : 255;
+    const glowG = Math.round(progress * 160);
+    ctx.globalAlpha = 0.35 + (1 - progress) * 0.45;
+    ctx.fillStyle = `rgb(${glowR},${glowG},40)`;
+    ctx.beginPath(); ctx.arc(0, 0, 28, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Bomb body
+    ctx.fillStyle = '#2f3542';
+    ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#636e72';
+    ctx.beginPath(); ctx.arc(-3, -4, 4.5, 0, Math.PI * 2); ctx.fill();
+
+    // Fuse rope
+    ctx.strokeStyle = '#f39c12';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, -12);
+    ctx.bezierCurveTo(10, -22, 7, -32, 3, -38);
+    ctx.stroke();
+
+    // Fuse spark (flashes faster near detonation)
+    const flashHz = 6 + (1 - progress) * 18;
+    if (Math.sin(b.fuse * flashHz) > 0) {
+      ctx.fillStyle = '#ffd700';
+      ctx.beginPath(); ctx.arc(3, -38, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(3, -38, 2, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Countdown label
+    ctx.fillStyle = progress < 0.4 ? '#ff4757' : '#ffffff';
+    ctx.font = `bold ${progress < 0.4 ? 12 : 10}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(b.fuse.toFixed(1), 0, 26);
+    ctx.textAlign = 'left';
+
+    ctx.restore();
+  }
+}
+
+// T — Shield Surge: full invulnerability for 3 s, visualised as a spinning bubble.
+export function useShield(player) {
+  player.invuln = 3.5;
+  player._shieldT = 3.5;
+  const cx = player.x + player.w / 2, cy = player.y + player.h / 2;
+  for (let i = 0; i < 22; i++) {
+    const ang = (i / 22) * Math.PI * 2;
+    const r = 26 + Math.random() * 10;
+    particles.push({
+      x: cx + Math.cos(ang) * r, y: cy + Math.sin(ang) * r,
+      vx: Math.cos(ang) * 55, vy: Math.sin(ang) * 55 - 30,
+      life: 0.7, maxLife: 0.7,
+      color: i % 2 ? '#80d4ff' : '#ffffff', size: 3.5, gravity: 80,
+    });
+  }
+}
+
+// Y — Chain Lightning: 60 dmg on nearest enemy, chains to 3 more for 35/20/10.
+// Boss shields stripped. Jumping bolt visual between each target.
+export function useChainLightning(player) {
+  const pcx = player.x + player.w / 2, pcy = player.y + player.h / 2;
+  const CHAIN_DMG = [60, 35, 20, 10];
+
+  // Sort alive enemies by distance from player
+  const sorted = enemies
+    .filter(e => e.alive)
+    .map(e => ({ e, dist: Math.hypot(e.x + e.w / 2 - pcx, e.y + e.h / 2 - pcy) }))
+    .sort((a, b) => a.dist - b.dist);
+
+  let fromX = pcx, fromY = pcy;
+  for (let i = 0; i < Math.min(CHAIN_DMG.length, sorted.length); i++) {
+    const { e, dist } = sorted[i];
+    if (i > 0 && dist > 360) break; // chain falls off past 360 px
+    if (e.boss && e.shieldHp > 0) e.shieldHp = 0;
+    const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+    addLightningBolt(fromX, fromY, ecx, ecy);
+    addHitParticles(ecx, ecy, '#ffff80', 8);
+    damageEnemy(e, CHAIN_DMG[i], ecx < pcx ? -1 : 1, 500, player, null);
+    fromX = ecx; fromY = ecy;
+  }
+  // Flash at player origin
+  for (let i = 0; i < 18; i++) {
+    const ang = (i / 18) * Math.PI * 2;
+    particles.push({
+      x: pcx, y: pcy,
+      vx: Math.cos(ang) * (90 + Math.random() * 110), vy: Math.sin(ang) * (90 + Math.random() * 110),
+      life: 0.38, maxLife: 0.38,
+      color: i % 2 ? '#ffff80' : '#80d4ff', size: 3.5, gravity: 0,
+    });
+  }
+}
+
+// U — Time Stop: freeze every enemy completely for 3 s (boss: 1.5 s).
+export function useTimeStop(player) {
+  const cx = player.x + player.w / 2, cy = player.y + player.h / 2;
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    e._frozenT = e.boss ? 1.5 : 3.0;
+    e.hitFlash = 0.08;
+  }
+  for (let i = 0; i < 32; i++) {
+    const ang = (i / 32) * Math.PI * 2;
+    const spd = 100 + Math.random() * 220;
+    particles.push({
+      x: cx, y: cy,
+      vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+      life: 1.1, maxLife: 1.1,
+      color: i % 3 === 0 ? '#ffffff' : i % 3 === 1 ? '#80d4ff' : '#c8eeff',
+      size: 4 + Math.random() * 3, gravity: 18,
+    });
+  }
+}
+
+// I — Quake Slam: shockwave from feet — 45 dmg to all enemies (90 vs bosses, 22 vs flyers).
+// Launches the player upward.
+export function useQuake(player) {
+  const cx = player.x + player.w / 2, cy = player.y + player.h;
+  // Ground shockwave particles spreading left and right
+  for (let i = 0; i < 26; i++) {
+    const ang = (i / 26) * Math.PI * 2;
+    particles.push({
+      x: cx + Math.cos(ang) * 10, y: cy,
+      vx: Math.cos(ang) * (110 + Math.random() * 200),
+      vy: Math.sin(ang) * (110 + Math.random() * 200) - 90,
+      life: 0.65, maxLife: 0.65,
+      color: i % 3 === 0 ? '#d35400' : i % 3 === 1 ? '#e67e22' : '#f39c12',
+      size: 4 + Math.random() * 3, gravity: 320,
+    });
+  }
+  // Launch player upward and restore double-jump
+  player.vy = Math.min(player.vy, -320);
+  player.jumpsLeft = 2;
+  // Damage all enemies
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    if (e.boss && e.shieldHp > 0) e.shieldHp = 0;
+    const dmg = e.boss ? 90 : (e.air ? 22 : 45);
+    const ecx = e.x + e.w / 2;
+    damageEnemy(e, dmg, ecx < cx ? -1 : 1, 850, player, null);
+    addHitParticles(ecx, e.y + e.h / 2, '#e67e22', 5);
+  }
 }

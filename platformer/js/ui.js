@@ -5,6 +5,7 @@ import {
   SKIN_DEFS, ownsSkin, buySkin, equipSkin, getEquippedSkin,
   WEAPON_UPGRADE_MAX, getWeaponUpgradeCost, upgradeWeapon,
   unlockEverything,
+  SPECIAL_DEFS, ownsSpecial, buySpecial,
 } from './state.js';
 import { STAGE_THEMES } from './renderer.js';
 import { STAGE_MODIFIERS } from './player.js';
@@ -145,6 +146,37 @@ export function updateHUD(stageIdx, levelIdx, coinsThisLevel, totalCoins, lives,
   if (el('hud-weapon')) {
     const w = getEquippedWeapon();
     el('hud-weapon').textContent = `${w.icon} ${w.label}`;
+  }
+}
+
+// Updates the special-attacks HUD strip. specialCDs is {heal, bomb, nova} → seconds remaining.
+export function updateSpecialsHUD(specialCDs) {
+  const strip = document.getElementById('hud-specials');
+  if (!strip) return;
+
+  // Show strip only if the player owns at least one special
+  const anyOwned = SPECIAL_DEFS.some(d => ownsSpecial(d.key));
+  strip.style.display = anyOwned ? 'flex' : 'none';
+  if (!anyOwned) return;
+
+  strip.innerHTML = '';
+  for (const def of SPECIAL_DEFS) {
+    if (!ownsSpecial(def.key)) continue;
+    const cd = specialCDs?.[def.key] ?? 0;
+    const maxCD = def.cooldown;
+    const ready = cd <= 0;
+    const pct = ready ? 1 : 1 - cd / maxCD;
+
+    const pill = document.createElement('div');
+    pill.className = 'special-pill' + (ready ? ' ready' : '');
+    pill.title = `${def.label} [${def.hotkey}]${ready ? '' : ` — ${Math.ceil(cd)}s`}`;
+    pill.innerHTML = `
+      <span class="sp-icon">${def.icon}</span>
+      <span class="sp-key">${def.hotkey}</span>
+      <div class="sp-bar"><div class="sp-fill" style="width:${Math.round(pct * 100)}%"></div></div>
+      <span class="sp-label">${ready ? 'READY' : Math.ceil(cd) + 's'}</span>
+    `;
+    strip.appendChild(pill);
   }
 }
 
@@ -315,6 +347,41 @@ function renderShop(callbacks) {
         playerData.upgrades[def.key]++;
         savePlayerData();
         renderShop(callbacks);
+      });
+    }
+    grid.appendChild(card);
+  }
+
+  // ── Special Attacks section ──
+  const spTitle = document.createElement('div');
+  spTitle.className = 'shop-section-title';
+  spTitle.textContent = '⚡ Special Attacks';
+  grid.appendChild(spTitle);
+
+  for (const def of SPECIAL_DEFS) {
+    const owned = ownsSpecial(def.key);
+    const canAfford = !owned && playerData.coins >= def.cost;
+
+    let btnHTML;
+    if (owned) {
+      btnHTML = `<div class="shop-maxed special-owned">OWNED · ${def.hotkey}</div>`;
+    } else {
+      btnHTML = `<button class="shop-buy special-buy${canAfford ? '' : ' cant-afford'}" data-sp-key="${def.key}">🪙 ${def.cost.toLocaleString()}</button>`;
+    }
+
+    const card = document.createElement('div');
+    card.className = 'shop-card special-card' + (owned ? ' owned' : '');
+    card.innerHTML = `
+      <div class="shop-icon">${def.icon}</div>
+      <div class="shop-name">${def.label}</div>
+      <div class="shop-desc">${def.desc}</div>
+      <div class="shop-wstat">Cooldown: ${def.cooldown}s · Key: ${def.hotkey}</div>
+      ${btnHTML}
+    `;
+    const spbtn = card.querySelector('button[data-sp-key]');
+    if (spbtn && canAfford) {
+      spbtn.addEventListener('click', () => {
+        if (buySpecial(def.key)) renderShop(callbacks);
       });
     }
     grid.appendChild(card);

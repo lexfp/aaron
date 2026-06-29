@@ -1,5 +1,5 @@
-import { loadPlayerData, playerData, markLevelComplete, getMagnetRadius, getStartLives, isStageComplete, getEquippedWeapon, grantCompletionSkin } from './state.js';
-import { initInput, consumeJump, consumeEsc, isAttack, clearAll } from './input.js';
+import { loadPlayerData, playerData, markLevelComplete, getMagnetRadius, getStartLives, isStageComplete, getEquippedWeapon, grantCompletionSkin, SPECIAL_DEFS, ownsSpecial } from './state.js';
+import { initInput, consumeJump, consumeEsc, isAttack, clearAll, consumeSpecial } from './input.js';
 import { player, initPlayer, updatePlayer, drawPlayer, setStageModifier, getStageModifier } from './player.js';
 import {
   generateLevel, drawPlatforms, drawHazards, getPlayerSpawn,
@@ -9,11 +9,14 @@ import {
   initEntities, updateEntities, drawEntities, exitDoor,
   updateEnemies, updateProjectiles, drawEnemies, drawProjectiles,
   playerMeleeAttack, spawnProjectile, isBossAlive,
+  useHeal, useBomb, useNova, useShield, useChainLightning, useTimeStop, useQuake,
+  updatePlayerBombs, drawPlayerBombs,
 } from './entities.js';
 import { drawBackground, getTheme } from './renderer.js';
 import {
   initUI, showScreen, updateHUD, showLevelComplete,
   showStageComplete, buildMainMenu, buildStageSelect, buildLevelSelect, showPauseMenu,
+  updateSpecialsHUD,
 } from './ui.js';
 
 const canvas = document.getElementById('game');
@@ -79,10 +82,17 @@ function startLevel(stage, level) {
   gameActive = true;
   prevTimestamp = null;
 
+  // Initialize special cooldowns (reset to 0 at level start)
+  if (!player.specialCDs) player.specialCDs = {};
+  for (const def of SPECIAL_DEFS) {
+    player.specialCDs[def.key] = 0;
+  }
+
   callbacks._lastCoins = 0;
   _lastHp = player.hp;
 
   updateHUD(stage, level, 0, playerData.coins, lives, player.hp, player.maxHp);
+  updateSpecialsHUD(player.specialCDs);
   showScreen('game-wrap');
 }
 
@@ -211,6 +221,30 @@ function gameLoop(timestamp) {
     player._charge = 0; // reset after attack fires
   }
   updateProjectiles(dt, levelData.platforms);
+
+  // Special attacks: tick cooldowns, then fire on Q/E/R press
+  let specialHUDDirty = false;
+  for (let i = 0; i < SPECIAL_DEFS.length; i++) {
+    const def = SPECIAL_DEFS[i];
+    if (player.specialCDs[def.key] > 0) {
+      player.specialCDs[def.key] = Math.max(0, player.specialCDs[def.key] - dt);
+      specialHUDDirty = true;
+    }
+    if (consumeSpecial(i) && ownsSpecial(def.key) && player.specialCDs[def.key] <= 0 && !player.dead) {
+      if (def.key === 'heal') useHeal(player);
+      else if (def.key === 'bomb') useBomb(player);
+      else if (def.key === 'nova') useNova(player);
+      else if (def.key === 'shield') useShield(player);
+      else if (def.key === 'lightning') useChainLightning(player);
+      else if (def.key === 'timestop') useTimeStop(player);
+      else if (def.key === 'quake') useQuake(player);
+      player.specialCDs[def.key] = def.cooldown;
+      specialHUDDirty = true;
+    }
+  }
+  if (specialHUDDirty) updateSpecialsHUD(player.specialCDs);
+  updatePlayerBombs(dt, levelData.platforms);
+
   const enemyRes = updateEnemies(dt, levelData.platforms, player);
 
   const collected = updateEntities(dt, player, getMagnetRadius());
@@ -257,6 +291,7 @@ function renderFrame() {
   drawEnemies(ctx, camX, GW, gameTime, player, _lastDt);
   drawPlayer(ctx, gameTime);
   drawProjectiles(ctx, camX, GW);
+  drawPlayerBombs(ctx, camX, GW);
 
   ctx.restore();
 

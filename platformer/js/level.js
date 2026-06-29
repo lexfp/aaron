@@ -184,11 +184,16 @@ function nCoins(coins, plat, n, rng) {
 
 // Parabolic arc of coins from (x1,y1) to (x2,y2), peaking upward by arcH px.
 // Doubles as a readable "this is the path" hint over every jump.
+// arcH is clamped so the peak is always within the player's single-jump reach from
+// the start platform — prevents coins from floating above the trajectory when climbing.
 function arcCoins(coins, x1, y1, x2, y2, n, rng, arcH = 55) {
+  // Peak coin y = midY - arcH. Player feet peak from y1 ≈ y1 - 82.
+  // Require peak_y >= feet_peak → arcH <= midY - y1 + 82 = (y2-y1)/2 + 82.
+  const safeH = Math.max(16, Math.min(arcH, (y2 - y1) / 2 + 82));
   for (let i = 0; i < n; i++) {
     const t = (i + 1) / (n + 1);
     const x = lerp(x1, x2, t) - 8;
-    const y = lerp(y1, y2, t) - arcH * Math.sin(Math.PI * t) - 8;
+    const y = lerp(y1, y2, t) - safeH * Math.sin(Math.PI * t) - 8;
     coins.push(mkCoin(x, y, rng() * Math.PI * 2));
   }
 }
@@ -245,7 +250,13 @@ function segGapRun(b, e) {
   const w = lerp(135, 80, e);
   const baseY = clamp(b.y - lerp(0, 45, e), TOP + 90, FLOOR);
   for (let i = 0; i < n; i++) {
-    connect(b, gap + b.rng() * 18, baseY + (b.rng() - 0.5) * 32, w, 'normal', 52, 2);
+    const pl = connect(b, gap + b.rng() * 18, baseY + (b.rng() - 0.5) * 32, w, 'normal', 52, 2);
+    // At medium+ difficulty, add edge spikes so sloppy landings hurt.
+    if (e > 0.35 && b.rng() < e * 0.65) {
+      const cnt = e > 0.65 && b.rng() < 0.5 ? 2 : 1;
+      const sx = b.rng() < 0.5 ? pl.x + 2 : pl.x + pl.w - 2 - cnt * 20;
+      addSpikes(b, sx, pl.y, cnt, 'up', 20);
+    }
   }
 }
 
@@ -275,7 +286,13 @@ function segPillars(b, e) {
   const amp = lerp(28, 70, e);
   const center = clamp(b.y - 18, TOP + 130, FLOOR - 40);
   for (let i = 0; i < n; i++) {
-    connect(b, gap, center + (i % 2 ? amp : -amp), w, 'normal', 58, 1);
+    const pl = connect(b, gap, center + (i % 2 ? amp : -amp), w, 'normal', 58, 1);
+    // High platforms (the ones you leap UP to) get edge spikes at medium+ difficulty.
+    if (i % 2 === 0 && e > 0.45 && b.rng() < e * 0.7) {
+      const cnt = e > 0.7 ? 2 : 1;
+      const side = b.rng() < 0.5;
+      addSpikes(b, side ? pl.x + 2 : pl.x + pl.w - 2 - cnt * 20, pl.y, cnt, 'up', 20);
+    }
   }
 }
 
@@ -314,13 +331,14 @@ function segDescentDrop(b, e) {
 // Ground run studded with spike clusters you must hop over.
 function segSpikePath(b, e) {
   connect(b, lerp(42, 72, e), FLOOR, 92, 'normal', 30, 1); // step down to ground level
-  const runLen = lerp(520, 820, e);
+  const runLen = lerp(640, 1100, e);
   const gx = b.x + 8;
   b.plats.push(mkGround(gx, runLen));
-  const clusters = 2 + Math.floor(e * 3 + b.rng() * 2);
+  // Many more clusters, each much wider — cannot be skipped with a casual double-jump.
+  const clusters = 4 + Math.floor(e * 5 + b.rng() * 2);
   for (let k = 0; k < clusters; k++) {
     const cxk = gx + runLen * (k + 1) / (clusters + 1) - 20;
-    const cnt = 1 + Math.floor(e * 2 + b.rng() * 2);
+    const cnt = 3 + Math.floor(e * 4 + b.rng() * 2); // 3–9 spikes (60–180 px wide)
     addSpikes(b, cxk, GROUND_Y, cnt, 'up', 20);
     arcCoins(b.coins, cxk - 22, GROUND_Y - 20, cxk + cnt * 20 + 22, GROUND_Y - 20, 3, b.rng, 62);
   }
@@ -368,14 +386,23 @@ function segElevator(b, e) {
 
 // Low corridor with ceiling spikes — a single jump clears each gap, but a
 // double jump skewers you. Punishes panic-jumping.
+// Ceiling covers the full platform AND the gap above it so there's no way to arc high
+// and descend onto an uncovered edge.
 function segGauntlet(b, e) {
-  const n = 3 + Math.floor(b.rng() * 2);
+  const n = 3 + Math.floor(b.rng() * 3);
   const w = lerp(112, 78, e);
   const gap = lerp(80, 120, e);
   for (let i = 0; i < n; i++) {
+    const prevX = b.x; // right edge before placing the next platform
     const pl = connect(b, gap, clamp(b.y + (b.rng() - 0.5) * 18, FLOOR - 70, FLOOR), w, 'normal', 26, 1);
-    const ceilY = pl.y - lerp(178, 150, e); // high enough that a single jump clears, a double doesn't
-    addSpikes(b, pl.x + 6, ceilY, Math.max(2, Math.floor(pl.w / 20) - 1), 'down', 18);
+    // ceilY tuned so player.y at single-jump peak (~255 from FLOOR) clears the hitbox,
+    // but double-jump peak (~189) does not. Valid window for FLOOR=410: ceilY in 184–246.
+    const ceilY = pl.y - lerp(165, 140, e);
+    // Full-width platform coverage (14 px spikes for tighter gaps)
+    addSpikes(b, pl.x + 2, ceilY, Math.max(4, Math.floor((pl.w - 4) / 14)), 'down', 14);
+    // Gap coverage — prevents soaring high over the gap then sneaking down past the spikes
+    const gapW = pl.x - prevX;
+    if (gapW > 14) addSpikes(b, prevX + 2, ceilY, Math.max(2, Math.floor((gapW - 4) / 14)), 'down', 14);
   }
 }
 
@@ -393,11 +420,11 @@ function segCrumbleRun(b, e) {
 // One big leap over an open spike pit — miss and you're impaled.
 function segSpikeLeap(b, e) {
   connect(b, lerp(80, 110, e), b.y, lerp(110, 82, e), 'normal', 28, 1);
-  const gap = lerp(190, 250, e);
-  const pitX = b.x + 30;
-  const pitW = gap - 30;
-  const sCount = Math.max(2, Math.floor(pitW / 22));
-  addSpikes(b, pitX, GROUND_Y, sCount, 'up', 22);
+  const gap = lerp(210, 280, e); // wider gap = scarier pit
+  const pitX = b.x + 20;
+  const pitW = gap - 20;
+  const sCount = Math.max(4, Math.floor(pitW / 20)); // denser spikes filling the pit
+  addSpikes(b, pitX, GROUND_Y, sCount, 'up', 20);
   connect(b, gap, b.y + (b.rng() - 0.5) * 28, lerp(122, 92, e), 'normal', 86, 4);
 }
 
@@ -427,12 +454,12 @@ const SEGMENTS = [
   { id: 'zigzag', fn: segZigzag, tier: 1, gate: 0 },
   { id: 'longLeap', fn: segLongLeap, tier: 1, gate: 0 },
   { id: 'descent', fn: segDescentDrop, tier: 1, gate: 0 },
-  { id: 'spikePath', fn: segSpikePath, tier: 1, gate: 0.03 },
+  { id: 'spikePath', fn: segSpikePath, tier: 1, gate: 0.01 },
   { id: 'movingBridge', fn: segMovingBridge, tier: 2, gate: 0.06 },
   { id: 'elevator', fn: segElevator, tier: 2, gate: 0.06 },
-  { id: 'gauntlet', fn: segGauntlet, tier: 2, gate: 0.10 },
+  { id: 'gauntlet', fn: segGauntlet, tier: 2, gate: 0.04 },
   { id: 'crumble', fn: segCrumbleRun, tier: 2, gate: 0.16 },
-  { id: 'spikeLeap', fn: segSpikeLeap, tier: 2, gate: 0.20 },
+  { id: 'spikeLeap', fn: segSpikeLeap, tier: 2, gate: 0.08 },
 ];
 
 function pickSegment(b, e, last, prof) {

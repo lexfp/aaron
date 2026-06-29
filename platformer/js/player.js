@@ -79,6 +79,7 @@ export const player = {
   windPushDir: 0,     // direction of the wind push (+1 or -1)
   dazeT: 0,           // shroom spore: dampens horizontal input
   _charge: 0,         // seconds the attack input has been held (charge tracking)
+  _shieldT: 0,        // Shield Surge active timer (visual bubble + invuln)
   // Computed from upgrades each level
   jumpForce: BASE_JUMP,
   djForce: BASE_DJ,
@@ -109,6 +110,7 @@ export function initPlayer(spawnX, spawnY) {
   player.attackCD = 0;
   player.swingT = 0;
   player._charge = 0;
+  player._shieldT = 0;
   player.weapon = getEquippedWeapon();
   player.iceSlipT = 0;
   player.windPushT = 0;
@@ -223,6 +225,7 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
   player.iceSlipT = Math.max(0, player.iceSlipT - dt);
   player.windPushT = Math.max(0, player.windPushT - dt);
   player.dazeT = Math.max(0, player.dazeT - dt);
+  player._shieldT = Math.max(0, player._shieldT - dt);
 
   // Walk distance for leg swing animation
   if (player.onGround && Math.abs(player.vx) > 15) {
@@ -252,8 +255,10 @@ export function drawPlayer(ctx, t) {
   ctx.translate(centerX, centerY);
   if (facing < 0) ctx.scale(-1, 1);
 
-  // Blink while invulnerable (i-frames) so the player can read that hits won't land.
-  if (player.invuln > 0) ctx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(player.invuln * 30));
+  // Ghost skin is translucent; invuln blink multiplies on top of the base alpha.
+  const baseAlpha = palette.alpha ?? 1;
+  if (player.invuln > 0) ctx.globalAlpha = baseAlpha * (0.4 + 0.6 * Math.abs(Math.sin(player.invuln * 30)));
+  else if (baseAlpha < 1) ctx.globalAlpha = baseAlpha;
 
   // Squash/stretch transform
   let sx = 1, sy = 1;
@@ -318,7 +323,7 @@ export function drawPlayer(ctx, t) {
   ctx.arc(0, -hh * 0.42, hw * 0.8, Math.PI * 1.1, Math.PI * 1.9);
   ctx.stroke();
 
-  // Accessory (visor or cap from active palette)
+  // Accessory (visor, cap, or crown from active palette)
   if (palette.accessory_type === 'visor') {
     ctx.fillStyle = palette.accessory_color;
     ctx.fillRect(-hw * 0.5, -hh * 0.52, hw * 0.9, hh * 0.14);
@@ -328,6 +333,27 @@ export function drawPlayer(ctx, t) {
     ctx.ellipse(hw * 0.08, -hh * 0.82, hw * 0.75, hh * 0.22, 0, Math.PI, 0);
     ctx.fill();
     ctx.fillRect(-hw * 0.7, -hh * 0.82, hw * 1.4, hh * 0.06);
+  } else if (palette.accessory_type === 'crown') {
+    const crownBase = -hh * 1.15; // just above hair
+    ctx.fillStyle = palette.accessory_color;
+    // Base band
+    ctx.fillRect(-hw * 0.7, crownBase, hw * 1.4, 5);
+    // Three spikes
+    const spikeXs = [-hw * 0.45, 0, hw * 0.45];
+    const spikeHs = [9, 13, 9];
+    for (let k = 0; k < 3; k++) {
+      ctx.beginPath();
+      ctx.moveTo(spikeXs[k] - 4, crownBase);
+      ctx.lineTo(spikeXs[k], crownBase - spikeHs[k]);
+      ctx.lineTo(spikeXs[k] + 4, crownBase);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Red jewel on center spike
+    ctx.fillStyle = '#e74c3c';
+    ctx.beginPath();
+    ctx.arc(0, crownBase - spikeHs[1] + 3, 2.5, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   // Eyes (right eye is front when facing right)
@@ -404,6 +430,28 @@ export function drawPlayer(ctx, t) {
     ctx.arc(0, -hh * 0.1, hw * 1.35, 0, Math.PI * 2);
     ctx.stroke();
     ctx.lineWidth = 1;
+  }
+
+  // Shield Surge bubble — slowly rotating cyan ring while active
+  if (player._shieldT > 0) {
+    const sa = Math.min(1, player._shieldT / 3.5);
+    ctx.save();
+    ctx.rotate(t * 1.4);
+    ctx.strokeStyle = `rgba(80,210,255,${sa * 0.9})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, -hh * 0.1, hw * 2.1, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = `rgba(200,240,255,${sa * 0.45})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, -hh * 0.1, hw * 1.85, 0, Math.PI * 2); ctx.stroke();
+    // Sparkle dots around the ring
+    for (let si = 0; si < 5; si++) {
+      const sa2 = (si / 5) * Math.PI * 2;
+      ctx.fillStyle = `rgba(200,240,255,${sa * 0.95})`;
+      ctx.beginPath();
+      ctx.arc(Math.cos(sa2) * hw * 2.0, -hh * 0.1 + Math.sin(sa2) * hw * 2.0, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   ctx.restore();
