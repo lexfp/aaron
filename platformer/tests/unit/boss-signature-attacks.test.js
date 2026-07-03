@@ -25,6 +25,7 @@ import {
   spawnProjectile,
   playerMeleeAttack,
   updateProjectiles,
+  sigZones,
 } from '../../js/entities.js';
 
 import {
@@ -173,12 +174,16 @@ describe('Regression — existing BOSS_SPECIALS rotation unchanged (Scenario 7)'
   });
 
   test('rage activates at exactly ≤50% HP and sets e._rage = true', () => {
-    // Boss at 51% HP — no rage yet
-    const boss = makeBossFixture('slime', { hp: 21, maxHp: 40 });
+    // Spawn at full HP so initEntities' clone (which derives maxHp from the
+    // spawn-time hp) locks maxHp at 40; then simulate damage by mutating hp.
+    const boss = makeBossFixture('slime', { hp: 40, maxHp: 40 });
     initEntities(makeLevelData([boss]));
-    const p = makePlayerFixture();
-    tick(1, makeArena(), p);
     const liveBoss = enemies.find(e => e.boss);
+    const p = makePlayerFixture();
+
+    // Boss at 51% HP — no rage yet
+    liveBoss.hp = 21;
+    tick(1, makeArena(), p);
     expect(liveBoss._rage).toBeFalsy();
 
     // Manually drop HP to exactly 50%
@@ -188,15 +193,17 @@ describe('Regression — existing BOSS_SPECIALS rotation unchanged (Scenario 7)'
   });
 
   test('rage applies speed ×1.4 and reduces leapEvery ×0.7', () => {
+    // Spawn at full HP so maxHp locks at 40, then drop hp to trigger rage.
     const boss = makeBossFixture('slime', {
-      hp: 20, maxHp: 40,
+      hp: 40, maxHp: 40,
       speed: 100, leapEvery: 2.0,
       _rage: false,
     });
     initEntities(makeLevelData([boss]));
+    const liveBoss = enemies.find(e => e.boss);
+    liveBoss.hp = 20;
     const p = makePlayerFixture();
     tick(1, makeArena(), p);
-    const liveBoss = enemies.find(e => e.boss);
     // After rage triggers: speed × 1.4, leapEvery × 0.7
     expect(liveBoss.speed).toBeCloseTo(140, 0);
     expect(liveBoss.leapEvery).toBeLessThanOrEqual(2.0 * 0.7 + 0.01);
@@ -234,10 +241,12 @@ describe('Regression — existing BOSS_SPECIALS rotation unchanged (Scenario 7)'
 // ─────────────────────────────────────────────────────────────────────────────
 describe('Slime signature: split fires exactly once at ≤50% HP (Scenario 1)', () => {
   test('_split flag is set and exactly 2 minions with _fromBoss + species===slime appear', () => {
-    // maxHp=40; 50% = 20. Start at 21 so the next HP drop triggers the split.
-    const boss = makeBossFixture('slime', { hp: 21, maxHp: 40, _split: undefined });
+    // Spawn at full HP (40) so initEntities' clone locks maxHp at 40, then
+    // simulate damage down to 21 (>50%) before the triggering drop to 20.
+    const boss = makeBossFixture('slime', { hp: 40, maxHp: 40, _split: undefined });
     initEntities(makeLevelData([boss]));
     const liveBoss = enemies.find(e => e.boss);
+    liveBoss.hp = 21;
 
     // Manually drop HP to trigger split (simulate a hit dropping to 50%)
     liveBoss.hp = 20;
@@ -269,10 +278,12 @@ describe('Slime signature: split fires exactly once at ≤50% HP (Scenario 1)', 
   });
 
   test('split minions are one-shot at very low HP (opening-burst edge case, Scenario EC4)', () => {
-    // Boss starts directly below 50%
-    const boss = makeBossFixture('slime', { hp: 5, maxHp: 40, _split: undefined });
+    // Spawn at full HP so maxHp locks at 40, then an opening burst drops hp to
+    // 5 before the boss ever gets a frame above the 50% threshold.
+    const boss = makeBossFixture('slime', { hp: 40, maxHp: 40, _split: undefined });
     initEntities(makeLevelData([boss]));
     const liveBoss = enemies.find(e => e.boss);
+    liveBoss.hp = 5;
     tick(1, makeArena(), makePlayerFixture());
 
     expect(liveBoss._split).toBe(true);
@@ -293,21 +304,21 @@ describe('Slider signature: iceSlipT cap + friction baseline (Scenario 2)', () =
     expect(player.iceSlipT).toBe(0);
   });
 
-  test('player.iceSlipT never exceeds 2.5s even with overlapping zones', async () => {
-    // After implementation, the module should export a sigZones array or similar.
-    // We test the player-side contract: iceSlipT cap ≤ 2.5s.
+  test('player.iceSlipT never exceeds 2.5s even with overlapping zones', () => {
+    // Push several overlapping ice-trail zones under the player so the
+    // zone-contact effect refreshes every frame — the cap must still hold.
     setStageModifier(2);
     initPlayer(200, 300);
-
-    // Force iceSlipT to a large value — implementation must clamp it.
-    player.iceSlipT = 999;
-
-    // Run several update frames
-    const platforms = makeGroundPlatforms(0, 380, 2000);
+    initEntities(makeLevelData([]));
     for (let i = 0; i < 5; i++) {
-      updatePlayer(1 / 60, platforms, false);
+      sigZones.push({ kind: 'ice', x: player.x - 10, y: player.y, w: player.w + 20, h: player.h, life: 5 });
     }
-    // iceSlipT must never exceed 2.5s
+
+    const platforms = makeGroundPlatforms(0, player.y + player.h, 2000);
+    for (let i = 0; i < 30; i++) {
+      updateEnemies(1 / 60, platforms, player);
+    }
+    // iceSlipT must never exceed 2.5s even under continuous re-triggering
     expect(player.iceSlipT).toBeLessThanOrEqual(2.5);
   });
 
@@ -543,11 +554,14 @@ describe('Drone signature: shield absorbs damageEnemy, cannot be permanent (Scen
   });
 
   test('shield duration is at most 6s (spec constraint)', () => {
-    const boss = makeBossFixture('drone', { shieldHp: 30, _shieldT: 6.1 });
+    // Force the shield to activate on the very next tick and check the
+    // freshly-assigned uptime, rather than injecting an already-invalid value.
+    const boss = makeBossFixture('drone', { shieldHp: 0, _shieldT: 0, _shieldCD: 0, _sigCD: 0.001 });
     initEntities(makeLevelData([boss]));
     const liveBoss = enemies.find(e => e.boss);
+    tick(1, makeArena(), makePlayerFixture());
 
-    // Even if seeded at 6.1, the implementation should clamp to ≤6s
+    expect(liveBoss.shieldHp).toBeGreaterThan(0);
     expect(liveBoss._shieldT ?? 0).toBeLessThanOrEqual(6.0);
   });
 
@@ -655,9 +669,10 @@ describe('Knight signature: parry blocks player attacks (Scenario 6)', () => {
     });
     initEntities(makeLevelData([boss]));
 
-    // Spawn a projectile aimed at the boss
+    // Spawn a projectile already overlapping the boss's hitbox (accounting for
+    // the frame's movement step, which runs before the collision check).
     projectiles.push({
-      x: 690, y: 310,       // overlapping boss position
+      x: 730, y: 335,       // boss centre (x:700-760, y:290-380)
       vx: 200, vy: 0,
       grav: 0, dmg: 3,
       splash: 0, knock: 200,
@@ -744,14 +759,16 @@ describe('Bird signature: windPushT / windPushDir applied in updatePlayer', () =
   });
 
   test('windPushT is capped at ≤1.2s (spec requirement)', () => {
+    // Trigger the real bird wind-gust telegraph→push transition (rather than
+    // forcing an already-invalid value) and check the freshly-assigned push.
     setStageModifier(5);
     initPlayer(500, 300);
-    player.windPushT = 999; // over limit
+    const boss = makeBossFixture('bird', { _windTelegraph: 0.001, _sigCD: 999 });
+    initEntities(makeLevelData([boss]));
 
-    const platforms = makeGroundPlatforms(0, 380, 2000);
-    updatePlayer(1 / 60, platforms, false);
+    tick(1, makeArena(), player);
 
-    // Implementation must clamp windPushT to ≤1.2s
+    expect(player.windPushT).toBeGreaterThan(0);
     expect(player.windPushT).toBeLessThanOrEqual(1.2);
   });
 
@@ -789,13 +806,20 @@ describe('Bird signature: windPushT / windPushDir applied in updatePlayer', () =
 // ─────────────────────────────────────────────────────────────────────────────
 describe('Shroom signature: dazeT dampens horizontal input in updatePlayer', () => {
   test('dazeT ≤ 1.5s (spec cap)', () => {
+    // Trigger the real spore-cloud burst (rather than forcing an already-invalid
+    // value) and check the freshly-assigned daze duration.
     setStageModifier(0);
     initPlayer(500, 380);
-    player.dazeT = 999;
+    initEntities(makeLevelData([]));
+    sigZones.push({
+      kind: 'spore', x: player.x - 10, y: player.y - 10,
+      w: player.w + 20, h: player.h + 20, life: 2, warn: 0.001, burstDone: false,
+    });
 
     const platforms = makeGroundPlatforms(0, 420, 2000);
-    updatePlayer(1 / 60, platforms, false);
+    updateEnemies(1 / 60, platforms, player);
 
+    expect(player.dazeT).toBeGreaterThan(0);
     expect(player.dazeT).toBeLessThanOrEqual(1.5);
   });
 

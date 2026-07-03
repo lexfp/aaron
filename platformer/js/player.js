@@ -1,12 +1,10 @@
 import { isLeft, isRight } from './input.js';
-import { resolveX, resolveY, STAGE_MODIFIERS } from './level.js';
+import { resolveX, resolveY } from './level.js';
 import { addDJParticles, addLandParticles } from './entities.js';
 import { getJumpMult, getDJMult, getSpeedMult, getEquippedWeapon } from './state.js';
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
-// NOTE: BASE_JUMP / BASE_DJ / GRAVITY are mirrored in level.js (P_JUMP/P_DJ/P_GRAV)
-// for the stage jump-envelope math — keep both in sync if these change.
 const BASE_JUMP = 555;
 const BASE_DJ = 495;
 const BASE_SPEED = 280;
@@ -15,11 +13,28 @@ const TERMINAL_VEL = 950;
 const COYOTE_TIME = 0.1;
 // Idle horizontal damping is per-stage now (see STAGE_MODIFIERS `.fric`); base is 0.72.
 
-// STAGE_MODIFIERS (the per-stage gameplay twists) lives in level.js now, so the
-// level generator can derive each stage's real jump envelope and scale gap/rise
-// geometry to match — every level is built for the physics it's played with.
-// Re-exported here for ui.js and any other consumer.
-export { STAGE_MODIFIERS };
+// Per-stage gameplay twist (index 0-9, matches STAGE_THEMES order in renderer.js).
+//   gMul  — gravity multiplier
+//   jMul  — jump/double-jump force multiplier (scaled WITH gravity on "heavy"
+//           stages so required jumps stay reachable — see physics note below)
+//   fric  — idle horizontal damping per frame (base 0.72; ↑ = slippery, ↓ = grippy)
+//   wind  — sideways gust acceleration amplitude (px/s², 0 = none)
+//   dark  — 1 = limited-visibility vignette around the player (rendered in main.js)
+// NOTE on reachability: scaling gMul and jMul together leaves horizontal jump
+// distance unchanged and only INCREASES vertical reach, and lowering gMul alone
+// only increases reach — so every twist keeps all 500 validated levels solvable.
+export const STAGE_MODIFIERS = [
+  { label: '🌱 Springy Grass', gMul: 1.0,  jMul: 1.12, fric: 0.72, wind: 0,    dark: 0 }, // Meadow
+  { label: '🕯️ Pitch Dark',    gMul: 1.0,  jMul: 1.0,  fric: 0.72, wind: 0,    dark: 1 }, // Cave
+  { label: '❄️ Slippery Ice',  gMul: 1.0,  jMul: 1.0,  fric: 0.965, wind: 0,   dark: 0 }, // Icy Peaks
+  { label: '🌬️ Desert Gusts',  gMul: 1.0,  jMul: 1.0,  fric: 0.72, wind: 1300, dark: 0 }, // Desert
+  { label: '🔥 Scorching Heat', gMul: 1.25, jMul: 1.25, fric: 0.72, wind: 0,    dark: 0 }, // Lava
+  { label: '☁️ Sky Updrafts',  gMul: 0.6,  jMul: 1.0,  fric: 0.78, wind: 0,    dark: 0 }, // Sky
+  { label: '🍄 Mossy Grip',    gMul: 1.0,  jMul: 1.0,  fric: 0.42, wind: 0,    dark: 0 }, // Forest
+  { label: '🚀 Zero Gravity',  gMul: 0.32, jMul: 1.0,  fric: 0.86, wind: 0,    dark: 0 }, // Space
+  { label: '💎 Bouncy Crystal', gMul: 1.0,  jMul: 1.24, fric: 0.72, wind: 0,    dark: 0 }, // Crystal
+  { label: '🏰 Heavy Gravity',  gMul: 1.45, jMul: 1.45, fric: 0.72, wind: 0,    dark: 0 }, // Dark Fortress
+];
 
 let _mod = STAGE_MODIFIERS[0];
 let _modT = 0; // time accumulator for oscillating effects (wind gusts)
@@ -58,11 +73,11 @@ export const player = {
   swingT: 0,          // remaining swing-animation time
   swingDur: 0.16,
   weapon: null,       // equipped weapon def (for drawing)
-  // Signature effect timers (set to 0 in initPlayer; decayed in updatePlayer)
-  iceSlipT: 0,     // slider ice trail: override friction toward slippery
-  windPushT: 0,    // bird wind gust: horizontal push duration
-  windPushDir: 0,  // bird wind gust: push direction (-1 or 1)
-  dazeT: 0,        // shroom spore: dampen horizontal input
+  // Boss signature effect timers (all decay to 0; reset by initPlayer)
+  iceSlipT: 0,        // slider ice trail: overrides idle friction toward slippery
+  windPushT: 0,       // bird wind gust: horizontal push for this many seconds
+  windPushDir: 0,     // direction of the wind push (+1 or -1)
+  dazeT: 0,           // shroom spore: dampens horizontal input
   // Computed from upgrades each level
   jumpForce: BASE_JUMP,
   djForce: BASE_DJ,
@@ -93,8 +108,6 @@ export function initPlayer(spawnX, spawnY) {
   player.attackCD = 0;
   player.swingT = 0;
   player.weapon = getEquippedWeapon();
-
-  // Signature effect timers — always reset to 0 on every spawn/respawn
   player.iceSlipT = 0;
   player.windPushT = 0;
   player.windPushDir = 0;
@@ -146,35 +159,27 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
 
   _modT += dt;
 
-  // Decay signature effect timers
-  if (player.iceSlipT > 0) player.iceSlipT = Math.max(0, player.iceSlipT - dt);
-  if (player.windPushT > 0) player.windPushT = Math.max(0, player.windPushT - dt);
-  if (player.dazeT > 0) player.dazeT = Math.max(0, player.dazeT - dt);
-
   // Horizontal movement (idle damping varies by stage: slippery ice vs. mossy grip)
-  // iceSlipT overrides friction toward slippery; dazeT dampens input control.
-  const inputLeft = isLeft(), inputRight = isRight();
-  const rawTarget = inputLeft ? -player.speed : inputRight ? player.speed : 0;
-  const targetVx = player.dazeT > 0 ? rawTarget * 0.35 : rawTarget; // shroom daze: reduced input
+  const dazeScale = player.dazeT > 0 ? 0.35 : 1.0; // shroom daze dampens input
+  const targetVx = isLeft() ? -player.speed * dazeScale : isRight() ? player.speed * dazeScale : 0;
   if (targetVx !== 0) {
     player.vx = targetVx;
     player.facing = targetVx > 0 ? 1 : -1;
   } else {
-    // ice trail overrides friction toward 0.965 (slippery) while iceSlipT > 0
     const activeFric = player.iceSlipT > 0 ? Math.max(_mod.fric, 0.965) : _mod.fric;
     player.vx *= activeFric;
     if (Math.abs(player.vx) < 8) player.vx = 0;
   }
 
-  // Bird wind push: horizontal shove, magnitude never exceeds base run speed;
-  // player still moves and jumps against it.
-  if (player.windPushT > 0) {
-    const pushAmt = Math.min(280, player.speed) * player.windPushDir * dt * 1.2;
-    player.vx = Math.max(-player.speed, Math.min(player.speed, player.vx + pushAmt));
-  }
-
   // Desert gusts: oscillating sideways push you must lean against.
   if (_mod.wind) player.vx += _mod.wind * Math.sin(_modT * 0.6) * dt;
+
+  // Bird wind gust: horizontal push for capped duration
+  if (player.windPushT > 0) {
+    player.vx += player.windPushDir * 560 * dt; // sustained gust acceleration
+    player.vx = Math.max(-BASE_SPEED, Math.min(BASE_SPEED, player.vx));
+    player.windPushT = Math.max(0, player.windPushT - dt);
+  }
 
   // Gravity (per-stage multiplier; terminal velocity tracks it so low-g feels floaty)
   const grav = GRAVITY * _mod.gMul;
@@ -213,6 +218,9 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
   player.swingT = Math.max(0, player.swingT - dt);
   player.invuln = Math.max(0, player.invuln - dt);
   player.hurtFlash = Math.max(0, player.hurtFlash - dt);
+  player.iceSlipT = Math.max(0, player.iceSlipT - dt);
+  player.windPushT = Math.max(0, player.windPushT - dt);
+  player.dazeT = Math.max(0, player.dazeT - dt);
 
   // Walk distance for leg swing animation
   if (player.onGround && Math.abs(player.vx) > 15) {
@@ -349,32 +357,27 @@ export function drawPlayer(ctx, t) {
     ctx.globalAlpha = 1;
   }
 
-  // Spore daze overlay — green-brown haze while dazeT > 0
+  // Shroom spore daze overlay
   if (player.dazeT > 0) {
-    const dAlpha = Math.min(0.55, player.dazeT / 1.5 * 0.55);
+    const dAlpha = Math.min(0.55, player.dazeT / 1.5) * (0.6 + Math.sin(t * 9) * 0.3);
     ctx.globalAlpha = dAlpha;
-    ctx.fillStyle = '#8b6914';
-    roundRect(ctx, -hw - 4, -hh - 4, w + 8, h + 8, 8);
-    ctx.fill();
+    ctx.fillStyle = '#e17055';
+    ctx.beginPath(); ctx.arc(0, -hh * 0.1, hw * 1.5, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
-    // pulsing spore ring
-    ctx.strokeStyle = `rgba(162,105,12,${0.5 + Math.sin(t * 8) * 0.3})`;
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(0, 0, hw * 1.6, 0, Math.PI * 2); ctx.stroke();
-    ctx.lineWidth = 1;
   }
 
-  // Wind push overlay — cyan streaks while windPushT > 0
+  // Bird wind push overlay
   if (player.windPushT > 0) {
-    const wAlpha = Math.min(0.45, player.windPushT / 1.2 * 0.45);
-    ctx.strokeStyle = `rgba(100,200,255,${wAlpha * 2})`;
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 3; i++) {
-      const oy = -hh * 0.4 + i * hh * 0.4;
-      const ox = player.windPushDir * (hw + 5 + i * 4);
-      ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + player.windPushDir * 10, oy); ctx.stroke();
+    const wAlpha = Math.min(0.5, player.windPushT / 1.1) * (0.5 + Math.sin(t * 14) * 0.3);
+    ctx.globalAlpha = wAlpha;
+    ctx.strokeStyle = '#c0d8ff'; ctx.lineWidth = 2;
+    for (let wi = 0; wi < 3; wi++) {
+      ctx.beginPath();
+      ctx.moveTo(player.windPushDir * (hw * 0.4 + wi * 5), -hh * 0.4 + wi * hh * 0.3);
+      ctx.lineTo(player.windPushDir * (hw * 1.1 + wi * 5), -hh * 0.4 + wi * hh * 0.3);
+      ctx.stroke();
     }
-    ctx.lineWidth = 1;
+    ctx.globalAlpha = 1;
   }
 
   // Double-jump flash outline
