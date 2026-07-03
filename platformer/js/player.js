@@ -1,6 +1,6 @@
-import { isLeft, isRight } from './input.js';
+import { isLeft, isRight, isDown, consumeDash } from './input.js';
 import { resolveX, resolveY } from './level.js';
-import { addDJParticles, addLandParticles } from './entities.js';
+import { addDJParticles, addLandParticles, addDashParticles, addSlideParticles } from './entities.js';
 import { getJumpMult, getDJMult, getSpeedMult, getEquippedWeapon, getEquippedSkin } from './state.js';
 
 function lerp(a, b, t) { return a + (b - a) * t; }
@@ -11,6 +11,13 @@ const BASE_SPEED = 280;
 const GRAVITY = 1850;
 const TERMINAL_VEL = 950;
 const COYOTE_TIME = 0.1;
+const PLAYER_H = 42;    // full standing height
+const SLIDE_H = 20;     // crouched height during slide
+const DASH_SPEED = 620; // px/s during dash burst
+const DASH_DUR = 0.18;  // seconds of active dash
+const DASH_CD = 1.6;    // seconds before dash is available again
+const SLIDE_DUR = 0.45; // seconds the slide lasts
+const SLIDE_CD = 0.7;   // cooldown after a slide ends
 // Idle horizontal damping is per-stage now (see STAGE_MODIFIERS `.fric`); base is 0.72.
 
 // Per-stage gameplay twist (index 0-9, matches STAGE_THEMES order in renderer.js).
@@ -80,6 +87,11 @@ export const player = {
   dazeT: 0,           // shroom spore: dampens horizontal input
   _charge: 0,         // seconds the attack input has been held (charge tracking)
   _shieldT: 0,        // Shield Surge active timer (visual bubble + invuln)
+  // Dash / slide
+  dashT: 0,    // remaining active dash time
+  dashCD: 0,   // cooldown until next dash
+  slideT: 0,   // remaining slide time
+  slideCD: 0,  // cooldown until next slide
   // Computed from upgrades each level
   jumpForce: BASE_JUMP,
   djForce: BASE_DJ,
@@ -116,10 +128,23 @@ export function initPlayer(spawnX, spawnY) {
   player.windPushT = 0;
   player.windPushDir = 0;
   player.dazeT = 0;
+  player.dashT = 0;
+  player.dashCD = 0;
+  player.slideT = 0;
+  player.slideCD = 0;
+  player.h = PLAYER_H;
 
   player.jumpForce = BASE_JUMP * getJumpMult() * _mod.jMul;
   player.djForce = BASE_DJ * getDJMult() * _mod.jMul;
   player.speed = BASE_SPEED * getSpeedMult();
+}
+
+function endSlide() {
+  if (player.h === SLIDE_H) {
+    player.y -= (PLAYER_H - SLIDE_H); // restore top: move up by height difference
+    player.h = PLAYER_H;
+  }
+  player.slideT = 0;
 }
 
 export function updatePlayer(dt, platforms, jumpJustPressed) {
@@ -141,6 +166,9 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
     player.coyoteTimer = Math.max(0, player.coyoteTimer - dt);
   }
 
+  // Jump while sliding: end slide first so height is correct
+  if (jumpJustPressed && player.slideT > 0) endSlide();
+
   // Jump logic
   if (player.jumpBufferTimer > 0) {
     if (player.coyoteTimer > 0 && player.jumpsLeft === 2) {
@@ -161,22 +189,52 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
     }
   }
 
+  // ── Dash ──────────────────────────────────────────────────────────────────
+  const dashPressed = consumeDash();
+  if (dashPressed && player.dashCD <= 0 && player.slideT <= 0) {
+    player.dashT = DASH_DUR;
+    player.dashCD = DASH_CD;
+    player.vy = Math.min(player.vy, 60); // dampen fall for a moment
+    player.invuln = Math.max(player.invuln, 0.18);
+    addDashParticles(player.x + player.w / 2, player.y + player.h / 2, player.facing);
+  }
+
+  // ── Slide ──────────────────────────────────────────────────────────────────
+  // Activate by holding Down/S while running on ground with cooldown ready.
+  if (player.onGround && player.slideT <= 0 && player.slideCD <= 0
+      && player.dashT <= 0 && Math.abs(player.vx) > 60 && isDown()) {
+    player.slideT = SLIDE_DUR;
+    player.slideCD = SLIDE_CD;
+    player.y += PLAYER_H - SLIDE_H; // keep feet planted: shrink from top
+    player.h = SLIDE_H;
+    player.vx = player.facing * player.speed * 1.55; // forward momentum boost
+    addSlideParticles(player.x + player.w / 2, player.y + player.h, player.facing);
+  }
+
   _modT += dt;
 
   // Horizontal movement (idle damping varies by stage: slippery ice vs. mossy grip)
-  const dazeScale = player.dazeT > 0 ? 0.35 : 1.0; // shroom daze dampens input
-  const targetVx = isLeft() ? -player.speed * dazeScale : isRight() ? player.speed * dazeScale : 0;
-  if (targetVx !== 0) {
-    player.vx = targetVx;
-    player.facing = targetVx > 0 ? 1 : -1;
+  if (player.dashT > 0) {
+    // Dash overrides normal movement completely
+    player.vx = player.facing * DASH_SPEED;
+  } else if (player.slideT > 0) {
+    // Slide: decelerate naturally from the boost, no steering
+    player.vx *= 0.97;
   } else {
-    const activeFric = player.iceSlipT > 0 ? Math.max(_mod.fric, 0.965) : _mod.fric;
-    player.vx *= activeFric;
-    if (Math.abs(player.vx) < 8) player.vx = 0;
+    const dazeScale = player.dazeT > 0 ? 0.35 : 1.0; // shroom daze dampens input
+    const targetVx = isLeft() ? -player.speed * dazeScale : isRight() ? player.speed * dazeScale : 0;
+    if (targetVx !== 0) {
+      player.vx = targetVx;
+      player.facing = targetVx > 0 ? 1 : -1;
+    } else {
+      const activeFric = player.iceSlipT > 0 ? Math.max(_mod.fric, 0.965) : _mod.fric;
+      player.vx *= activeFric;
+      if (Math.abs(player.vx) < 8) player.vx = 0;
+    }
   }
 
-  // Desert gusts: oscillating sideways push you must lean against.
-  if (_mod.wind) player.vx += _mod.wind * Math.sin(_modT * 0.6) * dt;
+  // Desert gusts: oscillating sideways push you must lean against (skip during dash).
+  if (_mod.wind && player.dashT <= 0) player.vx += _mod.wind * Math.sin(_modT * 0.6) * dt;
 
   // Bird wind gust: horizontal push for capped duration
   if (player.windPushT > 0) {
@@ -215,6 +273,9 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
     }
   }
 
+  // End slide if the player left the ground or the timer expired
+  if (player.slideT > 0 && !player.onGround) endSlide();
+
   // Update timers
   player.landSquash = Math.max(0, player.landSquash - dt * 5.5);
   player.djFlash = Math.max(0, player.djFlash - dt);
@@ -226,6 +287,13 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
   player.windPushT = Math.max(0, player.windPushT - dt);
   player.dazeT = Math.max(0, player.dazeT - dt);
   player._shieldT = Math.max(0, player._shieldT - dt);
+  player.dashT = Math.max(0, player.dashT - dt);
+  player.dashCD = Math.max(0, player.dashCD - dt);
+  if (player.slideT > 0) {
+    player.slideT = Math.max(0, player.slideT - dt);
+    if (player.slideT <= 0) endSlide();
+  }
+  player.slideCD = Math.max(0, player.slideCD - dt);
 
   // Walk distance for leg swing animation
   if (player.onGround && Math.abs(player.vx) > 15) {
@@ -233,7 +301,11 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
   }
 
   // Animation state
-  if (!player.onGround) {
+  if (player.slideT > 0) {
+    player.animState = 'slide';
+  } else if (player.dashT > 0) {
+    player.animState = 'dash';
+  } else if (!player.onGround) {
     player.animState = player.vy > 80 ? 'fall' : 'jump';
   } else if (Math.abs(player.vx) > 15) {
     player.animState = 'walk';
@@ -246,7 +318,11 @@ export function updatePlayer(dt, platforms, jumpJustPressed) {
 
 export function drawPlayer(ctx, t) {
   const palette = getEquippedSkin().palette;
-  const { x, y, w, h, facing, animState, animTimer, landSquash, djFlash, distanceTraveled } = player;
+  const { x, facing, animState, animTimer, landSquash, djFlash, distanceTraveled } = player;
+  // Always draw at full height so the art isn't squashed when sliding.
+  const w = player.w;
+  const h = PLAYER_H;
+  const y = player.h === SLIDE_H ? player.y - (PLAYER_H - SLIDE_H) : player.y;
 
   const centerX = x + w / 2;
   const centerY = y + h / 2;
@@ -260,9 +336,31 @@ export function drawPlayer(ctx, t) {
   if (player.invuln > 0) ctx.globalAlpha = baseAlpha * (0.4 + 0.6 * Math.abs(Math.sin(player.invuln * 30)));
   else if (baseAlpha < 1) ctx.globalAlpha = baseAlpha;
 
+  // Dash afterimage: fading horizontal streaks trailing behind the player.
+  if (player.dashT > 0) {
+    const dProg = player.dashT / DASH_DUR;
+    for (let i = 1; i <= 3; i++) {
+      const trailA = dProg * (0.3 - i * 0.08);
+      if (trailA <= 0) continue;
+      ctx.save();
+      ctx.globalAlpha = (baseAlpha < 1 ? baseAlpha : 1) * trailA;
+      ctx.translate(-facing * i * 18, 0);
+      ctx.fillStyle = '#ffe066';
+      const hw2 = w / 2, hh2 = h / 2;
+      ctx.fillRect(-hw2 * 0.72, -hh2 * 0.22, w * 0.72, h * 0.52);
+      ctx.beginPath(); ctx.arc(0, -hh2 * 0.42, hw2 * 0.85, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    if (baseAlpha < 1) ctx.globalAlpha = baseAlpha; // re-apply ghost alpha
+  }
+
   // Squash/stretch transform
-  let sx = 1, sy = 1;
-  if (landSquash > 0) {
+  let sx = 1, sy = 1, extraRot = 0;
+  if (animState === 'slide') {
+    sx = 1.22; sy = 0.62; extraRot = -0.30; // flatten + lean forward
+  } else if (animState === 'dash') {
+    sx = 1.18; sy = 0.88; // slightly wide
+  } else if (landSquash > 0) {
     const n = landSquash / 0.18;
     sx = 1 + 0.42 * n;
     sy = 1 - 0.38 * n;
@@ -273,6 +371,7 @@ export function drawPlayer(ctx, t) {
   } else if (animState === 'idle') {
     sy = 1 + Math.sin(animTimer * 3.2) * 0.028;
   }
+  if (extraRot) ctx.rotate(extraRot);
   ctx.scale(sx, sy);
 
   const hw = w / 2;
@@ -280,8 +379,16 @@ export function drawPlayer(ctx, t) {
 
   // --- Legs ---
   const legSwing = animState === 'walk' ? Math.sin(distanceTraveled * 0.048) * 0.55 : 0;
-  drawLimb(ctx, -hw * 0.38, hh * 0.25, legSwing, palette.leg, 6, hh * 0.48);
-  drawLimb(ctx, hw * 0.38, hh * 0.25, -legSwing, palette.leg, 6, hh * 0.48);
+  let leg1A = legSwing, leg2A = -legSwing;
+  if (animState === 'slide') {
+    // Smooth entry: ramps from neutral to full pose over the first ~0.075s
+    const sf = Math.min(1, Math.max(0, 1 - player.slideT / SLIDE_DUR) * 6);
+    const wb = Math.sin(animTimer * 22) * 0.06; // subtle alive wobble during slide
+    leg1A = lerp(0, -1.05, sf) + wb; // left leg trails back
+    leg2A = lerp(0,  1.15, sf) + wb; // right leg kicks forward
+  }
+  drawLimb(ctx, -hw * 0.38, hh * 0.25, leg1A, palette.leg, 6, hh * 0.48);
+  drawLimb(ctx, hw * 0.38, hh * 0.25, leg2A, palette.leg, 6, hh * 0.48);
 
   // --- Body (shirt) ---
   ctx.fillStyle = palette.body;
@@ -294,8 +401,14 @@ export function drawPlayer(ctx, t) {
   // --- Arms ---
   const armSwing = animState === 'walk' ? -legSwing * 0.85 : 0;
   const armFall = animState === 'fall' ? 0.75 : 0;
-  drawLimb(ctx, hw * 0.72, -hh * 0.1, armFall + armSwing, palette.limb, 5, hh * 0.38, true);
-  drawLimb(ctx, -hw * 0.72, -hh * 0.1, armFall - armSwing, palette.limb, 5, hh * 0.38, true);
+  let arm1A = armFall + armSwing, arm2A = armFall - armSwing;
+  if (animState === 'slide') {
+    const sf = Math.min(1, Math.max(0, 1 - player.slideT / SLIDE_DUR) * 6);
+    arm1A = lerp(0,  1.2, sf); // right/front arm sweeps back-down
+    arm2A = lerp(0, -0.8, sf); // left/back arm reaches forward-up
+  }
+  drawLimb(ctx, hw * 0.72, -hh * 0.1, arm1A, palette.limb, 5, hh * 0.38, true);
+  drawLimb(ctx, -hw * 0.72, -hh * 0.1, arm2A, palette.limb, 5, hh * 0.38, true);
 
   // --- Head ---
   ctx.fillStyle = palette.skin;

@@ -92,6 +92,34 @@ export function addLandParticles(wx, wy) {
   }
 }
 
+export function addDashParticles(wx, wy, dir) {
+  for (let i = 0; i < 9; i++) {
+    particles.push({
+      x: wx - dir * (i * 8), y: wy + (Math.random() - 0.5) * 20,
+      vx: -dir * (40 + Math.random() * 110),
+      vy: (Math.random() - 0.5) * 50,
+      life: 0.24, maxLife: 0.24,
+      color: i < 4 ? '#ffe066' : 'rgba(255,180,30,0.55)',
+      size: 4 - i * 0.35,
+      gravity: 0,
+    });
+  }
+}
+
+export function addSlideParticles(wx, wy, dir) {
+  for (let i = 0; i < 6; i++) {
+    particles.push({
+      x: wx - dir * (i * 7), y: wy,
+      vx: -dir * (20 + Math.random() * 70),
+      vy: -15 - Math.random() * 50,
+      life: 0.3, maxLife: 0.3,
+      color: 'rgba(210,190,160,0.75)',
+      size: 3,
+      gravity: 240,
+    });
+  }
+}
+
 export function addHitParticles(wx, wy, color, n = 7) {
   for (let i = 0; i < n; i++) {
     const angle = Math.random() * Math.PI * 2;
@@ -916,7 +944,17 @@ export function updateEnemies(dt, platforms, player) {
         e.x += e.dir * e.speed * freezeMul * dt; // carry momentum through the air
       }
     } else if (bhv === 'boss') {
-      if (e._sliding) {  // slider boss: high-speed ice dash across arena
+      // LOS gate: boss idles at the back of the arena until the player steps into it.
+      if (!e._losActive) {
+        if (pcx >= e.patrolMin) { e._losActive = true; }
+        else {
+          // Idle: drift slowly toward _backX at the rear of the arena.
+          const targetX = e._backX !== undefined ? e._backX : e.patrolMax;
+          const dx = targetX - ecx;
+          if (Math.abs(dx) > 4) e.x += (dx > 0 ? 1 : -1) * Math.min(40, Math.abs(dx)) * dt;
+          e.dir = -1; // always face the player approach direction
+        }
+      } else if (e._sliding) {  // slider boss: high-speed ice dash across arena
         e.dir = e._slideDir;
         e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + e._slideDir * e._slideV * freezeMul * dt));
         e._slideT -= dt;
@@ -991,7 +1029,7 @@ export function updateEnemies(dt, platforms, player) {
         e.x = e.baseX + Math.sin(e.t * 1.2) * 16 - e.w / 2;
         e.y = e.baseY + Math.sin(e.t * 1.9) * 9;
         e._cd = Math.max(0, (e._cd || 0) - dt);
-        if (!e._cd && Math.hypot(pcx - ecx, pcy - ecy) < e.swoopRange) {
+        if (!e._cd && e._losActive !== false && Math.hypot(pcx - ecx, pcy - ecy) < e.swoopRange) {
           e._mode = 1; e._tx = pcx; e._ty = pcy; e._stT = 1.0;
         }
       }
@@ -1063,8 +1101,14 @@ export function updateEnemies(dt, platforms, player) {
       }
     }
 
+    // LOS activation for swoop/fly bosses (ground bosses set it in bhv==='boss' branch).
+    if (e.boss && !e._losActive && e.behavior !== 'boss') {
+      if (pcx >= e.patrolMin) e._losActive = true;
+    }
+
     // Boss special attack system: per-species cooldown + rage at 50% HP
-    if (e.boss) {
+    // Gated behind _losActive — boss doesn't attack until the player enters the arena.
+    if (e.boss && e._losActive) {
       if (!e._rage && e.hp > 0 && e.hp <= e.maxHp * 0.5) {
         e._rage = true;
         e.speed = Math.round((e.speed || 60) * 1.4);

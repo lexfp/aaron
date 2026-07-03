@@ -263,9 +263,17 @@ function gameLoop(timestamp) {
     updateHUD(currentStage, currentLevel, coinsThisLevel, playerData.coins, lives, player.hp, player.maxHp);
   }
 
-  // Check death (fell off bottom, touched a hazard, or hit by an enemy)
-  if (player.y > GH + 100 || hazardHit(player, levelData.hazards) || enemyRes.playerHit) {
+  // Check death / hazard damage
+  if (player.y > GH + 100) {
     deathTimer = 0.35;
+  } else if (enemyRes.playerHit) {
+    deathTimer = 0.35;
+  } else if (hazardHit(player, levelData.hazards) && player.invuln <= 0) {
+    player.hp = Math.max(0, player.hp - 30);
+    player.invuln = 1.2;       // 1.2 s i-frames so the player can escape the zone
+    player.hurtFlash = 0.4;
+    player.vy = Math.min(player.vy, -400); // knock the player upward out of spikes
+    if (player.hp <= 0) deathTimer = 0.35;
   }
 
   // Check exit (locked while a stage boss is alive)

@@ -38,7 +38,8 @@ function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 //   flyerFreq — how common the stage's air species are (cave bats, sky birds…).
 //   (Enemy species themselves live in SPECIES / STAGE_ROSTER below.)
 const TERRAIN_POOL = ['gap', 'stairsUp', 'stairsDown', 'coinVault', 'pillars',
-  'zigzag', 'longLeap', 'descent', 'spikePath', 'spikeLeap', 'gauntlet'];
+  'zigzag', 'longLeap', 'descent', 'spikePath', 'spikeLeap', 'gauntlet',
+  'lowCrawl', 'dashGap'];
 
 const STAGE_PROFILES = [
   { grounded: true,  low: true,  pool: TERRAIN_POOL, flyerFreq: 1.0 }, // 0 Meadow — grassy field
@@ -118,9 +119,10 @@ function makeBoss(stageIdx, p, arena) {
   const scale = 3;
   const w = base.w * scale, h = base.h * scale;
   const flying = sp === 'bird' || sp === 'drone';
+  const bossHp = (80 + stageIdx * 16) + Math.round(p * (50 + stageIdx * 8));
   const e = {
     ...base, boss: true, bossScale: scale, w, h,
-    hp: (80 + stageIdx * 16) + Math.round(p * (50 + stageIdx * 8)),
+    hp: bossHp, maxHp: bossHp,
     dmg: Math.max(18, (base.dmg || 8) + 12 + stageIdx * 2),
     x: Math.round(arena.x + arena.w * 0.6), dir: -1, phase: 0,
     patrolMin: arena.x + 6, patrolMax: arena.x + arena.w - 6 - w,
@@ -162,6 +164,23 @@ function makeBoss(stageIdx, p, arena) {
   const SIG_CD = { crawler: 6.0, scorpion: 5.0, lavablob: 4.5, bird: 5.0,
                    shroom: 5.5, drone: 4.5, golem: 6.0, knight: 4.5 };
   e._sigCD = SIG_CD[sp] || 0;
+
+  // Minion spawning: pick the stage's primary ground species (or air if none)
+  // and cache the template + arena so spawnBossMinion can use them.
+  const rosterIdx = ((stageIdx % 10) + 10) % 10;
+  const roster = STAGE_ROSTER[rosterIdx];
+  const minionList = roster.ground.length ? roster.ground : roster.air;
+  e._minionArena = arena;
+  if (minionList.length > 0) {
+    e._minionTemplate = SPECIES[minionList[0][0]](p);
+  }
+
+  // LOS activation: boss is dormant until the player enters the arena.
+  // _losActive starts false; set to true the first time the player crosses
+  // the left edge of the arena. Once active it stays active permanently.
+  e._losActive = false;
+  e._backX = Math.round(arena.x + arena.w - e.w - 8); // resting x at rear of arena
+
   return e;
 }
 
@@ -436,6 +455,55 @@ function segCoinVault(b, e) {
   nCoins(b.coins, pl, 4, b.rng);
 }
 
+// Low ceiling crawl — a ground run with hanging spikes the player must slide under.
+// Ceiling height tuned so a standing player's inset hitbox (py+3) hits the spike
+// bottom but a sliding player's inset hitbox (py+3 when h=20) clears it.
+// With GROUND_Y=430: standing top = 388+3=391, sliding top = 410+3=413.
+// Spike at topY=385 → effective bottom = 385+14=399: 391<399 (hit), 413>399 (clear). ✓
+function segLowCrawl(b, e) {
+  // Ramp down to ground level
+  connect(b, lerp(50, 75, e), FLOOR, lerp(100, 76, e), 'normal', 28, 1);
+  const runLen = lerp(500, 820, e);
+  const gx = b.x + 10;
+  b.plats.push(mkGround(gx, runLen));
+  // Coin trail showing the slide path
+  arcCoins(b.coins, b.x - 18, GROUND_Y - 22, gx + 55, GROUND_Y - 22, 3, b.rng, 36);
+  // Low ceiling spike sections — must slide to pass (can't jump either)
+  const sections = 1 + Math.floor(e * 1.5 + b.rng() * 1);
+  const sectionW = runLen / (sections + 1);
+  for (let k = 0; k < sections; k++) {
+    const sxk = gx + sectionW * (k + 0.5 + b.rng() * 0.3) - 30;
+    const ceilY = GROUND_Y - 45; // 385 — standing collides, sliding clears (see note above)
+    const cnt = 3 + Math.floor(e * 3 + b.rng() * 1.5); // 3–6 spikes wide
+    addSpikes(b, sxk, ceilY, cnt, 'down', 20);
+    // Coins tucked under the crawl space reward a clean slide
+    arcCoins(b.coins, sxk - 8, GROUND_Y - 22, sxk + cnt * 20 + 8, GROUND_Y - 22, 3, b.rng, 24);
+  }
+  b.x = gx + runLen; b.y = GROUND_Y;
+}
+
+// Dash gap — a wide horizontal void rewarded by a dash+jump. The gap is set just
+// past comfortable double-jump range so a running dash is the natural solution.
+// Coin arc visually shows the dash trajectory.
+function segDashGap(b, e) {
+  // Short approach platform to build up a run
+  connect(b, lerp(55, 85, e), b.y + (b.rng() - 0.5) * 24, lerp(140, 110, e), 'normal', 38, 1);
+  // Gap wider than a plain running jump (~168px) but crossable with a mid-air dash
+  // (~229px reach). Dash+DJ clears it comfortably; plain DJ (~271px) also works at
+  // lower difficulties — the point is that the dash visibly helps.
+  const gap = lerp(200, 250, e);
+  const landW = lerp(130, 100, e);
+  const dy = (b.rng() - 0.48) * 32;
+  const landY = clamp(b.y + dy, TOP + 90, FLOOR);
+  const fromX = b.x, fromY = b.y;
+  const lp = mkP(fromX + gap, landY, landW, 'normal');
+  b.plats.push(lp);
+  // Dense coin arc tracing the dash-jump trajectory
+  arcCoins(b.coins, fromX, fromY, lp.x + lp.w * 0.5, landY, 6, b.rng, 68);
+  nCoins(b.coins, lp, 2, b.rng);
+  b.x = lp.x + lp.w; b.y = landY;
+}
+
 // Final approach — a generous platform that hosts the exit door.
 function segFinish(b) {
   const pl = connect(b, 105, clamp(b.y, TOP + 130, FLOOR), 210, 'normal', 45, 0);
@@ -460,6 +528,8 @@ const SEGMENTS = [
   { id: 'gauntlet', fn: segGauntlet, tier: 2, gate: 0.04 },
   { id: 'crumble', fn: segCrumbleRun, tier: 2, gate: 0.16 },
   { id: 'spikeLeap', fn: segSpikeLeap, tier: 2, gate: 0.08 },
+  { id: 'lowCrawl', fn: segLowCrawl, tier: 2, gate: 0.10 },
+  { id: 'dashGap',  fn: segDashGap,  tier: 1, gate: 0.05 },
 ];
 
 function pickSegment(b, e, last, prof) {

@@ -1,6 +1,7 @@
 const held = new Set();
 let _jumpJustPressed = false;
 let _escJustPressed = false;
+let _dashJustPressed = false;
 let _mouseDown = false;
 // 5 active slots mapped to Q/E/R/T/G — consumed on press
 const _specials = [false, false, false, false, false];
@@ -17,6 +18,9 @@ export function initInput() {
     }
     if (e.code === 'Escape') {
       _escJustPressed = true;
+    }
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+      _dashJustPressed = true;
     }
     const si = SPECIAL_CODES.indexOf(e.code);
     if (si !== -1) _specials[si] = true;
@@ -64,10 +68,21 @@ export function consumeSpecial(idx) {
   return v;
 }
 
+export function isDown() {
+  return held.has('ArrowDown') || held.has('KeyS');
+}
+
+export function consumeDash() {
+  const v = _dashJustPressed;
+  _dashJustPressed = false;
+  return v;
+}
+
 export function clearAll() {
   held.clear();
   _jumpJustPressed = false;
   _escJustPressed = false;
+  _dashJustPressed = false;
   _mouseDown = false;
   for (let i = 0; i < _specials.length; i++) _specials[i] = false;
 }

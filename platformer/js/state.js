@@ -299,7 +299,7 @@ export const SKIN_DEFS = [
   {
     key: 'ghost', label: 'Ghost', icon: '👻', cost: 350, unlock: null,
     desc: 'Hauntingly translucent.',
-    palette: { body: '#e8eaf6', bodyStripe: '#c5cae9', limb: '#e3e8f0', leg: '#9fa8da', skin: '#f5f5f5', hair: '#b0bec5', alpha: 0.72 },
+    palette: { body: '#2980b9', bodyStripe: '#1a6fa8', limb: '#f0a070', leg: '#1a252f', skin: '#f5cba7', hair: '#5d4037', alpha: 0.55 },
   },
   {
     key: 'desert', label: 'Desert Fox', icon: '🦊', cost: 400, unlock: null,
