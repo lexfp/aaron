@@ -1,0 +1,324 @@
+#!/usr/bin/env bash
+#
+# cswap — switch between Claude Code accounts without logging out/in.
+#
+# Claude Code (Linux/WSL) reads OAuth tokens from ~/.claude/.credentials.json
+# and re-reads them whenever that file changes. The visible account identity
+# (email/org) lives in ~/.claude.json under "oauthAccount". This script
+# snapshots both per numbered slot and swaps them on demand.
+#
+# Native Linux/macOS use ~/. Under WSL, where the Claude Code you use is often
+# the *Windows* build, cswap auto-detects the Windows profile and operates on
+# its files instead. Override with CLAUDE_HOME=/path if detection guesses wrong.
+#
+#   cswap save 1 [label]   snapshot the CURRENT account into slot 1
+#   cswap 1                switch to slot 1
+#   cswap list             show saved slots (* = currently active)
+#   cswap current          show the active account email
+#   cswap rm 1             delete slot 1
+#
+# Install:  mv cswap ~/.local/bin/cswap && chmod +x ~/.local/bin/cswap
+#           (ensure ~/.local/bin is on your PATH)
+#
+set -euo pipefail
+
+# --- locate the Claude Code home --------------------------------------------
+# Native Linux/macOS: everything lives under $HOME (~/.claude, ~/.claude.json).
+# Under WSL the Claude Code you actually use is often the *Windows* build, whose
+# files live on the Windows drive (/mnt/c/Users/<you>/...). We detect that case
+# and target those files, while leaving native installs byte-for-byte unchanged.
+
+is_wsl() { grep -qiE '(microsoft|wsl)' /proc/version 2>/dev/null; }
+
+# Print the Windows user profile as a WSL path, or nothing + nonzero on failure.
+windows_home() {
+  local up=""
+  if command -v wslvar >/dev/null 2>&1; then
+    up="$(wslvar USERPROFILE 2>/dev/null | tr -d '\r' || true)"
+  fi
+  if [ -z "$up" ] && command -v cmd.exe >/dev/null 2>&1; then
+    up="$(cmd.exe /C 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r' || true)"
+  fi
+  if [ -n "$up" ] && command -v wslpath >/dev/null 2>&1; then
+    local p; p="$(wslpath -u "$up" 2>/dev/null || true)"
+    [ -n "$p" ] && { printf '%s\n' "$p"; return 0; }
+  fi
+  # Last resort: scan /mnt/c/Users for a profile that already has a Claude config.
+  local d
+  for d in /mnt/c/Users/*; do
+    [ -f "$d/.claude.json" ] && { printf '%s\n' "$d"; return 0; }
+  done
+  return 1
+}
+
+# Resolve CLAUDE_HOME: the dir that holds .claude/ and .claude.json.
+resolve_claude_home() {
+  # 1. Explicit override always wins.
+  if [ -n "${CLAUDE_HOME:-}" ]; then printf '%s\n' "$CLAUDE_HOME"; return; fi
+  # 2. Native install present, or not WSL at all -> use $HOME. This is the only
+  #    branch plain Linux/macOS ever reaches, so their behavior is unchanged.
+  if [ -f "$HOME/.claude/.credentials.json" ] || [ -f "$HOME/.claude.json" ] || ! is_wsl; then
+    printf '%s\n' "$HOME"; return
+  fi
+  # 3. WSL with no native login -> fall back to the Windows profile if it has one.
+  local wh; wh="$(windows_home || true)"
+  if [ -n "$wh" ] && { [ -f "$wh/.claude/.credentials.json" ] || [ -f "$wh/.claude.json" ]; }; then
+    printf '%s\n' "$wh"; return
+  fi
+  # 4. Nothing found: keep $HOME; the command will report the missing file.
+  printf '%s\n' "$HOME"
+}
+
+CLAUDE_HOME="$(resolve_claude_home)"
+CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$CLAUDE_HOME/.claude}"
+CRED="$CLAUDE_DIR/.credentials.json"
+CONFIG="$CLAUDE_HOME/.claude.json"
+STORE="${CSWAP_STORE:-$CLAUDE_HOME/.claude-swap}"
+
+mkdir -p "$STORE"
+
+die() { printf 'cswap: %s\n' "$1" >&2; exit 1; }
+have_python() { command -v python3 >/dev/null 2>&1 || die "python3 is required"; }
+
+# Read oauthAccount.emailAddress from a ~/.claude.json-style file ($1).
+email_from_config() {
+  [ -f "$1" ] || { echo ""; return; }
+  python3 - "$1" <<'PY'
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    # Accept either the full ~/.claude.json (nested under oauthAccount)
+    # or a bare oauthAccount blob (a saved slot).
+    acct = d.get("oauthAccount") if isinstance(d.get("oauthAccount"), dict) else d
+    print((acct or {}).get("emailAddress", "") or "")
+except Exception:
+    print("")
+PY
+}
+
+current_email() { email_from_config "$CONFIG"; }
+
+# Print the slot whose saved identity matches email $1, or nothing.
+slot_for_email() {
+  local want="$1" f slot
+  [ -n "$want" ] || return 1
+  for f in "$STORE"/*.account.json; do
+    [ -e "$f" ] || continue
+    slot="$(basename "$f" .account.json)"
+    [ "$(email_from_config "$f")" = "$want" ] && { printf '%s\n' "$slot"; return 0; }
+  done
+  return 1
+}
+
+# Re-snapshot the LIVE account back into its matching slot. Rotating tokens
+# invalidate stale snapshots, so we capture the freshest token the instant
+# before switching away. No-op if the live account isn't in any slot.
+refresh_current_slot() {
+  [ -f "$CRED" ] || return 0
+  local cur slot
+  cur="$(current_email)"
+  slot="$(slot_for_email "$cur" || true)"
+  [ -n "$slot" ] || return 0
+  cp "$CRED" "$STORE/$slot.credentials.json"
+  chmod 600 "$STORE/$slot.credentials.json"
+  if [ -f "$CONFIG" ]; then
+    python3 - "$CONFIG" "$STORE/$slot.account.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+json.dump(d.get("oauthAccount") or {}, open(sys.argv[2], "w"), indent=2)
+PY
+  fi
+  printf 'Refreshed slot %s (%s) before switching.\n' "$slot" "$cur"
+}
+
+# --- save -------------------------------------------------------------------
+cmd_save() {
+  have_python
+  local slot="${1:-}" label="${2:-}"
+  [ -n "$slot" ] || die "usage: cswap save <slot> [label]"
+  [ -f "$CRED" ] || die "no credentials at $CRED — log in once with 'claude' first"
+
+  cp "$CRED" "$STORE/$slot.credentials.json"
+  chmod 600 "$STORE/$slot.credentials.json"
+
+  # Snapshot just the oauthAccount blob (not the whole config).
+  if [ -f "$CONFIG" ]; then
+    python3 - "$CONFIG" "$STORE/$slot.account.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+json.dump(d.get("oauthAccount") or {}, open(sys.argv[2], "w"), indent=2)
+PY
+  fi
+
+  [ -n "$label" ] || label="$(current_email)"
+  [ -n "$label" ] || label="account-$slot"
+  printf '%s\n' "$label" > "$STORE/$slot.label"
+  printf 'Saved slot %s  ->  %s\n' "$slot" "$label"
+}
+
+# --- switch -----------------------------------------------------------------
+cmd_switch() {
+  have_python
+  local slot="$1"
+  local src="$STORE/$slot.credentials.json"
+  [ -f "$src" ] || die "slot $slot not found — save it first: cswap save $slot"
+
+  # Keep the account we're leaving fresh before we overwrite the live file.
+  refresh_current_slot
+
+  cp "$src" "$CRED"
+  chmod 600 "$CRED"
+
+  # Patch oauthAccount back into ~/.claude.json, leaving everything else intact.
+  if [ -f "$STORE/$slot.account.json" ] && [ -f "$CONFIG" ]; then
+    python3 - "$CONFIG" "$STORE/$slot.account.json" <<'PY'
+import json, os, sys
+cfg_path, acct_path = sys.argv[1], sys.argv[2]
+cfg = json.load(open(cfg_path))
+cfg["oauthAccount"] = json.load(open(acct_path))
+tmp = cfg_path + ".cswap.tmp"
+json.dump(cfg, open(tmp, "w"), indent=2)
+os.replace(tmp, cfg_path)
+PY
+  fi
+
+  local label; label="$(cat "$STORE/$slot.label" 2>/dev/null || echo "slot $slot")"
+  printf 'Switched to slot %s  ->  %s\n' "$slot" "$label"
+  printf '(open a new Claude Code session to pick it up)\n'
+}
+
+# --- list -------------------------------------------------------------------
+cmd_list() {
+  local now; now="$(current_email)"
+  local found=0
+  shopt -s nullglob
+  for f in "$STORE"/*.credentials.json; do
+    found=1
+    local slot label slot_email marker
+    slot="$(basename "$f" .credentials.json)"
+    label="$(cat "$STORE/$slot.label" 2>/dev/null || echo "account-$slot")"
+    slot_email="$(email_from_config "$STORE/$slot.account.json")"
+    marker="  "
+    [ -n "$now" ] && [ "$now" = "$slot_email" ] && marker="* "
+    printf '%s%-4s %s\n' "$marker" "$slot" "$label"
+  done
+  [ "$found" -eq 1 ] || echo "no saved accounts yet — run: cswap save 1"
+}
+
+# --- remove -----------------------------------------------------------------
+cmd_rm() {
+  local slot="$1"
+  rm -f "$STORE/$slot.credentials.json" "$STORE/$slot.account.json" "$STORE/$slot.label"
+  printf 'Removed slot %s\n' "$slot"
+}
+
+usage() {
+  cat <<'EOF'
+cswap — switch between Claude Code accounts without logging out/in
+
+WHAT IT DOES
+  Claude Code (Linux/WSL) reads your OAuth tokens from
+  ~/.claude/.credentials.json and re-reads them whenever the file changes.
+  cswap snapshots that file (plus your account identity from ~/.claude.json)
+  into numbered slots and swaps them on demand — no logging in and out.
+
+COMMANDS
+  cswap install               copy cswap to ~/.local/bin and add it to PATH
+  cswap save <slot> [label]   snapshot the CURRENT account into a slot
+  cswap <slot>                switch to a slot  (e.g. cswap 1, cswap 2)
+  cswap list                  list saved slots (* = currently active)
+  cswap current               show the active account email
+  cswap rm <slot>             delete a slot
+  cswap help                  show this help
+
+FIRST-TIME SETUP
+  1. Install it:                       cswap install
+  2. Log in to account A (claude /login), then snapshot it:
+                                        cswap save 1 work
+  3. Log out, log in to account B, then snapshot it:
+                                        cswap save 2 personal
+  Repeat for as many accounts as you like.
+
+EVERYDAY USE
+  cswap 1            switch to account A
+  cswap 2            switch to account B
+  cswap list         see what you've got
+  Start a NEW Claude Code session after switching to pick up the change.
+
+NOTES
+  * You only log in once per account — cswap save captures the tokens.
+  * Re-run 'cswap save N' occasionally while account N is active to keep its
+    stored token fresh (Claude Code rotates tokens over time).
+  * Snapshots live in ~/.claude-swap/ (override with $CSWAP_STORE).
+EOF
+}
+
+# --- install ----------------------------------------------------------------
+# Resolve this script's own absolute path (follows symlinks).
+self_path() {
+  local src="${BASH_SOURCE[0]}" dir
+  while [ -h "$src" ]; do
+    dir="$(cd -P "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    [[ "$src" != /* ]] && src="$dir/$src"
+  done
+  cd -P "$(dirname "$src")" && printf '%s/%s\n' "$(pwd)" "$(basename "$src")"
+}
+
+cmd_install() {
+  local bindir="${CSWAP_BIN:-$HOME/.local/bin}"
+  local target="$bindir/cswap"
+  local me; me="$(self_path)"
+
+  mkdir -p "$bindir"
+  if [ "$me" = "$target" ]; then
+    chmod +x "$target"
+    printf 'Already installed at %s\n' "$target"
+  else
+    cp "$me" "$target"
+    chmod +x "$target"
+    printf 'Installed cswap to %s\n' "$target"
+  fi
+
+  # Report the detected environment so the user can confirm it picked the right
+  # account store (especially under WSL, where it targets the Windows profile).
+  if is_wsl && [ "$CLAUDE_HOME" != "$HOME" ]; then
+    printf 'Detected WSL — using Windows Claude files under %s\n' "$CLAUDE_HOME"
+  else
+    printf 'Using Claude files under %s\n' "$CLAUDE_HOME"
+  fi
+  if [ ! -f "$CRED" ]; then
+    printf 'Note: no credentials found yet at %s\n' "$CRED"
+    printf '      log in once with Claude Code, then: cswap save 1\n'
+  fi
+
+  # Ensure bindir is on PATH; if not, append to the user's shell rc.
+  case ":$PATH:" in
+    *":$bindir:"*) printf 'PATH already includes %s — ready to use: cswap\n' "$bindir";;
+    *)
+      local rc="$HOME/.bashrc"
+      [ -n "${ZSH_VERSION:-}" ] && rc="$HOME/.zshrc"
+      [ "$(basename "${SHELL:-}")" = "zsh" ] && rc="$HOME/.zshrc"
+      local line="export PATH=\"$bindir:\$PATH\""
+      if [ -f "$rc" ] && grep -Fq "$line" "$rc"; then
+        :
+      else
+        printf '\n# added by cswap install\n%s\n' "$line" >> "$rc"
+        printf 'Added %s to PATH in %s\n' "$bindir" "$rc"
+      fi
+      printf 'Run this (or open a new terminal) to use cswap now:\n  source %s\n' "$rc"
+      ;;
+  esac
+}
+
+# --- dispatch ---------------------------------------------------------------
+cmd="${1:-}"; [ $# -gt 0 ] && shift || true
+case "$cmd" in
+  install)         cmd_install;;
+  save)            cmd_save "$@";;
+  list|ls)         cmd_list;;
+  current|whoami)  e="$(current_email)"; printf '%s\n' "${e:-<none>}";;
+  rm|remove|del)   [ -n "${1:-}" ] || die "usage: cswap rm <slot>"; cmd_rm "$1";;
+  ""|-h|--help|help) usage;;
+  *) if printf '%s' "$cmd" | grep -Eq '^[A-Za-z0-9_-]+$'; then cmd_switch "$cmd"; else die "unknown command: $cmd"; fi;;
+esac

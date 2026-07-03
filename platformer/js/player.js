@@ -1,10 +1,12 @@
 import { isLeft, isRight } from './input.js';
-import { resolveX, resolveY } from './level.js';
+import { resolveX, resolveY, STAGE_MODIFIERS } from './level.js';
 import { addDJParticles, addLandParticles } from './entities.js';
 import { getJumpMult, getDJMult, getSpeedMult, getEquippedWeapon } from './state.js';
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
+// NOTE: BASE_JUMP / BASE_DJ / GRAVITY are mirrored in level.js (P_JUMP/P_DJ/P_GRAV)
+// for the stage jump-envelope math — keep both in sync if these change.
 const BASE_JUMP = 555;
 const BASE_DJ = 495;
 const BASE_SPEED = 280;
@@ -13,28 +15,11 @@ const TERMINAL_VEL = 950;
 const COYOTE_TIME = 0.1;
 // Idle horizontal damping is per-stage now (see STAGE_MODIFIERS `.fric`); base is 0.72.
 
-// Per-stage gameplay twist (index 0-9, matches STAGE_THEMES order in renderer.js).
-//   gMul  — gravity multiplier
-//   jMul  — jump/double-jump force multiplier (scaled WITH gravity on "heavy"
-//           stages so required jumps stay reachable — see physics note below)
-//   fric  — idle horizontal damping per frame (base 0.72; ↑ = slippery, ↓ = grippy)
-//   wind  — sideways gust acceleration amplitude (px/s², 0 = none)
-//   dark  — 1 = limited-visibility vignette around the player (rendered in main.js)
-// NOTE on reachability: scaling gMul and jMul together leaves horizontal jump
-// distance unchanged and only INCREASES vertical reach, and lowering gMul alone
-// only increases reach — so every twist keeps all 500 validated levels solvable.
-export const STAGE_MODIFIERS = [
-  { label: '🌱 Springy Grass', gMul: 1.0,  jMul: 1.12, fric: 0.72, wind: 0,    dark: 0 }, // Meadow
-  { label: '🕯️ Pitch Dark',    gMul: 1.0,  jMul: 1.0,  fric: 0.72, wind: 0,    dark: 1 }, // Cave
-  { label: '❄️ Slippery Ice',  gMul: 1.0,  jMul: 1.0,  fric: 0.965, wind: 0,   dark: 0 }, // Icy Peaks
-  { label: '🌬️ Desert Gusts',  gMul: 1.0,  jMul: 1.0,  fric: 0.72, wind: 1300, dark: 0 }, // Desert
-  { label: '🔥 Scorching Heat', gMul: 1.25, jMul: 1.25, fric: 0.72, wind: 0,    dark: 0 }, // Lava
-  { label: '☁️ Sky Updrafts',  gMul: 0.6,  jMul: 1.0,  fric: 0.78, wind: 0,    dark: 0 }, // Sky
-  { label: '🍄 Mossy Grip',    gMul: 1.0,  jMul: 1.0,  fric: 0.42, wind: 0,    dark: 0 }, // Forest
-  { label: '🚀 Zero Gravity',  gMul: 0.32, jMul: 1.0,  fric: 0.86, wind: 0,    dark: 0 }, // Space
-  { label: '💎 Bouncy Crystal', gMul: 1.0,  jMul: 1.24, fric: 0.72, wind: 0,    dark: 0 }, // Crystal
-  { label: '🏰 Heavy Gravity',  gMul: 1.45, jMul: 1.45, fric: 0.72, wind: 0,    dark: 0 }, // Dark Fortress
-];
+// STAGE_MODIFIERS (the per-stage gameplay twists) lives in level.js now, so the
+// level generator can derive each stage's real jump envelope and scale gap/rise
+// geometry to match — every level is built for the physics it's played with.
+// Re-exported here for ui.js and any other consumer.
+export { STAGE_MODIFIERS };
 
 let _mod = STAGE_MODIFIERS[0];
 let _modT = 0; // time accumulator for oscillating effects (wind gusts)

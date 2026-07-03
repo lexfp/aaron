@@ -1144,6 +1144,13 @@ export function updateEnemies(dt, platforms, player) {
           }
         }
       }
+
+      // Periodic minion spawn: every boss spawns a stage minion on a timer
+      e._spawnCD -= dt;
+      if (e._spawnCD <= 0) {
+        spawnBossMinion(e);
+        e._spawnCD = (10 + Math.random() * 5) * (e._rage ? 0.65 : 1.0);
+      }
     }
 
     if (player.dead) continue;

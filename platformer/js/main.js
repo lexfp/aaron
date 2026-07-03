@@ -78,7 +78,7 @@ function startLevel(stage, level) {
   callbacks._lastCoins = 0;
   _lastHp = player.hp;
 
-  updateHUD(stage, level, 0, playerData.coins, lives, player.hp, player.maxHp);
+  updateHUD(stage, level, 0, playerData.coins, lives, player.hp, player.maxHp, levelData.flavor);
   showScreen('game-wrap');
 }
 
@@ -103,7 +103,7 @@ function onPlayerDeath() {
     respawnPlayer();
   }
   _lastHp = player.hp;
-  updateHUD(currentStage, currentLevel, coinsThisLevel, playerData.coins, lives, player.hp, player.maxHp);
+  updateHUD(currentStage, currentLevel, coinsThisLevel, playerData.coins, lives, player.hp, player.maxHp, levelData.flavor);
 }
 
 function onLevelComplete() {
@@ -199,13 +199,13 @@ function gameLoop(timestamp) {
     coinsThisLevel += collected;
     playerData.coins += collected;
     callbacks._lastCoins = coinsThisLevel;
-    updateHUD(currentStage, currentLevel, coinsThisLevel, playerData.coins, lives, player.hp, player.maxHp);
+    updateHUD(currentStage, currentLevel, coinsThisLevel, playerData.coins, lives, player.hp, player.maxHp, levelData.flavor);
   }
 
   // Refresh the HP bar whenever it changes (e.g. took an enemy hit).
   if (player.hp !== _lastHp) {
     _lastHp = player.hp;
-    updateHUD(currentStage, currentLevel, coinsThisLevel, playerData.coins, lives, player.hp, player.maxHp);
+    updateHUD(currentStage, currentLevel, coinsThisLevel, playerData.coins, lives, player.hp, player.maxHp, levelData.flavor);
   }
 
   // Check death (fell off bottom, touched a hazard, hit by enemy, or hp drained to 0)

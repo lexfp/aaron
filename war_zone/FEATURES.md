@@ -20,11 +20,11 @@ All controls (except 1–9 weapon slots) are rebindable via the **Keybinds** men
 | Map | Size | Key Feature |
 |-----|------|-------------|
 | Warehouse | 120 | Pitch dark, flickering ceiling lights |
-| City Ruins | 480 | Chunk-streamed buildings, craters, street lamps, day/night cycle |
-| Dark Forest | 480 | Chunk-streamed trees, boulders, mushroom clusters |
+| City Ruins | 480 | Chunk-streamed buildings, craters, street lamps, day/night cycle; wood barrels (GLB) outside buildings, chairs (GLB) inside buildings |
+| Dark Forest | 480 | Chunk-streamed fantasy_tree GLB models (same size as old procedural trees), boulders, mushroom clusters |
 | Rocky Mountains | 480 | Chunk-streamed slopes; raycaster-based floor snapping |
 | Desert Outpost | 480 | Chunk-streamed dunes (isSlope), ruined walls (30% chunk chance) |
-| Fortress | 250 | Static; outer walls h=6 with 4 staircases to walk tops; inner keep h=10; 3 original secret passages + 4 underground tunnels (N/S/E/W walls, press E) descending via staircases to underground network: east/west/north corridors meet central stone chamber with 4 columns & torches; south corridor T-junctions into east corridor; 2 enclosed wall corridors (N & E interior) — all opened with E (3s); label shown in prompt (tunnel/corridor/passage); towers, battlements, torches |
+| Fortress | 250 | Static; outer walls h=6 with 4 staircases to walk tops; inner keep h=10; 3 secret wall passages + 2 enclosed secret wall corridors (N & E interior, 2 doors each, opened with E for 3s; label shown in prompt); underground network (east/west/north corridors meet central stone chamber with 4 columns & torches; south corridor T-junctions into east corridor) reachable ONLY via hidden stairwells at the east end of Corridor A and the south end of Corridor B — the surface above the tunnels is sealed (no fall-through) and the old outer-wall tunnel doors are removed; towers, battlements, torches |
 | Cave | 200 | Enclosed underground labyrinth; glowing crystal PointLights; zombie spawn restricted to designated cavern |
 | The Hallway | 200 | Single 8-wide × 10-tall × 380-long corridor. Player spawns at z=+187 (south end); zombies spawn at z=−187 (north end). Ceiling light strips every 20 units; wall torches near zombie end. Scattered crates for cover. Pure chokepoint survival. |
 
@@ -60,7 +60,7 @@ All controls (except 1–9 weapon slots) are rebindable via the **Keybinds** men
 **Attachments:** Silencer $500 (no noise/zombie attraction) · Scope $800 (+20 damage when zoomed, for guns without native scope)
 
 ## Armor & Equipment
-Four slots: Helmet, Breastplate, Pants, Boots. Drag-drop or click to equip in Loadout. Armor absorbs up to 50% of each hit; pool depletes over time.
+Four slots: Helmet, Breastplate, Pants, Boots. Drag-drop or click to equip in Loadout. Armor absorbs up to 50% of each hit; pool depletes over time. Heavy Breastplate uses a 3D chestplate model (bronzeChestplate.glb) in third-person view.
 
 | Slot | Light | Chainmail | Heavy |
 |------|-------|-----------|-------|
@@ -168,4 +168,4 @@ The `#homepage` div uses a **two-panel split layout** with a dark military visua
 **Visual style:** No glow effects. Muted red accents at rest, bright red on hover. Scanline texture overlay. The `.menu-btn` class is **not** used on the homepage — it is reserved for the pause menu and round overlay buttons.
 
 ## Module Map
-`engine.js` scene/camera/renderer · `data.js` all constants · `state.js` player+game state, leveling · `map.js` terrain+chunk streaming · `entities.js` enemy AI+spawning · `weapons.js` view models+reload · `combat.js` shooting+damage+explosions · `input.js` keyboard/mouse/chat · `ui.js` shop/loadout/HUD · `audio.js` Web Audio synth · `main.js` game loop+collision+3rd-person camera
+`engine.js` scene/camera/renderer · `data.js` all constants · `state.js` player+game state, leveling · `map.js` terrain+chunk streaming · `entities.js` enemy AI+spawning · `weapons.js` view models+reload · `combat.js` shooting+damage+explosions · `input.js` keyboard/mouse/chat · `ui.js` shop/loadout/HUD · `audio.js` Web Audio synth · `main.js` game loop+collision+3rd-person armor · `models.js` GLTF model preloader+cache (barrel, chair, tree, chestplate)

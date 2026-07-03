@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { MAPS } from './data.js';
 import { scene, obstacles, setObstacles, setWallBounds } from './engine.js';
 import { gameState } from './state.js';
+import { getBarrel, getChair, getTree, isBarrelReady, isChairReady, isTreeReady } from './models.js';
 
 function mulberry32(seed) {
     return function () {
@@ -402,9 +403,31 @@ function _buildCityChunkMeshes(bcx, bcz) {
                 }
             }
 
-            // Interior furniture
-            if (rng() < 0.7) addObs(furnitureMat2, 1.5, 0.75, 0.8, bx + (rng() - 0.5) * (w - 3), 0.375, bz + (rng() - 0.5) * (d - 3));
-            if (rng() < 0.5) addObs(furnitureMat2, 0.8, 1.5, 0.5, bx + (rng() - 0.5) * (w - 3), 0.75, bz + (rng() - 0.5) * (d - 3));
+            // Interior furniture — chairs replace the old box furniture
+            if (isChairReady() && rng() < 0.5) {
+                const chair = getChair();
+                const cX = bx + (rng() - 0.5) * (w - 3);
+                const cZ = bz + (rng() - 0.5) * (d - 3);
+                chair.position.set(cX, 0, cZ);
+                const s = 2.25 + rng() * 0.9;
+                chair.scale.set(s, s, s);
+                chair.rotation.y = rng() * Math.PI * 2;
+                addVis(chair);
+            } else {
+                addObs(furnitureMat2, 1.5, 0.75, 0.8, bx + (rng() - 0.5) * (w - 3), 0.375, bz + (rng() - 0.5) * (d - 3));
+            }
+            if (isChairReady() && rng() < 0.35) {
+                const chair = getChair();
+                const cX = bx + (rng() - 0.5) * (w - 3);
+                const cZ = bz + (rng() - 0.5) * (d - 3);
+                chair.position.set(cX, 0, cZ);
+                const s = 2.25 + rng() * 0.9;
+                chair.scale.set(s, s, s);
+                chair.rotation.y = rng() * Math.PI * 2;
+                addVis(chair);
+            } else {
+                addObs(furnitureMat2, 0.8, 1.5, 0.5, bx + (rng() - 0.5) * (w - 3), 0.75, bz + (rng() - 0.5) * (d - 3));
+            }
 
             // Exterior crates & barrels
             const numCrates = Math.floor(rng() * 4) + 1;
@@ -423,6 +446,27 @@ function _buildCityChunkMeshes(bcx, bcz) {
                 addObs(trashMat, 0.4, 0.6, 0.4, bx - w / 2 - 1, 0.3, bz + rng() * d - d / 2);
             }
 
+            // GLB decorative models
+            if (isBarrelReady() && rng() < 0.35) {
+                const barrel = getBarrel();
+                const bX = bx + (rng() - 0.5) * (w + 4);
+                const bZ = bz + d / 2 + 2 + rng() * 3;
+                barrel.position.set(bX, 0, bZ);
+                const s = 1.0 + rng() * 0.5;
+                barrel.scale.set(s, s, s);
+                barrel.rotation.y = rng() * Math.PI * 2;
+                addVis(barrel);
+            }
+            if (isBarrelReady() && rng() < 0.25) {
+                const barrel = getBarrel();
+                const bX = bx + (rng() - 0.5) * (w + 4);
+                const bZ = bz - d / 2 - 2 - rng() * 2;
+                barrel.position.set(bX, 0, bZ);
+                const s = 0.9 + rng() * 0.4;
+                barrel.scale.set(s, s, s);
+                barrel.rotation.y = rng() * Math.PI * 2;
+                addVis(barrel);
+            }
             // Graffiti decal
             const grafMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.5 + rng() * 2, 0.8 + rng() * 1.2), grafMats[Math.floor(rng() * grafMats.length)]);
             grafMesh.position.set(bx + (rng() - 0.5) * (w - 2), 1.5 + rng() * 2, bz + d / 2 + 0.03);
@@ -479,8 +523,19 @@ function _buildForestChunkMeshes(cx, cz) {
 
     for (const [x, z] of treePositions) {
         const scale = 0.4 + rng() * 1.8;
-        const thisLeafMat = leafMats[Math.floor(rng() * leafMats.length)];
 
+        if (isTreeReady()) {
+            const tree = getTree();
+            tree.position.set(x, 0, z);
+            tree.scale.set(scale, scale, scale);
+            tree.rotation.y = rng() * Math.PI * 2;
+            scene.add(tree); meshes.push(tree);
+            chunkObs.push({ mesh: tree, box: new THREE.Box3().setFromObject(tree), isTrunk: true, passThrough: true });
+            continue;
+        }
+
+        // Fallback procedural tree
+        const thisLeafMat = leafMats[Math.floor(rng() * leafMats.length)];
         const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * scale, 0.55 * scale, 8 * scale, 6), treeMat);
         trunk.position.set(x, 4 * scale, z);
         scene.add(trunk); meshes.push(trunk);
@@ -1004,44 +1059,32 @@ function buildFortressMap(obs) {
     }
 
     // --- Outer perimeter walls (±85, 6 tall, 4 thick) ---
-    // North (z=-85): underground tunnel at x=0 + existing passage at x=35 + right bulk
+    // North (z=-85): existing passage at x=35 (underground is entered via the secret corridors, not the walls)
     addObstacle(obs, stoneMat, 81, 6, 4, -44.5, 3, -85);   // x=-85 to x=-4
-    addObstacle(obs, stoneMat, 8, 3, 4, 0, 4.5, -85);       // arch above underground N tunnel (y=3–6)
-    addPassage(0, 1.5, -85, 8, 3, 4, 'tunnel');             // underground tunnel N (x=-4 to x=4)
+    addObstacle(obs, stoneMat, 8, 6, 4, 0, 3, -85);         // x=-4 to x=4 (solid — old tunnel door removed)
     addObstacle(obs, stoneMat, 29, 6, 4, 18.5, 3, -85);     // x=4 to x=33
     addPassage(35, 1.5, -85, 4, 3, 4);                       // existing passage at x=35
     addObstacle(obs, stoneMat, 4, 3, 4, 35, 4.5, -85);       // arch above existing passage
     addObstacle(obs, stoneMat, 48, 6, 4, 61, 3, -85);        // x=37 to x=85
-    addTorch(-3, 2.5, -83); addTorch(3, 2.5, -83);           // N tunnel — inner wall face
-    addTorch(-3, 2.5, -87); addTorch(3, 2.5, -87);           // N tunnel — outer wall face
-    // South (z=+85): left bulk + split right bulk for underground tunnel at x=55
+    // South (z=+85): gatehouse gap at x=-12..12, rest solid
     addObstacle(obs, darkStoneMat, 73, 6, 4, -48.5, 3, 85);  // x=-85 to x=-12
     addObstacle(obs, darkStoneMat, 40, 6, 4, 32, 3, 85);      // x=12 to x=52
-    addObstacle(obs, darkStoneMat, 6, 3, 4, 55, 4.5, 85);     // arch above underground S tunnel
-    addPassage(55, 1.5, 85, 6, 3, 4, 'tunnel');               // underground tunnel S (x=52–58)
+    addObstacle(obs, darkStoneMat, 6, 6, 4, 55, 3, 85);       // x=52 to x=58 (solid — old tunnel door removed)
     addObstacle(obs, darkStoneMat, 27, 6, 4, 71.5, 3, 85);    // x=58 to x=85
-    addTorch(52, 2.5, 83); addTorch(58, 2.5, 83);             // S tunnel — inner wall face
-    addTorch(52, 2.5, 87); addTorch(58, 2.5, 87);             // S tunnel — outer wall face
-    // East (x=+85): split upper section for underground tunnel at z=0 + existing passage at z=10
+    // East (x=+85): existing passage at z=10
     addObstacle(obs, stoneMat, 4, 6, 82, 85, 3, -44);         // z=-85 to z=-3
-    addObstacle(obs, stoneMat, 4, 3, 6, 85, 4.5, 0);          // arch above underground E tunnel
-    addPassage(85, 1.5, 0, 4, 3, 6, 'tunnel');                // underground tunnel E (z=-3 to z=3)
+    addObstacle(obs, stoneMat, 4, 6, 6, 85, 3, 0);            // z=-3 to z=3 (solid — old tunnel door removed)
     addObstacle(obs, stoneMat, 4, 6, 5, 85, 3, 5.5);          // z=3 to z=8
     addPassage(85, 1.5, 10, 4, 3, 4);                          // existing passage at z=10
     addObstacle(obs, stoneMat, 4, 3, 4, 85, 4.5, 10);          // arch above existing passage
     addObstacle(obs, stoneMat, 4, 6, 73, 85, 3, 48.5);         // z=12 to z=85
-    addTorch(83, 2.5, -3); addTorch(83, 2.5, 3);              // E tunnel — inner wall face
-    addTorch(87, 2.5, -3); addTorch(87, 2.5, 3);              // E tunnel — outer wall face
-    // West (x=-85): top + existing passage at z=-35 + section + underground tunnel at z=0 + bottom
+    // West (x=-85): existing passage at z=-35
     addObstacle(obs, stoneMat, 4, 6, 48, -85, 3, -61);        // z=-85 to z=-37
     addPassage(-85, 1.5, -35, 4, 3, 4);                        // existing passage at z=-35
     addObstacle(obs, stoneMat, 4, 3, 4, -85, 4.5, -35);        // arch above existing passage
     addObstacle(obs, stoneMat, 4, 6, 30, -85, 3, -18);         // z=-33 to z=-3
-    addObstacle(obs, stoneMat, 4, 3, 6, -85, 4.5, 0);          // arch above underground W tunnel
-    addPassage(-85, 1.5, 0, 4, 3, 6, 'tunnel');                // underground tunnel W (z=-3 to z=3)
+    addObstacle(obs, stoneMat, 4, 6, 6, -85, 3, 0);            // z=-3 to z=3 (solid — old tunnel door removed)
     addObstacle(obs, stoneMat, 4, 6, 82, -85, 3, 44);          // z=3 to z=85
-    addTorch(-83, 2.5, -3); addTorch(-83, 2.5, 3);            // W tunnel — inner wall face
-    addTorch(-87, 2.5, -3); addTorch(-87, 2.5, 3);            // W tunnel — outer wall face
 
     // Walkway on top of outer walls (y=6)
     addObstacle(obs, pathMat, 148, 0.15, 3.6, 0, 6.075, -85, { noCollide: true });
@@ -1060,28 +1103,35 @@ function buildFortressMap(obs) {
     addObstacle(obs, stoneMat, 1, 6, 3.5, -75.5, 3, -81.25); // west end cap
     addObstacle(obs, stoneMat, 1, 6, 3.5, -14.5, 3, -81.25); // east end cap
     addObstacle(obs, stoneMat, 62, 1, 4, -45, 6.5, -81, { noCollide: true }); // roof slab
-    addObstacle(obs, pathMat, 60, 0.1, 3.5, -45, 0.05, -81.25, { noCollide: true }); // floor slab
+    addObstacle(obs, pathMat, 53, 0.1, 3.5, -48.5, 0.05, -81.25, { noCollide: true }); // floor slab (ends x=-22 — stairwell pit beyond)
     addTorch(-68, 4, -81); addTorch(-43, 4, -81); addTorch(-20, 4, -81);
 
-    // --- Secret Corridor B: alongside east outer wall interior (z=-75 to z=-20, x=79.5 to x=83) ---
+    // --- Secret Corridor B: alongside east outer wall interior (z=-75 to z=-12, x=79.5 to x=83) ---
     addObstacle(obs, stoneMat, 1, 6, 11, 79.5, 3, -69.5); // z=-75–-64
     addPassage(79.5, 3, -61, 1, 6, 6, 'corridor');         // door 1 (z=-64–-58)
     addObstacle(obs, stoneMat, 1, 6, 30, 79.5, 3, -43);    // z=-58–-28
     addPassage(79.5, 3, -25, 1, 6, 6, 'corridor');         // door 2 (z=-28–-22)
-    addObstacle(obs, stoneMat, 1, 6,  2, 79.5, 3, -21);    // z=-22–-20
+    addObstacle(obs, stoneMat, 1, 6, 10, 79.5, 3, -17);    // z=-22–-12 (extension housing the stairwell)
     addObstacle(obs, stoneMat, 3.5, 6, 1, 81.25, 3, -75.5); // north end cap
-    addObstacle(obs, stoneMat, 3.5, 6, 1, 81.25, 3, -19.5); // south end cap
-    addObstacle(obs, stoneMat, 4, 1, 57, 81, 6.5, -47.5, { noCollide: true }); // roof slab
-    addObstacle(obs, pathMat, 3.5, 0.1, 55, 81.25, 0.05, -47.5, { noCollide: true }); // floor slab
-    addTorch(81, 4, -68); addTorch(81, 4, -43); addTorch(81, 4, -22);
+    addObstacle(obs, stoneMat, 3.5, 6, 1, 81.25, 3, -12.5); // south end cap
+    addObstacle(obs, stoneMat, 4, 1, 64, 81, 6.5, -44, { noCollide: true }); // roof slab
+    addObstacle(obs, pathMat, 3.5, 0.1, 53, 81.25, 0.05, -48.5, { noCollide: true }); // floor slab (ends z=-22 — stairwell pit beyond)
+    addTorch(81, 4, -68); addTorch(81, 4, -43); addTorch(81, 4, -22); addTorch(80.2, 4, -15);
 
     // --- Underground Network: Central Room + 4 Tunnel Corridors ---
-    // Rectangular zones tell getFloorHeight the floor is 8 units below ground in these areas
+    // Rectangular zones tell getFloorHeight the floor is 8 units below ground in these areas.
+    // The surface above is sealed (see getFloorHeight) — the lowered floor only applies to
+    // entities already below ground or inside a zone's `entry` rect (the corridor stairwells),
+    // so the network is reachable ONLY via the stairwells at the ends of Secret Corridors A & B.
     gameState.undergroundZones.push({minX:-6,  maxX:6,   minZ:-6,  maxZ:6,   depth:8}); // central room
     gameState.undergroundZones.push({minX:-3,  maxX:3,   minZ:-83, maxZ:-6,  depth:8}); // north corridor
     gameState.undergroundZones.push({minX:6,   maxX:85,  minZ:-3,  maxZ:3,   depth:8}); // east corridor
     gameState.undergroundZones.push({minX:-85, maxX:-6,  minZ:-3,  maxZ:3,   depth:8}); // west corridor
     gameState.undergroundZones.push({minX:52,  maxX:58,  minZ:3,   maxZ:83,  depth:8}); // south corridor
+    gameState.undergroundZones.push({minX:-22, maxX:-3,  minZ:-83, maxZ:-80, depth:8,
+        entry:{minX:-22, maxX:-15, minZ:-83, maxZ:-80}}); // Corridor A stairwell + connector → north corridor
+    gameState.undergroundZones.push({minX:80,  maxX:83,  minZ:-22, maxZ:-3,  depth:8,
+        entry:{minX:80, maxX:83, minZ:-22, maxZ:-13}});   // Corridor B stairwell + connector → east corridor
 
     // — Central room (12×12, floor y=-8, enclosed by stone walls + columns) —
     // Walls h=8, center y=-4 (tops flush with surface at y=0)
@@ -1106,49 +1156,60 @@ function buildFortressMap(obs) {
     addTorch(-4, -2,  4); addTorch(4, -2,  4);
 
     // — North corridor (x=-3 to x=3, z=-83 to z=-6) —
-    addObstacle(obs, stoneMat, 1, 8, 77, -3, -4, -44.5);  // west wall
+    addObstacle(obs, stoneMat, 1, 8, 73, -3, -4, -42.5);  // west wall (opening z=-83..-79 for Corridor A connector)
     addObstacle(obs, stoneMat, 1, 8, 77,  3, -4, -44.5);  // east wall
     addObstacle(obs, stoneMat, 6, 0.4, 77, 0, -3, -44.5, { noCollide: true }); // ceiling
-    // Descending stairs: 16 steps × 0.5 drop × 1.2 depth, south from z=-83
-    for (let i = 0; i < 16; i++) {
-        addObstacle(obs, stoneMat, 6, 0.5, 1.2, 0, -i * 0.5 - 0.25, -83 + (i + 0.5) * 1.2);
-    }
     // Corridor torches mounted on east wall
     for (const tz of [-68, -50, -32, -16]) addTorch(2.5, -6, tz);
 
     // — East corridor (x=6 to x=85, z=-3 to z=3) —
-    addObstacle(obs, stoneMat, 79, 8, 1, 45.5, -4, -3);    // north wall
+    addObstacle(obs, stoneMat, 73, 8, 1, 42.5, -4, -3);    // north wall (opening x=79..83 for Corridor B connector)
     addObstacle(obs, stoneMat, 46, 8, 1, 29,   -4,  3);    // south wall west of S-corridor junction
     addObstacle(obs, stoneMat, 27, 8, 1, 71.5, -4,  3);    // south wall east of S-corridor junction
+    addObstacle(obs, stoneMat, 1, 8, 6, 83.5, -4, 0);      // east end cap (old wall-door stairs removed)
     addObstacle(obs, stoneMat, 79, 0.4, 6, 45.5, -3, 0, { noCollide: true }); // ceiling
-    // Descending stairs: west from x=83
-    for (let i = 0; i < 16; i++) {
-        addObstacle(obs, stoneMat, 1.2, 0.5, 6, 83 - (i + 0.5) * 1.2, -i * 0.5 - 0.25, 0);
-    }
     // Corridor torches mounted on north wall
     for (const tx of [70, 50, 30, 15]) addTorch(tx, -6, -2.5);
 
     // — West corridor (x=-85 to x=-6, z=-3 to z=3) —
     addObstacle(obs, stoneMat, 79, 8, 1, -45.5, -4, -3);   // north wall
     addObstacle(obs, stoneMat, 79, 8, 1, -45.5, -4,  3);   // south wall
+    addObstacle(obs, stoneMat, 1, 8, 6, -83.5, -4, 0);     // west end cap (old wall-door stairs removed)
     addObstacle(obs, stoneMat, 79, 0.4, 6, -45.5, -3, 0, { noCollide: true }); // ceiling
-    // Descending stairs: east from x=-83
-    for (let i = 0; i < 16; i++) {
-        addObstacle(obs, stoneMat, 1.2, 0.5, 6, -83 + (i + 0.5) * 1.2, -i * 0.5 - 0.25, 0);
-    }
     // Corridor torches mounted on south wall
     for (const tx of [-70, -50, -30, -15]) addTorch(tx, -6, 2.5);
 
     // — South corridor (x=52–58, z=3 to z=83) — T-junctions into east corridor at z=3 —
     addObstacle(obs, stoneMat, 1, 8, 80, 52, -4, 43);      // west wall
     addObstacle(obs, stoneMat, 1, 8, 80, 58, -4, 43);      // east wall
+    addObstacle(obs, stoneMat, 7, 8, 1, 55, -4, 82.5);     // south end cap (old wall-door stairs removed)
     addObstacle(obs, stoneMat, 6, 0.4, 80, 55, -3, 43, { noCollide: true }); // ceiling
-    // Descending stairs: north from z=83
-    for (let i = 0; i < 16; i++) {
-        addObstacle(obs, stoneMat, 6, 0.5, 1.2, 55, -i * 0.5 - 0.25, 83 - (i + 0.5) * 1.2);
-    }
     // Corridor torches mounted on west wall
     for (const tz of [68, 50, 32, 14]) addTorch(52.5, -6, tz);
+
+    // — Corridor A stairwell + connector (the ONLY north-side way down): the floor slab of
+    // Secret Corridor A ends at x=-22; 16 steps descend eastward to y=-8, pass under the
+    // corridor's east end cap, and a short connector joins the north corridor's west opening —
+    for (let i = 0; i < 16; i++) {
+        addObstacle(obs, stoneMat, 0.8, 0.5, 3, -22 + (i + 0.5) * 0.8, -i * 0.5 - 0.25, -81.5);
+    }
+    addObstacle(obs, stoneMat, 26, 8, 1, -9.5, -4, -83.5); // north side wall (also caps north corridor's north end)
+    addObstacle(obs, stoneMat, 20, 8, 1, -13, -4, -79.5);  // south side wall
+    addObstacle(obs, pathMat, 8, 0.1, 3, -6.5, -7.95, -81.5, { noCollide: true }); // connector floor
+    addObstacle(obs, stoneMat, 11, 0.4, 3, -8, -3, -81.5, { noCollide: true });    // connector ceiling
+    addTorch(-9, -6, -80.2);
+
+    // — Corridor B stairwell + connector (the ONLY east-side way down): the floor slab of
+    // Secret Corridor B ends at z=-22; 16 steps descend southward to y=-8, pass under the
+    // corridor's south end cap, and a short connector joins the east corridor's north opening —
+    for (let i = 0; i < 16; i++) {
+        addObstacle(obs, stoneMat, 3, 0.5, 0.8, 81.5, -i * 0.5 - 0.25, -22 + (i + 0.5) * 0.8);
+    }
+    addObstacle(obs, stoneMat, 1, 8, 20, 79.5, -4, -13);   // west side wall
+    addObstacle(obs, stoneMat, 1, 8, 20, 83.5, -4, -13);   // east side wall
+    addObstacle(obs, pathMat, 3, 0.1, 8, 81.5, -7.95, -6.5, { noCollide: true }); // connector floor
+    addObstacle(obs, stoneMat, 3, 0.4, 9, 81.5, -3, -7.5, { noCollide: true });   // connector ceiling
+    addTorch(80.2, -6, -9);
 
     // Staircases to outer wall tops (12 steps, rise 6)
     addStaircase(-55, -73.4, 'N');
