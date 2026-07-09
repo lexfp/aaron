@@ -127,11 +127,11 @@ export function buildLevelSelect(stageIdx, callbacks) {
   }
 }
 
-export function updateHUD(stageIdx, levelIdx, coinsThisLevel, totalCoins, lives, hp = 100, maxHp = 100) {
+export function updateHUD(stageIdx, levelIdx, coinsThisLevel, totalCoins, lives, hp = 100, maxHp = 100, flavor = null) {
   const el = id => document.getElementById(id);
   const mod = STAGE_MODIFIERS[(stageIdx - 1) % 10];
   if (el('hud-stage')) {
-    el('hud-stage').textContent = `S${stageIdx}-L${levelIdx}`;
+    el('hud-stage').textContent = `S${stageIdx}-L${levelIdx}${flavor ? ' · ' + flavor : ''}`;
     if (el('hud-modifier')) el('hud-modifier').textContent = mod ? mod.label : '';
   }
   if (el('hud-coins-level')) el('hud-coins-level').textContent = coinsThisLevel;

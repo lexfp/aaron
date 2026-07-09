@@ -194,9 +194,13 @@ function mkCoin(x, y, spin) {
   return { x: Math.round(x), y: Math.round(y), collected: false, spinAngle: spin };
 }
 
+// Fraction of coin slots that actually spawn a coin — lower = rarer coins.
+const COIN_DENSITY = 0.5;
+
 function nCoins(coins, plat, n, rng) {
   const sp = plat.w / (n + 1);
   for (let c = 0; c < n; c++) {
+    if (rng() >= COIN_DENSITY) continue;
     coins.push(mkCoin(plat.x + sp * (c + 1) - 8, plat.y - 36, rng() * Math.PI * 2));
   }
 }
@@ -210,6 +214,7 @@ function arcCoins(coins, x1, y1, x2, y2, n, rng, arcH = 55) {
   // Require peak_y >= feet_peak → arcH <= midY - y1 + 82 = (y2-y1)/2 + 82.
   const safeH = Math.max(16, Math.min(arcH, (y2 - y1) / 2 + 82));
   for (let i = 0; i < n; i++) {
+    if (rng() >= COIN_DENSITY) continue;
     const t = (i + 1) / (n + 1);
     const x = lerp(x1, x2, t) - 8;
     const y = lerp(y1, y2, t) - safeH * Math.sin(Math.PI * t) - 8;

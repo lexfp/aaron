@@ -21,6 +21,7 @@ import { shoot, updateFireZones, updateProjectiles, checkPvPEnd, damagePlayer, u
 import { setupInput, checkInteractionPrompt, isMouseDown } from './input.js';
 import { register } from './callbacks.js';
 import { checkAchievements, initAchievementsUI, openAchievementsScreen } from './achievements.js';
+import { preloadAll, getChestplate, getKatana, isChestplateReady, isKatanaReady } from './models.js';
 
 // --- Register callbacks to break circular deps ---
 
@@ -122,7 +123,12 @@ function getFloorHeight(pos, allowUncapped = false) {
     }
     for (const zone of (gameState.undergroundZones || [])) {
         if (pos.x >= zone.minX && pos.x <= zone.maxX && pos.z >= zone.minZ && pos.z <= zone.maxZ) {
-            if (-zone.depth < floor) floor = -zone.depth;
+            // The surface above the network is sealed: the lowered floor only applies
+            // to entities already below ground, or inside the zone's entry stairwell.
+            const e = zone.entry;
+            const belowGround = pos.y - 1.7 < -0.3;
+            const inEntry = e && pos.x >= e.minX && pos.x <= e.maxX && pos.z >= e.minZ && pos.z <= e.maxZ;
+            if ((belowGround || inEntry) && -zone.depth < floor) floor = -zone.depth;
             break;
         }
     }
@@ -417,16 +423,23 @@ function updateTpArmor() {
     }
 
     if (armorId) {
-        const mat = matFor(armorId);
-        // Front plate
-        tpChestPlate = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.78, 0.12), mat);
-        tpChestPlate.position.set(0, 0, 0.16);
-        tpTorso.add(tpChestPlate);
-        // Back plate
-        const tpBackPlate = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.78, 0.12), mat);
-        tpBackPlate.position.set(0, 0, -0.16);
-        tpTorso.add(tpBackPlate);
-        tpChestPlate._back = tpBackPlate; // track for removal
+        if (armorId.startsWith('heavy') && isChestplateReady()) {
+            const plate = getChestplate();
+            plate.scale.set(0.12, 0.12, 0.12);
+            plate.position.set(0, 0.26, 0.16);
+            tpTorso.add(plate);
+            tpChestPlate = plate;
+            tpChestPlate._back = null;
+        } else {
+            const mat = matFor(armorId);
+            tpChestPlate = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.78, 0.12), mat);
+            tpChestPlate.position.set(0, 0, 0.16);
+            tpTorso.add(tpChestPlate);
+            const tpBackPlate = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.78, 0.12), mat);
+            tpBackPlate.position.set(0, 0, -0.16);
+            tpTorso.add(tpBackPlate);
+            tpChestPlate._back = tpBackPlate;
+        }
     }
     if (helmetId) {
         const mat = matFor(helmetId);
@@ -719,19 +732,27 @@ function _buildTpMeleeModel(weaponId) {
         tpGunGroup.add(bar);
 
     } else if (weaponId === 'katana') {
-        const bladeMat = new THREE.MeshStandardMaterial({ color: 0xdcdcdc, metalness: 0.95, roughness: 0.04 });
-        const guardMat = new THREE.MeshStandardMaterial({ color: 0xcc9920, metalness: 0.6 });
-        const kWood = new THREE.MeshStandardMaterial({ color: 0x2a1a08, roughness: 0.85 });
-        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.020, 0.24, 8), kWood);
-        handle.rotation.x = Math.PI / 2;
-        handle.position.set(0, 0.02, -0.05);
-        tpGunGroup.add(handle);
-        const guard = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.018, 0.018), guardMat);
-        guard.position.set(0, 0.02, 0.09);
-        tpGunGroup.add(guard);
-        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.011, 0.90), bladeMat);
-        blade.position.set(0, 0.02, 0.55);
-        tpGunGroup.add(blade);
+        if (isKatanaReady()) {
+            const k = getKatana();
+            k.rotation.y = Math.PI;
+            k.position.set(0, 0.02, 0.15);
+            k.scale.set(0.35, 0.35, 0.35);
+            tpGunGroup.add(k);
+        } else {
+            const bladeMat = new THREE.MeshStandardMaterial({ color: 0xdcdcdc, metalness: 0.95, roughness: 0.04 });
+            const guardMat = new THREE.MeshStandardMaterial({ color: 0xcc9920, metalness: 0.6 });
+            const kWood = new THREE.MeshStandardMaterial({ color: 0x2a1a08, roughness: 0.85 });
+            const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.020, 0.24, 8), kWood);
+            handle.rotation.x = Math.PI / 2;
+            handle.position.set(0, 0.02, -0.05);
+            tpGunGroup.add(handle);
+            const guard = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.018, 0.018), guardMat);
+            guard.position.set(0, 0.02, 0.09);
+            tpGunGroup.add(guard);
+            const blade = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.011, 0.90), bladeMat);
+            blade.position.set(0, 0.02, 0.55);
+            tpGunGroup.add(blade);
+        }
 
     } else if (weaponId === 'longsword') {
         const bladeMat = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 0.88, roughness: 0.12 });
@@ -1807,5 +1828,6 @@ setupKeybindsMenu();
 updateHomeStats();
 initTutorial();
 initAchievementsUI();
+preloadAll();
 animate();
 window.__wzReady = true;
