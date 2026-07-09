@@ -1,5 +1,37 @@
 const SAVE_KEY = 'platformer_save';
 
+// ─── KEYBINDS ─────────────────────────────────────────────────────────────
+// Each action maps to an array of KeyboardEvent.code strings. Untouched
+// actions keep their full multi-key default (e.g. jump accepts Space, Up
+// Arrow, or W); rebinding an action collapses it to the single key pressed.
+export const DEFAULT_KEYBINDS = {
+  moveLeft: ['ArrowLeft', 'KeyA'],
+  moveRight: ['ArrowRight', 'KeyD'],
+  jump: ['Space', 'ArrowUp', 'KeyW'],
+  dash: ['ShiftLeft', 'ShiftRight'],
+  slide: ['ArrowDown', 'KeyS'],
+  attack: ['KeyJ', 'KeyX', 'KeyK', 'KeyF', 'Enter'],
+  special1: ['KeyQ'],
+  special2: ['KeyE'],
+  special3: ['KeyR'],
+  special4: ['KeyT'],
+  special5: ['KeyG'],
+};
+
+export const KEYBIND_ACTIONS = [
+  { key: 'moveLeft', label: 'Move Left' },
+  { key: 'moveRight', label: 'Move Right' },
+  { key: 'jump', label: 'Jump' },
+  { key: 'dash', label: 'Dash' },
+  { key: 'slide', label: 'Slide (hold, ground+moving)' },
+  { key: 'attack', label: 'Attack' },
+  { key: 'special1', label: 'Special Slot 1' },
+  { key: 'special2', label: 'Special Slot 2' },
+  { key: 'special3', label: 'Special Slot 3' },
+  { key: 'special4', label: 'Special Slot 4' },
+  { key: 'special5', label: 'Special Slot 5' },
+];
+
 const DEFAULT = {
   coins: 0,
   upgrades: { jump: 0, speed: 0, magnet: 0, djBoost: 0, lives: 0 },
@@ -12,6 +44,7 @@ const DEFAULT = {
   weaponLevels: { fists: 0, sword: 0, hammer: 0, blaster: 0, launcher: 0, knives: 0, spear: 0, icewand: 0, flamestaff: 0, stormrod: 0, excalibur: 0 },
   specials: {},
   equippedSpecials: ['heal', 'bomb', 'nova', null, null],
+  keybinds: JSON.parse(JSON.stringify(DEFAULT_KEYBINDS)),
 };
 
 export let playerData = JSON.parse(JSON.stringify(DEFAULT));
@@ -31,6 +64,13 @@ export function loadPlayerData() {
     playerData.equippedSpecials = Array.isArray(saved.equippedSpecials)
       ? [...saved.equippedSpecials.slice(0, 5), null, null, null, null, null].slice(0, 5)
       : [...DEFAULT.equippedSpecials];
+    playerData.keybinds = {};
+    for (const { key } of KEYBIND_ACTIONS) {
+      const savedBinding = saved.keybinds && saved.keybinds[key];
+      playerData.keybinds[key] = (Array.isArray(savedBinding) && savedBinding.length)
+        ? [...savedBinding]
+        : [...DEFAULT_KEYBINDS[key]];
+    }
     if (!playerData.equippedWeapon || !playerData.weapons[playerData.equippedWeapon]) {
       playerData.equippedWeapon = 'fists';
     }
@@ -47,6 +87,37 @@ export function savePlayerData() {
 
 export function resetAllProgress() {
   playerData = JSON.parse(JSON.stringify(DEFAULT));
+  savePlayerData();
+}
+
+// Returns the live keybinds object (not a snapshot) so a rebind performed
+// mid-session is immediately visible to input.js on its next check.
+export function getKeybinds() {
+  if (!playerData.keybinds) playerData.keybinds = JSON.parse(JSON.stringify(DEFAULT_KEYBINDS));
+  return playerData.keybinds;
+}
+
+// Binds `code` to `action` as a single-key replacement. Rejects Escape
+// (reserved for pause/cancel) and rejects a code already bound to a
+// different action, returning which action holds it instead of silently
+// overwriting.
+export function setKeybind(action, code) {
+  if (!DEFAULT_KEYBINDS[action]) return { ok: false };
+  if (code === 'Escape') return { ok: false };
+  const kb = getKeybinds();
+  for (const other of Object.keys(kb)) {
+    if (other === action) continue;
+    if (Array.isArray(kb[other]) && kb[other].includes(code)) {
+      return { ok: false, conflictAction: other };
+    }
+  }
+  kb[action] = [code];
+  savePlayerData();
+  return { ok: true };
+}
+
+export function resetKeybinds() {
+  playerData.keybinds = JSON.parse(JSON.stringify(DEFAULT_KEYBINDS));
   savePlayerData();
 }
 

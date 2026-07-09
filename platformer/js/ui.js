@@ -7,12 +7,13 @@ import {
   unlockEverything,
   SPECIAL_DEFS, SPECIAL_MAP, ownsSpecial, buySpecial,
   SLOT_KEYS, getEquippedSpecials, setEquippedSpecial,
+  KEYBIND_ACTIONS, getKeybinds, setKeybind, resetKeybinds,
 } from './state.js';
 import { STAGE_THEMES } from './renderer.js';
 import { STAGE_MODIFIERS } from './player.js';
 
 const SCREENS = ['main-menu', 'stage-select', 'level-select', 'game-wrap',
-  'level-complete', 'shop-overlay', 'stage-complete', 'pause-menu'];
+  'level-complete', 'shop-overlay', 'stage-complete', 'pause-menu', 'keybinds-menu'];
 
 export function showScreen(id) {
   for (const s of SCREENS) {
@@ -30,6 +31,13 @@ export function initUI(callbacks) {
   });
   const shopBtn = document.getElementById('btn-shop');
   if (shopBtn) shopBtn.addEventListener('click', () => showShop(undefined, undefined, callbacks));
+  document.getElementById('btn-keybinds').addEventListener('click', () => openKeybindsMenu('main-menu'));
+  document.getElementById('btn-pause-keybinds').addEventListener('click', () => openKeybindsMenu('pause-menu'));
+  document.getElementById('btn-kb-back').addEventListener('click', () => showScreen(_kbReturnScreen));
+  document.getElementById('btn-kb-reset').addEventListener('click', () => {
+    resetKeybinds();
+    renderKeybindsList();
+  });
   document.getElementById('btn-reset').addEventListener('click', () => {
     if (confirm('Reset ALL progress? This cannot be undone.')) {
       resetAllProgress();
@@ -125,6 +133,82 @@ export function buildLevelSelect(stageIdx, callbacks) {
     });
     grid.appendChild(btn);
   }
+}
+
+/* ============================================================
+ *  KEYBINDS MENU
+ * ============================================================ */
+
+const CODE_LABELS = {
+  ArrowLeft: 'Left Arrow', ArrowRight: 'Right Arrow', ArrowUp: 'Up Arrow', ArrowDown: 'Down Arrow',
+  Space: 'Space', ShiftLeft: 'Left Shift', ShiftRight: 'Right Shift', Enter: 'Enter',
+};
+
+function codeLabel(code) {
+  if (CODE_LABELS[code]) return CODE_LABELS[code];
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Digit')) return code.slice(5);
+  return code;
+}
+
+function actionLabel(action) {
+  const found = KEYBIND_ACTIONS.find(a => a.key === action);
+  return found ? found.label : action;
+}
+
+let _kbReturnScreen = 'main-menu';
+
+export function openKeybindsMenu(returnScreen) {
+  _kbReturnScreen = returnScreen;
+  renderKeybindsList();
+  showScreen('keybinds-menu');
+}
+
+function renderKeybindsList() {
+  const list = document.getElementById('keybinds-list');
+  const msg = document.getElementById('kb-conflict-msg');
+  if (!list) return;
+  if (msg) msg.textContent = '';
+  list.innerHTML = '';
+  const kb = getKeybinds();
+  for (const { key, label } of KEYBIND_ACTIONS) {
+    const codes = kb[key] || [];
+    const row = document.createElement('div');
+    row.className = 'kb-row';
+    row.innerHTML = `
+      <div class="kb-label">${label}</div>
+      <div class="kb-keys">${codes.map(codeLabel).join(' / ')}</div>
+      <button class="kb-rebind-btn" data-action="${key}">Rebind</button>
+    `;
+    list.appendChild(row);
+  }
+  list.querySelectorAll('.kb-rebind-btn').forEach(btn => {
+    btn.addEventListener('click', () => startKeybindCapture(btn.dataset.action, btn));
+  });
+}
+
+function startKeybindCapture(action, btn) {
+  btn.textContent = 'Press a key…';
+  btn.classList.add('capturing');
+  const handler = (e) => {
+    e.preventDefault();
+    window.removeEventListener('keydown', handler, true);
+    if (e.code === 'Escape') {
+      renderKeybindsList();
+      return;
+    }
+    const result = setKeybind(action, e.code);
+    renderKeybindsList();
+    if (!result.ok) {
+      const msg = document.getElementById('kb-conflict-msg');
+      if (msg) {
+        msg.textContent = result.conflictAction
+          ? `That key is already bound to ${actionLabel(result.conflictAction)}.`
+          : `That key can't be bound.`;
+      }
+    }
+  };
+  window.addEventListener('keydown', handler, true);
 }
 
 export function updateHUD(stageIdx, levelIdx, coinsThisLevel, totalCoins, lives, hp = 100, maxHp = 100, flavor = null) {

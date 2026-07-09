@@ -1,29 +1,31 @@
+import { getKeybinds } from './state.js';
+
 const held = new Set();
 let _jumpJustPressed = false;
 let _escJustPressed = false;
 let _dashJustPressed = false;
 let _mouseDown = false;
-// 5 active slots mapped to Q/E/R/T/G — consumed on press
+// 5 active slots mapped to special1..special5 — consumed on press
 const _specials = [false, false, false, false, false];
-const SPECIAL_CODES = ['KeyQ', 'KeyE', 'KeyR', 'KeyT', 'KeyG'];
-
-const ATTACK_KEYS = new Set(['KeyJ', 'KeyX', 'KeyK', 'KeyF', 'Enter']);
+const SPECIAL_ACTIONS = ['special1', 'special2', 'special3', 'special4', 'special5'];
 
 export function initInput() {
   window.addEventListener('keydown', e => {
     if (e.repeat) return;
     held.add(e.code);
-    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+    const kb = getKeybinds();
+    if (kb.jump.includes(e.code)) {
       _jumpJustPressed = true;
     }
     if (e.code === 'Escape') {
       _escJustPressed = true;
     }
-    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+    if (kb.dash.includes(e.code)) {
       _dashJustPressed = true;
     }
-    const si = SPECIAL_CODES.indexOf(e.code);
-    if (si !== -1) _specials[si] = true;
+    for (let i = 0; i < SPECIAL_ACTIONS.length; i++) {
+      if (kb[SPECIAL_ACTIONS[i]].includes(e.code)) _specials[i] = true;
+    }
   });
   window.addEventListener('keyup', e => {
     held.delete(e.code);
@@ -34,11 +36,15 @@ export function initInput() {
 }
 
 export function isLeft() {
-  return held.has('ArrowLeft') || held.has('KeyA');
+  const codes = getKeybinds().moveLeft;
+  for (const c of codes) if (held.has(c)) return true;
+  return false;
 }
 
 export function isRight() {
-  return held.has('ArrowRight') || held.has('KeyD');
+  const codes = getKeybinds().moveRight;
+  for (const c of codes) if (held.has(c)) return true;
+  return false;
 }
 
 export function consumeJump() {
@@ -57,7 +63,7 @@ export function consumeEsc() {
 // mouse fires repeatedly at the weapon's rate.
 export function isAttack() {
   if (_mouseDown) return true;
-  for (const k of ATTACK_KEYS) if (held.has(k)) return true;
+  for (const k of getKeybinds().attack) if (held.has(k)) return true;
   return false;
 }
 
@@ -69,7 +75,9 @@ export function consumeSpecial(idx) {
 }
 
 export function isDown() {
-  return held.has('ArrowDown') || held.has('KeyS');
+  const codes = getKeybinds().slide;
+  for (const c of codes) if (held.has(c)) return true;
+  return false;
 }
 
 export function consumeDash() {
