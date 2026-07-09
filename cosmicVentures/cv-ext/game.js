@@ -651,7 +651,7 @@ function gameTick() {
       const buyBtn = document.getElementById('buy-btn-'+i);
       if(buyBtn) {
         const s = cachedBuyState[i];
-        buyBtn.className = 'buy-biz-btn ' + (s.canAffordAny ? 'can-afford' : 'no-afford');
+        buyBtn.className = 'buy-biz-btn ' + (s.canAffordRequested ? 'can-afford' : 'no-afford');
         buyBtn.textContent = s.label;
       }
       const mgrBtn = document.getElementById('mgr-btn-'+i);
@@ -811,7 +811,7 @@ function renderBusinesses() {
         ) : ''}
       </div>
       <div class="biz-footer">
-        <button id="buy-btn-${i}" class="buy-biz-btn ${canAffordAny ? 'can-afford' : 'no-afford'}" data-action="buy" data-idx="${i}">${buyLabel}</button>
+        <button id="buy-btn-${i}" class="buy-biz-btn ${canAffordRequested ? 'can-afford' : 'no-afford'}" data-action="buy" data-idx="${i}">${buyLabel}</button>
         ${!hasManager
           ? `<button id="mgr-btn-${i}" class="manager-buy-btn ${canAffordManager ? 'affordable' : ''}" data-action="mgr" data-idx="${i}">🤖 ${fmt(MANAGER_COSTS[i])}</button>`
           : `<span style="color:var(--green);font-size:0.75rem">🤖 Manager active</span>`}

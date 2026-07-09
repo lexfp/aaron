@@ -6,131 +6,354 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rivius</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body {
+        :root {
+            --bg-0: #050308;
+            --bg-1: #0c0a16;
+            --ink: #f2eef7;
+            --dim: #8b84a3;
+            --pink: #ff2e88;
+            --cyan: #21e6ff;
+            --amber: #ffb703;
+            --violet: #9d4dff;
+            --mint: #35e6a0;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
             margin: 0;
             padding: 0;
-            background: radial-gradient(circle at center, #1a1a2e, #0f0f1a);
-            color: #fff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        body {
+            background:
+                radial-gradient(ellipse 120% 80% at 50% -10%, #1b1330 0%, transparent 55%),
+                radial-gradient(ellipse 100% 60% at 50% 110%, #130b22 0%, transparent 60%),
+                var(--bg-0);
+            color: var(--ink);
+            font-family: 'Space Mono', monospace;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            overflow-x: hidden;
+            position: relative;
         }
 
-        h1 {
-            font-size: 4rem;
-            margin-bottom: 3rem;
-            text-transform: uppercase;
-            letter-spacing: 5px;
-            background: linear-gradient(90deg, #ff4444, #ff8800, #ffaa00);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            text-shadow: 0 5px 15px rgba(255, 68, 68, 0.3);
+        /* film grain */
+        .noise {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.05;
+            mix-blend-mode: overlay;
+            z-index: 3;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
         }
 
-        .container {
+        /* scanlines */
+        .scanlines {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 4;
+            background: repeating-linear-gradient(
+                to bottom,
+                rgba(0, 0, 0, 0) 0px,
+                rgba(0, 0, 0, 0.16) 1px,
+                rgba(0, 0, 0, 0) 3px
+            );
+            animation: scanDrift 9s linear infinite;
+        }
+
+        @keyframes scanDrift {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 120px; }
+        }
+
+        .vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 2;
+            box-shadow: inset 0 0 18vw 2vw rgba(0, 0, 0, 0.85);
+        }
+
+        main.arcade {
+            position: relative;
+            z-index: 5;
+            width: min(920px, 92vw);
+            padding: clamp(28px, 5vw, 56px) clamp(20px, 5vw, 48px) 40px;
+            margin: 48px 0;
+        }
+
+        /* ── marquee header ───────────────────────────────────────── */
+        .marquee {
+            text-align: center;
+            margin-bottom: clamp(36px, 6vw, 56px);
+        }
+
+        .bulbs {
             display: flex;
-            flex-direction: column;
+            justify-content: center;
+            gap: 14px;
+            margin-bottom: 22px;
+        }
+
+        .bulbs span {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--amber);
+            box-shadow: 0 0 6px 2px rgba(255, 183, 3, 0.7);
+            animation: bulbPulse 2.4s ease-in-out infinite;
+        }
+
+        .bulbs span:nth-child(3n+1) { background: var(--pink); box-shadow: 0 0 6px 2px rgba(255, 46, 136, 0.7); animation-delay: 0s; }
+        .bulbs span:nth-child(3n+2) { background: var(--cyan); box-shadow: 0 0 6px 2px rgba(33, 230, 255, 0.7); animation-delay: 0.4s; }
+        .bulbs span:nth-child(3n)   { background: var(--amber); animation-delay: 0.8s; }
+
+        @keyframes bulbPulse {
+            0%, 100% { opacity: 0.35; transform: scale(0.85); }
+            50% { opacity: 1; transform: scale(1); }
+        }
+
+        h1.brand {
+            font-family: 'Press Start 2P', monospace;
+            font-size: clamp(2.1rem, 7vw, 3.6rem);
+            margin: 0;
+            letter-spacing: 4px;
+            line-height: 1.3;
+            color: var(--ink);
+            text-shadow:
+                0 0 6px rgba(255, 255, 255, 0.35),
+                0 0 22px var(--pink),
+                0 0 46px rgba(157, 77, 255, 0.55);
+            animation: flicker 6s ease-in-out infinite;
+        }
+
+        @keyframes flicker {
+            0%, 92%, 100% { opacity: 1; }
+            93% { opacity: 0.7; }
+            94% { opacity: 1; }
+            95% { opacity: 0.55; }
+            96% { opacity: 1; }
+        }
+
+        .tagline {
+            margin: 14px 0 0;
+            font-size: 0.78rem;
+            letter-spacing: 6px;
+            color: var(--cyan);
+            text-shadow: 0 0 10px rgba(33, 230, 255, 0.6);
+        }
+
+        .insert-coin {
+            margin: 22px 0 0;
+            font-size: 0.7rem;
+            letter-spacing: 3px;
+            color: var(--dim);
+            animation: blink 1.6s steps(1) infinite;
+        }
+
+        @keyframes blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0.15; }
+        }
+
+        /* ── cartridge grid ───────────────────────────────────────── */
+        .cartridges {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
             gap: 20px;
         }
 
-        .game-link {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 350px;
-            padding: 20px;
-            text-decoration: none;
-            font-size: 1.8rem;
-            font-weight: bold;
-            background: rgba(255, 255, 255, 0.03);
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        .cart {
+            --accent: var(--pink);
             position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 20px 22px 22px;
+            text-decoration: none;
+            color: var(--ink);
+            background: linear-gradient(155deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 4px;
+            clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
+            transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.28s ease, border-color 0.28s ease;
             overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
         }
 
-        .game-link::before {
+        .cart::before {
             content: '';
             position: absolute;
-            top: 0;
-            left: -100%;
-            width: 50%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-            transition: left 0.5s ease;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: var(--accent);
+            box-shadow: 0 0 10px 1px var(--accent);
         }
 
-        .game-link:hover::before {
-            left: 150%;
+        .cart::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(120px 90px at 85% -10%, color-mix(in srgb, var(--accent) 35%, transparent), transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
 
-        .game-link:hover {
-            transform: translateY(-5px);
-            border-color: #ffaa00;
-            background: rgba(255, 170, 0, 0.05);
-            box-shadow: 0 10px 25px rgba(255, 170, 0, 0.2);
+        .cart:hover::after { opacity: 1; }
+
+        .cart:hover {
+            transform: translateY(-6px) scale(1.015);
+            border-color: color-mix(in srgb, var(--accent) 65%, rgba(255,255,255,0.2));
+            box-shadow: 0 16px 34px rgba(0, 0, 0, 0.6), 0 0 26px -6px var(--accent);
         }
 
-        .site-footer {
-            margin-top: 50px;
+        .cart-index {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.65rem;
+            color: var(--accent);
+            letter-spacing: 1px;
+        }
+
+        .cart-title {
+            font-family: 'Press Start 2P', monospace;
             font-size: 1rem;
-            color: rgba(255, 255, 255, 0.6);
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            line-height: 1.5;
+            letter-spacing: 1px;
         }
 
-        .site-footer a {
-            color: #ffaa00;
-            text-decoration: none;
-            font-weight: bold;
-            transition: all 0.3s ease;
+        .cart-desc {
+            font-size: 0.82rem;
+            color: var(--dim);
+            line-height: 1.5;
+        }
+
+        .cart-arrow {
+            margin-top: 6px;
+            font-size: 0.78rem;
+            color: var(--accent);
             display: flex;
             align-items: center;
             gap: 6px;
+            transition: gap 0.25s ease;
+        }
+
+        .cart:hover .cart-arrow { gap: 12px; }
+
+        .cart[data-hue="pink"]   { --accent: var(--pink); }
+        .cart[data-hue="cyan"]  { --accent: var(--cyan); }
+        .cart[data-hue="mint"]  { --accent: var(--mint); }
+        .cart[data-hue="violet"] { --accent: var(--violet); }
+        .cart[data-hue="amber"] { --accent: var(--amber); }
+
+        /* ── footer ────────────────────────────────────────────────── */
+        .site-footer {
+            margin-top: 44px;
+            text-align: center;
+            font-size: 0.78rem;
+            color: var(--dim);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .site-footer a {
+            color: var(--cyan);
+            text-decoration: none;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.25s ease, text-shadow 0.25s ease;
         }
 
         .site-footer a:hover {
-            color: #ff4444;
-            text-shadow: 0 0 10px rgba(255, 68, 68, 0.3);
+            color: var(--pink);
+            text-shadow: 0 0 10px rgba(255, 46, 136, 0.6);
         }
 
         .github-icon {
-            width: 20px;
-            height: 20px;
+            width: 16px;
+            height: 16px;
             fill: currentColor;
+        }
+
+        @media (max-width: 480px) {
+            .bulbs { display: none; }
         }
     </style>
 </head>
 
 <body>
-    <h1>Games</h1>
-    <div class="container">
-        <a class="game-link" href="cosmicVentures/cosmic-ventures%20(1).html">Cosmic Ventures</a>
-        <a class="game-link" href="war_zone/war_zone.html">War Zone</a>
-        <a class="game-link" href="dog_clicker/stitch_assets/main_game.html">Dog Clicker</a>
-        <a class="game-link" href="tic-tac-toe-bot/index.html">Tic-Tac-Toe</a>
-        <a class="game-link" href="platformer/platformer.html">Platformer</a>
-    </div>
+    <div class="noise"></div>
+    <div class="scanlines"></div>
+    <div class="vignette"></div>
 
-    <footer class="site-footer">
-        Created by Aaron |
-        <a href="https://github.com/lexfp/aaron" target="_blank" rel="noopener noreferrer">
-            <svg class="github-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path
-                    d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
-            </svg>
-            GitHub
-        </a>
-    </footer>
+    <main class="arcade">
+        <div class="marquee">
+            <div class="bulbs">
+                <span></span><span></span><span></span><span></span><span></span>
+                <span></span><span></span><span></span><span></span>
+            </div>
+            <h1 class="brand">RIVIUS</h1>
+            <p class="tagline">ARCADE</p>
+            <p class="insert-coin">// SELECT A CARTRIDGE //</p>
+        </div>
+
+        <div class="cartridges">
+            <a class="cart" data-hue="violet" href="cosmicVentures/cosmic-ventures%20(1).html">
+                <span class="cart-index">01</span>
+                <span class="cart-title">Cosmic<br>Ventures</span>
+                <span class="cart-desc">Idle space-trading sim across the stars.</span>
+                <span class="cart-arrow">PLAY &rsaquo;&rsaquo;</span>
+            </a>
+            <a class="cart" data-hue="pink" href="war_zone/war_zone.html">
+                <span class="cart-index">02</span>
+                <span class="cart-title">War<br>Zone</span>
+                <span class="cart-desc">3D tactical shooter, three maps, three modes.</span>
+                <span class="cart-arrow">PLAY &rsaquo;&rsaquo;</span>
+            </a>
+            <a class="cart" data-hue="mint" href="dog_clicker/stitch_assets/main_game.html">
+                <span class="cart-index">03</span>
+                <span class="cart-title">Dog<br>Clicker</span>
+                <span class="cart-desc">A very good boy, one click at a time.</span>
+                <span class="cart-arrow">PLAY &rsaquo;&rsaquo;</span>
+            </a>
+            <a class="cart" data-hue="cyan" href="tic-tac-toe-bot/index.html">
+                <span class="cart-index">04</span>
+                <span class="cart-title">Tic-Tac-<br>Toe</span>
+                <span class="cart-desc">An unbeatable minimax bot awaits.</span>
+                <span class="cart-arrow">PLAY &rsaquo;&rsaquo;</span>
+            </a>
+            <a class="cart" data-hue="amber" href="platformer/platformer.html">
+                <span class="cart-index">05</span>
+                <span class="cart-title">Platformer</span>
+                <span class="cart-desc">10 worlds, 500 hand-composed levels.</span>
+                <span class="cart-arrow">PLAY &rsaquo;&rsaquo;</span>
+            </a>
+        </div>
+
+        <footer class="site-footer">
+            Created by Aaron
+            <a href="https://github.com/lexfp/aaron" target="_blank" rel="noopener noreferrer">
+                <svg class="github-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                        d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+                </svg>
+                GitHub
+            </a>
+        </footer>
+    </main>
 </body>
 
 </html>
