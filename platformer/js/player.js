@@ -579,6 +579,15 @@ function drawWeaponSwing(ctx, hw, hh, weapon, prog, limbColor) {
   const reach = weapon.reach || 26;
   const arm = limbColor || '#f0a070';
 
+  // Upgrade levels make the weapon visibly bigger and give it a colored glow —
+  // a single uniform scale + shadow keeps every weapon's art in sync with its level.
+  const level = weapon.level || 0;
+  if (level > 0) {
+    ctx.scale(1 + level * 0.15, 1 + level * 0.15);
+    ctx.shadowColor = weapon.color;
+    ctx.shadowBlur = 3 + level * 4;
+  }
+
   if (weapon.type === 'ranged') {
     switch (key) {
       case 'blaster': {

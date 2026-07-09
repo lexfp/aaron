@@ -363,23 +363,32 @@ function damageEnemy(e, dmg, knockDir, knock, player, weapon) {
     else if (e.patrolMax > e.patrolMin) e.x = Math.max(e.patrolMin, Math.min(e.patrolMax, e.x + dx));
   }
 
-  // Apply on-hit weapon effects
+  // Apply on-hit weapon effects — upgrade level scales their potency
+  // (duration, chain radius/jumps, heal amount), not just raw damage.
   if (weapon && weapon.effect) {
+    const level = weapon.level || 0;
     if (weapon.effect === 'burn') {
-      e._burn = { t: 2.5, dps: weapon.damage * 0.5 };
+      e._burn = { t: 2.5 + level * 0.5, dps: weapon.damage * 0.5 };
     } else if (weapon.effect === 'freeze') {
-      e._freeze = 1.5;
+      e._freeze = 1.5 + level * 0.35;
     } else if (weapon.effect === 'chain') {
-      // Deal chain damage to the nearest other alive enemy within 140px
-      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
-      let nearest = null, nearDist = Infinity;
-      for (const other of enemies) {
-        if (!other.alive || other === e) continue;
-        const ocx = other.x + other.w / 2, ocy = other.y + other.h / 2;
-        const d = Math.hypot(ocx - ecx, ocy - ecy);
-        if (d < 140 && d < nearDist) { nearest = other; nearDist = d; }
-      }
-      if (nearest) {
+      // Hop chain damage through the nearest unhit enemies in range. Upgrades
+      // widen the hop radius and add extra hops (a longer lightning chain).
+      const chainRadius = 140 + level * 25;
+      const maxJumps = 1 + level;
+      const hit = new Set([e]);
+      let source = e;
+      for (let jump = 0; jump < maxJumps; jump++) {
+        const scx = source.x + source.w / 2, scy = source.y + source.h / 2;
+        let nearest = null, nearDist = Infinity;
+        for (const other of enemies) {
+          if (!other.alive || hit.has(other)) continue;
+          const ocx = other.x + other.w / 2, ocy = other.y + other.h / 2;
+          const d = Math.hypot(ocx - scx, ocy - scy);
+          if (d < chainRadius && d < nearDist) { nearest = other; nearDist = d; }
+        }
+        if (!nearest) break;
+        hit.add(nearest);
         const chainDmg = Math.max(1, Math.floor(weapon.damage * 0.5));
         nearest.hp -= chainDmg;
         nearest.hitFlash = 0.13;
@@ -389,9 +398,10 @@ function damageEnemy(e, dmg, knockDir, knock, player, weapon) {
         } else {
           addHitParticles(ncx, ncy, '#c8aaff', 4);
         }
+        source = nearest;
       }
     } else if (weapon.effect === 'lifesteal' && player) {
-      const heal = Math.min(2, weapon.damage);
+      const heal = Math.min(2 + level * 1.5, weapon.damage);
       player.hp += heal;
       player.hp = Math.min(player.maxHp, player.hp);
     }
@@ -441,6 +451,7 @@ export function spawnProjectile(player, weapon, charged) {
   const dir = player.facing;
   const dmg = charged ? Math.ceil(weapon.damage * 2) : weapon.damage;
   const knock = charged ? weapon.knockback * 1.6 : weapon.knockback;
+  const level = weapon.level || 0;
   projectiles.push({
     x: player.x + player.w / 2 + dir * 16,
     y: player.y + player.h * 0.4,
@@ -451,7 +462,7 @@ export function spawnProjectile(player, weapon, charged) {
     splash: weapon.splash || 0,
     knock: knock || 200,
     color: weapon.color,
-    r: weapon.splash ? 6 : 4,
+    r: (weapon.splash ? 6 : 4) + level * 1.2, // bigger, more visible bolt at higher levels
     life: 2.4, dir,
     effect: weapon.effect || null,
     weapon,

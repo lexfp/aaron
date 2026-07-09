@@ -743,9 +743,10 @@ describe('Edge Case 6 — lifesteal capped at player.maxHp', () => {
     src = readSrc('entities.js');
   });
 
-  test('lifesteal adds min(2, weapon.damage) to player.hp', () => {
-    // Math.min(2, weapon.damage)
-    expect(/Math\.min\s*\(\s*2\s*,[\s\S]{0,20}damage/.test(src)).toBe(true);
+  test('lifesteal adds min(2 + level-scaled bonus, weapon.damage) to player.hp', () => {
+    // Math.min(2 + level * <mul>, weapon.damage) — base heal of 2, scaled by
+    // upgrade level, still capped at the weapon's own damage.
+    expect(/Math\.min\s*\(\s*2\s*(?:\+[\s\S]{0,20})?,[\s\S]{0,20}damage/.test(src)).toBe(true);
   });
 
   test('player.hp is capped at player.maxHp after lifesteal', () => {

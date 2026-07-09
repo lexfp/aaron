@@ -227,7 +227,7 @@ export function equipWeapon(key) {
 export function getEquippedWeapon() {
   const base = WEAPON_MAP[playerData.equippedWeapon] || WEAPON_MAP.fists;
   const level = (playerData.weaponLevels && playerData.weaponLevels[base.key]) || 0;
-  if (level === 0) return base;
+  if (level === 0) return { ...base, level: 0 };
   // Build an upgraded copy — do NOT mutate WEAPON_DEFS.
   // Each upgrade level multiplies damage by 1.25 (rounded, min 1 above base).
   let dmg = base.damage;
@@ -236,8 +236,25 @@ export function getEquippedWeapon() {
   // Each upgrade level multiplies cooldown by 0.9.
   let cd = base.cooldown;
   for (let i = 0; i < level; i++) cd *= 0.9;
+  // Range grows with level too: melee reach +12%/level, ranged projectile
+  // speed +10%/level, splash radius +18%/level (only for weapons that have it).
+  const scaledReach = base.reach ? Math.round(base.reach * (1 + level * 0.12)) : base.reach;
+  const scaledSpeed = base.speed ? Math.round(base.speed * (1 + level * 0.10)) : base.speed;
+  const scaledSplash = base.splash ? Math.round(base.splash * (1 + level * 0.18)) : base.splash;
+  const scaledKnockback = Math.round(base.knockback * (1 + level * 0.08));
   // Return a new object with upgraded fields — WEAPON_DEFS entries are never touched.
-  return { ...base, damage: scaledDamage, cooldown: cd };
+  // `level` is carried along so the renderer can scale the weapon's visual size/glow
+  // and on-hit effects (burn/freeze/chain/lifesteal) can scale their potency.
+  return {
+    ...base,
+    damage: scaledDamage,
+    cooldown: cd,
+    reach: scaledReach,
+    speed: scaledSpeed,
+    splash: scaledSplash,
+    knockback: scaledKnockback,
+    level,
+  };
 }
 
 // Returns the coin cost for the next upgrade level of the given weapon key,

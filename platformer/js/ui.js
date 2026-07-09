@@ -146,7 +146,8 @@ export function updateHUD(stageIdx, levelIdx, coinsThisLevel, totalCoins, lives,
   if (el('hud-hp-text')) el('hud-hp-text').textContent = `${Math.ceil(hp)}/${maxHp}`;
   if (el('hud-weapon')) {
     const w = getEquippedWeapon();
-    el('hud-weapon').textContent = `${w.icon} ${w.label}`;
+    const stars = w.level > 0 ? ` ${'★'.repeat(w.level)}` : '';
+    el('hud-weapon').textContent = `${w.icon} ${w.label}${stars}`;
   }
 }
 
