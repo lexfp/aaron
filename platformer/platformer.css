@@ -471,7 +471,8 @@ a:focus-visible {
    scroll, so these scroll from the top instead — nothing is cut off. */
 #shop-overlay,
 #stage-select,
-#level-select {
+#level-select,
+#keybinds-menu {
   justify-content: flex-start;
   overflow-y: auto;
   overflow-x: hidden;
@@ -481,7 +482,8 @@ a:focus-visible {
 /* Keep the inner column padded away from the very top/bottom edges while scrolled. */
 #shop-overlay .screen-inner,
 #stage-select .screen-inner,
-#level-select .screen-inner {
+#level-select .screen-inner,
+#keybinds-menu .screen-inner {
   padding-block: 32px;
   margin: auto 0;
 }
@@ -1061,6 +1063,73 @@ a:focus-visible {
 .ls-level.done::after {
   content: ' ✓';
   font-size: 9px;
+}
+
+/* ===== KEYBINDS MENU ===== */
+
+#keybinds-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.kb-label {
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+}
+
+.kb-keys {
+  color: var(--text-dim);
+  font-size: 13px;
+  flex: 1;
+  text-align: center;
+}
+
+.kb-rebind-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition);
+}
+
+.kb-rebind-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.kb-rebind-btn.capturing {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.kb-conflict {
+  min-height: 18px;
+  color: var(--red);
+  font-size: 13px;
+  text-align: center;
+  margin-top: 10px;
+}
+
+.kb-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
 }
 
 /* ===== PAUSE MENU ===== */

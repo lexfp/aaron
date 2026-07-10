@@ -32,6 +32,7 @@
         <button id="btn-play" class="menu-btn">▶ Play</button>
         <button id="btn-stage-select" class="menu-btn">🗺 Stage Select</button>
         <button id="btn-shop" class="menu-btn">🛍 Shop</button>
+        <button id="btn-keybinds" class="menu-btn">⌨ Keybinds</button>
         <button id="btn-reset" class="menu-btn">↺ New Game</button>
       </div>
 
@@ -45,6 +46,21 @@
       </div>
 
       <div class="menu-tip">Arrow keys / WASD to move · Space to jump (twice for double jump!) · Shift to dash · Down/S while running to slide · J / X / click to attack · Q E R T G for specials · ESC to pause</div>
+    </div>
+  </div>
+
+  <!-- KEYBINDS MENU -->
+  <div id="keybinds-menu" class="screen">
+    <div class="screen-inner">
+      <div class="screen-header">
+        <button id="btn-kb-back" class="back-btn">← Back</button>
+        <div class="ss-title">Keybinds</div>
+      </div>
+      <div id="keybinds-list"></div>
+      <div id="kb-conflict-msg" class="kb-conflict"></div>
+      <div class="kb-actions">
+        <button id="btn-kb-reset" class="back-btn">↺ Reset to Defaults</button>
+      </div>
     </div>
   </div>
 
@@ -103,6 +119,7 @@
     <div class="pause-box">
       <div class="pause-title">PAUSED</div>
       <button id="btn-resume" class="pause-btn primary">▶ Resume</button>
+      <button id="btn-pause-keybinds" class="pause-btn">⌨ Keybinds</button>
       <button id="btn-pause-menu" class="pause-btn">⌂ Main Menu</button>
     </div>
   </div>
