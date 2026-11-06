@@ -270,7 +270,7 @@ Identical state machine to Rivshield:
 
   A failed static-load = same outcome class as a failed AWS deploy: log, `continue` to next slug, no `ci: merge` retained on `platformer-specs`.
 
-- C.5 doc-update agent (optional) — updates `CLAUDE.md`'s `## Recent Features (platformer)` section.
+- C.5 doc-update agent (optional) — updates `docs/platformer.md` (the platformer reference; `CLAUDE.md` holds rules only).
 
 ### 5.6 Phase E — scenario drive (gating)
 
