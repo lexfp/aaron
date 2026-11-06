@@ -439,7 +439,7 @@ A failed static-load = same outcome class as a failed Rivshield deploy: log, `co
 
 ### C.5 — Doc-update (soft)
 
-Spawn doc-update agent. Updates `aaron/CLAUDE.md`'s `### platformer/` section if a feature merits mention. Soft fail -> warning only.
+Spawn doc-update agent. Updates `aaron/docs/platformer.md` (the platformer reference; `CLAUDE.md` holds rules only) if a feature merits mention. Soft fail -> warning only.
 
 ---
 
